@@ -1,0 +1,16 @@
+{
+  "base": "8d925e9df32d8755f22bd2635e400a6b3e93f69c",
+  "head": "d9a1e9449d2c49ab5c376685cc18af3ba5f4ca24",
+  "platforms": [],
+  "policy": "review-ci-v2.2-no-sonar",
+  "pr": 3601,
+  "repository": "storytold/filmcraft",
+  "source_tree": "03f4d711545a246bdc5cabfa4b476fe62cdb5438",
+  "workflows": {
+    ".github/workflows/ci.yml": "aff715f720edea9110ef43939b27cf82b8d654b48b7b06b6c0904f6ba259c94e",
+    ".github/workflows/freebsd.yml": "e0ff852b8890fde940c314f08dda223947fb2807e954f2023e6b1127c94f15c7",
+    ".github/workflows/nix.yml": "273377b74e5e6d0561ac706e5f05eeae68f24c9381993c2ed9fae164700e8fbb",
+    ".github/workflows/packaging-lint.yml": "222d556ca2a171c19559912936887432d370c619baafeeb8acdce1e288e201a3",
+    ".github/workflows/windows-arm64.yml": "9e254edb35f1d6daa9135982024d2733ebc32175f0c85d5b601ea61d2649b398"
+  }
+}
