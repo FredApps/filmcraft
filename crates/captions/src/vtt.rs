@@ -211,4 +211,33 @@ mod tests {
         // ...and the parser must decode it back: the text used to come back as `A --&gt; B`
         assert_eq!(parse(&w).unwrap().cues, doc.cues);
     }
+
+    // Cue text is stored as rendered text: a bare `-->` cannot appear in cue text, so the
+    // writer escapes it as `--&gt;` and the parser decodes it back (which also normalizes an
+    // externally stored `--&gt;` to the bare arrow; both render the same). Any other entity
+    // (e.g. `&amp;`) is author markup and is preserved byte-for-byte.
+    #[test]
+    fn stored_arrow_entity_decodes_to_bare_arrow() {
+        let d = parse("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nA --&gt; B\n").unwrap();
+        assert_eq!(d.cues[0].text, "A --> B");
+    }
+
+    #[test]
+    fn other_entities_are_preserved_verbatim() {
+        let d = parse("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nTom &amp; Jerry &gt; all\n").unwrap();
+        assert_eq!(d.cues[0].text, "Tom &amp; Jerry &gt; all");
+    }
+
+    #[test]
+    fn arrow_spellings_converge_on_write_parse_loop() {
+        for (source, first) in
+            [("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nA --> B\n", "A --> B"), ("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nA --&gt; B\n", "A --> B")]
+        {
+            let once = parse(source).unwrap();
+            assert_eq!(once.cues[0].text, first);
+            let twice = parse(&write(&once)).unwrap();
+            assert_eq!(twice.cues, once.cues);
+            assert_eq!(parse(&write(&twice)).unwrap().cues, once.cues);
+        }
+    }
 }
