@@ -8,6 +8,11 @@
 //! and does so again whenever it reconfigures the surface (a resize), so [`tag_windows_srgb`]
 //! is called every frame and only acts on a layer that has none.
 //!
+//! This is an SDR choice. Settings ▸ Color ▸ Extended Dynamic Range Monitoring
+//! (`color.extendedDynamicRange`) is not wired yet; when it is, an EDR surface needs an extended
+//! colour space (and `wantsExtendedDynamicRangeContent`) on the layer instead, so this call has to
+//! skip those layers or tag them differently, or it will clamp them back to SDR sRGB.
+//!
 //! The one non-media OS call in this crate after `cursor`: `crates/platform` is the only crate
 //! allowed `unsafe` (AGENTS.md §0.3, ADR 0001), and walking a layer's sublayers is an `unsafe`
 //! binding.
