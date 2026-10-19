@@ -253,6 +253,30 @@ fn h264_with_its_parameter_sets_in_the_header() {
     check_h26x_frames("H.264 global header", &path, &src);
 }
 
+/// A header whose parameter sets don't decode (here an SPS cut short) on a stream that carries
+/// good ones in band: the file still opens and plays from the in-band sets, as it did when the
+/// header's were ignored.
+#[test]
+fn h264_with_a_damaged_header_set_uses_its_in_band_sets() {
+    let video = ["-c:v", "libx264", "-bf", "2", "-g", "12", "-pix_fmt", "yuv420p"];
+    let Some((path, _)) = avi("avi_h264_in_band.avi", &video, &["-c:a", "pcm_s16le"]) else { return };
+    let mut bytes = std::fs::read(&path).unwrap();
+    // the bad sets go after the bitmap header, in bytes taken from the reserve chunk that follows
+    let le32 = |b: &[u8], at: usize| u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]);
+    let strf = bytes.windows(4).position(|w| w == b"strf").unwrap();
+    let size = le32(&bytes, strf + 4);
+    let junk = strf + 8 + size as usize;
+    assert_eq!(&bytes[junk..junk + 4], b"JUNK");
+    let reserve = le32(&bytes, junk + 4);
+    let bad = [0, 0, 0, 1, 0x67, 0x64];
+    bytes[strf + 4..strf + 8].copy_from_slice(&(size + bad.len() as u32).to_le_bytes());
+    bytes[junk..junk + bad.len()].copy_from_slice(&bad);
+    bytes[junk + bad.len()..junk + bad.len() + 4].copy_from_slice(b"JUNK");
+    bytes[junk + bad.len() + 4..junk + bad.len() + 8].copy_from_slice(&(reserve - bad.len() as u32).to_le_bytes());
+    let src = crate::open_bytes("damaged_header.avi", bytes.into()).unwrap();
+    check_h26x_frames("H.264 damaged header sets", &path, &src);
+}
+
 /// H.264 copied from an MP4 as it is: an `avcC` record in the header and length-prefixed chunks,
 /// with B-frames.
 #[test]
