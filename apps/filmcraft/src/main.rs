@@ -353,19 +353,19 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
 #[cfg(target_os = "macos")]
 fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops> {
     use filmcraft_platform::file_promise::DropId;
+    use std::collections::HashMap;
     use std::sync::{Mutex, PoisonError};
-    /// Drops still waiting for their files, oldest first. A drop whose promises never land leaves
-    /// its entry behind, so this is capped rather than cleared: the newest few are all that can
-    /// still be waiting, and an unknown id simply imports without a position.
-    const REMEMBERED_DROPS: usize = 16;
 
     let shared = filmcraft_ui_egui::PromisedDrops::default();
     let destination = Arc::clone(&shared.destination);
     let arrived = Arc::clone(&shared.arrived);
     let lost = Arc::clone(&shared.lost);
-    // Where each taken drop landed, read as it happens: its files can take minutes to arrive.
-    let positions: Arc<Mutex<Vec<(DropId, Option<egui::Pos2>)>>> = Arc::new(Mutex::new(Vec::new()));
+    // Where each drop still waiting for its files landed, read as it happens: they can take
+    // minutes to arrive, however many drags are in flight, and the entry goes when the drop is
+    // over either way. Only a promise that neither lands nor fails leaves one behind.
+    let positions: Arc<Mutex<HashMap<DropId, Option<egui::Pos2>>>> = Arc::new(Mutex::new(HashMap::new()));
     let dropped_at = Arc::clone(&positions);
+    let failed_at = Arc::clone(&positions);
     let dropped_ctx = ctx.clone();
     let failed_ctx = ctx.clone();
     let installed = filmcraft_platform::file_promise::install(filmcraft_platform::file_promise::Handlers {
@@ -384,14 +384,10 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
             let at = at
                 .map(|(x, y)| egui::pos2(x as f32 / zoom, y as f32 / zoom))
                 .or_else(|| dropped_ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos())));
-            let mut positions = dropped_at.lock().unwrap_or_else(PoisonError::into_inner);
-            if positions.len() >= REMEMBERED_DROPS {
-                positions.remove(0);
-            }
-            positions.push((id, at));
+            dropped_at.lock().unwrap_or_else(PoisonError::into_inner).insert(id, at);
         }),
         received: Box::new(move |id, files| {
-            let at = positions.lock().unwrap_or_else(PoisonError::into_inner).iter().rev().find(|(d, _)| *d == id).and_then(|(_, at)| *at);
+            let at = positions.lock().unwrap_or_else(PoisonError::into_inner).remove(&id).flatten();
             arrived
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -399,7 +395,8 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
             // The files arrive between frames: without this the import waits for the next one.
             ctx.request_repaint();
         }),
-        failed: Box::new(move |_, files, reason| {
+        failed: Box::new(move |id, files, reason| {
+            failed_at.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
             lost.lock().unwrap_or_else(PoisonError::into_inner).push(filmcraft_ui_egui::PromiseLost { files, reason });
             failed_ctx.request_repaint();
         }),
