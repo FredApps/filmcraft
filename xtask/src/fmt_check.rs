@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::process::Command;
 
+// Bound metadata parsing so a malformed or unexpectedly huge Cargo response cannot amplify memory use.
 const MAX_PACKAGES: usize = 4096;
 const MAX_ID_BYTES: usize = 16384;
 const MAX_NAME_BYTES: usize = 1024;
