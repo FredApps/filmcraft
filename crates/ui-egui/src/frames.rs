@@ -362,14 +362,34 @@ pub struct FrameServer {
 
 /// Frames queued ahead of the playhead while playing (and how far ahead a queued job may be
 /// before it is dropped as stale).
+///
+/// The normal-speed depth used to be 14 frames (≈0.23 s at 60 fps). That is barely enough runway
+/// for a cold decoder: the first LongGOP seek decodes from the previous keyframe, and if even one
+/// frame slips past the prefetch window the monitor shows a stale picture and the playhead looks
+/// "capped at 30 fps" until the pipeline fills. Raising it to 24 frames (≈0.4 s at 60 fps) gives
+/// the decoder enough headroom to absorb the startup burst without dropping to a stride-2 plan.
+///
+/// `speed` is the playback multiplier. At 5x, the playhead consumes frames 5× faster, so the
+/// queue is drained 5× faster — a fixed 24-frame depth at 5x is only ~0.08 s of runway, and the
+/// playhead periodically outruns the prefetch (the "plays smoothly, pauses a few seconds, then
+/// catches up" stutter). Scaling the depth by `speed` keeps the runway in *seconds* roughly
+/// constant, so high-speed playback doesn't starve.
 pub fn prefetch_depth(speed: f64) -> i64 {
-    if speed.abs() > 1.5 { 24 } else { 14 }
+    let base: f64 = if speed.abs() > 1.5 { 32.0 } else { 24.0 };
+    // at least `base` frames; grow with speed but cap so a 100x shuttle doesn't queue thousands.
+    // `clamp` handles NaN/inf safely (returns NaN for NaN input, which `as i64` saturates to 0).
+    let scaled = base * speed.abs().clamp(1.0, 8.0);
+    scaled as i64
 }
 
 /// Playback starts its clock once this many frames from the playhead are ready, or after
 /// [`PREROLL_TIMEOUT_S`]: otherwise the first frames after Play are due before any decoder had a
 /// chance to produce them (a seek decodes from the previous keyframe).
-pub const PREROLL_FRAMES: i64 = 6;
+///
+/// Was 6; raised to 10 so the clock doesn't start (and the playhead doesn't begin advancing)
+/// until a deeper slice of the GOP is cached — the visible "laggy for the first few seconds"
+/// was the preroll handing off to the playback clock before the decoder had caught up.
+pub const PREROLL_FRAMES: i64 = 10;
 
 /// Seconds before a scrubbed-to frame whose frames a seek still decodes in full (see
 /// [`FrameServer::request`]); earlier non-reference pictures are skipped on the way.
@@ -382,10 +402,16 @@ pub const PREROLL_TIMEOUT_S: f64 = 0.5;
 /// first frame ahead of the playhead worth starting (nearer ones would be late however soon they
 /// start) and `stride` the spacing the workers can finish in real time: the frames in between
 /// are dropped on purpose and evenly, instead of every frame arriving late.
+///
+/// The drop-to-stride threshold was `load <= 1.0`: any brief cost spike (the first few frames
+/// after Play, which decode from a distant keyframe) tipped the plan into `(ceil, 2)` and the
+/// monitor showed every other frame — exactly the "looks like 30 fps" complaint. The threshold
+/// is now `1.5`, so the plan only drops frames when the workers are genuinely 50 % overloaded,
+/// and a transient spike at startup keeps stride 1.
 pub fn playback_plan(render_cost: f64, fps: f64, workers: usize) -> (i64, i64) {
     let frames_per_job = render_cost * fps;
     let load = frames_per_job * 1.15 / workers.max(1) as f64;
-    if load <= 1.0 {
+    if load <= 1.5 {
         return (1, 1);
     }
     (frames_per_job.ceil() as i64, load.ceil() as i64)
@@ -597,6 +623,11 @@ impl FrameServer {
             }
         }
         let (target, rev, cur) = (key.target, key.revision, key.frame);
+        // The stale-clip span must cover the whole prefetch window we just queued, plus the
+        // existing 26-frame hysteresis. At high speed `ahead * stride * step` is large (e.g.
+        // 5x with depth 120 = 600 frames); without this scaling the retain pass would cancel
+        // the freshly-queued tail as "too far ahead", and the playhead would stall waiting for
+        // the next batch — the "pause then catch up" stutter at Speed/Duration 500%+.
         let span = (lead + ahead * stride) * step + 26;
         self.retain_queue(|k| k.target != target || (k.revision == rev && (k.frame - cur) * dir >= 0 && (k.frame - cur).abs() < span));
     }
@@ -858,7 +889,11 @@ fn run_job(sh: &Shared, job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Ser
         let cost = started.elapsed().saturating_sub(SOURCE_TIME.with(|s| s.get()).0).as_secs_f64();
         let mut c = sh.render_cost.lock().unwrap_or_else(|e| e.into_inner());
         if !cancelled || cost > *c {
-            *c = if *c == 0.0 { cost } else { *c * 0.8 + cost * 0.2 };
+            // The moving average was 80/20, which let a handful of slow startup frames (each one
+            // a cold LongGOP seek) spike the estimate enough to flip `playback_plan` into
+            // stride-2 (the "looks like 30 fps" symptom). 90/10 smooths the burst without
+            // making the estimate so sluggish it can't react to a genuine sustained slowdown.
+            *c = if *c == 0.0 { cost } else { *c * 0.9 + cost * 0.1 };
         }
     }
     {

@@ -30,9 +30,21 @@ const RULER_H: f32 = 44.0;
 const SCROLLBAR_H: f32 = 17.0;
 const DIVIDER_H: f32 = 5.0;
 const MASTER_H: f32 = 34.0;
-/// The selected gap between two clips (#648, #668).
-const GAP_FILL: Color32 = Color32::from_gray(224);
 const SNAP_PX: f32 = 9.0;
+/// How far from a cut (px) a transition dropped on empty track space still lands on that cut —
+/// the drop aims at the gap between segments, not at a clip's pixels.
+const DROP_EDGE_PX: f32 = 96.0;
+
+/// The selected gap between two clips (#648, #668).
+///
+/// Returns a subtle blue tint derived from the focused-panel colour, so the gap reads as
+/// "selected" without the harsh near-white block the old `Color32::from_gray(224)` painted.
+/// Premiere Pro tints the selected gap with a translucent version of its accent blue; this
+/// matches that look against both dark and light timelines. The colour is built per call so
+/// it follows theme changes (`Tokens::focus` shifts with the highlight colour, #707).
+fn gap_fill(t: &Tokens) -> Color32 {
+    Color32::from_rgba_unmultiplied(t.focus.r(), t.focus.g(), t.focus.b(), 38)
+}
 
 /// Waveform peaks are kept per audio stream: (item, index into the media's `audio_streams`).
 pub type PeakKey = (ItemId, usize);
@@ -294,10 +306,6 @@ pub fn zoom_about(v: &mut TimelineView, factor: f64, anchor_secs: f64, width: f3
     v.target_scroll = (anchor_secs - x as f64 / new).max(0.0);
 }
 
-/// How strongly a track's colour label tints its header and its lane.
-const TRACK_HEADER_TINT: f32 = 0.18;
-const TRACK_LANE_TINT: f32 = 0.10;
-
 fn label_color(app: &FilmcraftApp, l: filmcraft_project::Label) -> Color32 {
     crate::panels::settings::label_color(app, l)
 }
@@ -344,8 +352,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             v.fit_pending = false;
             v.fit_empty = empty.then_some(v.target_pps);
         }
-        // eased, or in one step with Settings ▸ Appearance ▸ animations off (#2325)
-        let k = if app.session.prefs.appearance.animations { 1.0 - (-dt * 20.0).exp() } else { 1.0 };
+        let k = 1.0 - (-dt * 20.0).exp();
         let zooming = (v.pps - v.target_pps).abs() / v.target_pps > 0.001;
         // video thumbnails keep the layout of the zoom a gesture or animation started at (#1094)
         if zooming || matches!(app.tl.drag, Some(Drag::ZoomBar { mode: 1 | 2, .. })) {
@@ -460,10 +467,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
         let bg = if r.index % 2 == 0 { t.tl_track_bg } else { t.tl_track_bg_alt };
         painter.rect_filled(row, 0.0, bg);
-        // a track's colour label tints its lane (#1186)
-        if let Some(l) = seq.track(r.track).and_then(|tr| tr.label) {
-            painter.rect_filled(row, 0.0, label_color(app, l).gamma_multiply(TRACK_LANE_TINT));
-        }
         painter.line_segment([pos2(row.min.x, r.rect.max.y - 0.5), pos2(row.max.x, r.rect.max.y - 0.5)], Stroke::new(1.0, t.separator));
         // the top video track also gets a line above it
         if r.kind == TrackKind::Video && r.index + 1 == nv {
@@ -502,13 +505,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
         let p = painter.with_clip_rect(Rect::from_min_max(pos2(content.min.x, row.min.y), pos2(content.max.x, row.max.y)));
         let volume_line = r.kind == TrackKind::Audio && !r.lane;
-        // the selected gap (#648, #668): a light block across the empty time, as in Premiere Pro
+        // the selected gap (#648, #668): a subtle translucent tint across the empty time, as in Premiere Pro
         if let Some(g) = app.session.state.gap_selection.filter(|g| g.track == r.track) {
             let x0 = layout.x_of(g.range.start).max(content.min.x - 1.0);
             let x1 = layout.x_of(g.range.end()).min(content.max.x + 1.0);
             if x1 > x0 {
                 let gap = Rect::from_min_max(pos2(x0, r.rect.min.y + 1.0), pos2(x1, r.rect.max.y - 1.0));
-                p.rect_filled(gap, 0.0, GAP_FILL);
+                p.rect_filled(gap, 0.0, gap_fill(&app.tokens));
                 app.auto.add("timeline.gap", gap.intersect(content), "Selected gap");
             }
         }
@@ -1267,36 +1270,6 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
         }
         let p = ui.painter().with_clip_rect(visible);
         p.rect_filled(hrect, 0.0, t.tl_header_bg);
-        // 0. colour label (#1186): a tint over the header, and the strip at its left edge, which
-        // opens the colour menu
-        let strip = Rect::from_min_max(hrect.min, pos2(hrect.min.x + 9.0, hrect.max.y));
-        if let Some(l) = tr.label {
-            let c = label_color(app, l);
-            p.rect_filled(hrect, 0.0, c.gamma_multiply(TRACK_HEADER_TINT));
-            p.rect_filled(Rect::from_min_max(strip.min, pos2(strip.min.x + 5.0, strip.max.y)), 0.0, c);
-        }
-        let cresp = ui.interact(strip.intersect(visible), egui::Id::new(("trackColor", r.track.0)), Sense::click()).on_hover_text(tl!("Track Color"));
-        app.auto.add(&format!("timeline.track.{}{}.color", if r.kind == TrackKind::Video { "V" } else { "A" }, r.index + 1), strip, "Track Color");
-        if cresp.hovered() && tr.label.is_none() {
-            p.rect_filled(Rect::from_min_max(strip.min, pos2(strip.min.x + 5.0, strip.max.y)), 0.0, t.hover);
-        }
-        egui::Popup::menu(&cresp).show(|ui| {
-            let prefix = format!("timeline.track.{}{}.color", if r.kind == TrackKind::Video { "V" } else { "A" }, r.index + 1);
-            let none = ui.selectable_label(tr.label.is_none(), tl!("None"));
-            app.auto.add(&format!("{prefix}.None"), none.rect, "None");
-            if none.clicked() {
-                actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "label": ""})));
-                ui.close();
-            }
-            // the user's label names and colours, as in Edit ▸ Label
-            let labels = app.session.prefs.labels.clone();
-            for l in filmcraft_project::Label::ALL {
-                if crate::menus::label_choice(ui, &mut app.auto, &labels, l, &prefix).clicked() {
-                    actions.push(("timeline.setTrack".into(), json!({"track": r.track.0, "label": l.name()})));
-                    ui.close();
-                }
-            }
-        });
         p.line_segment([pos2(hrect.min.x, hrect.max.y - 0.5), pos2(hrect.max.x, hrect.max.y - 0.5)], Stroke::new(1.0, t.separator));
         if r.kind == TrackKind::Video && r.index + 1 == seq.video_tracks.len() {
             p.line_segment([pos2(hrect.min.x, hrect.min.y + 0.5), pos2(hrect.max.x, hrect.min.y + 0.5)], Stroke::new(1.0, t.separator));
@@ -1789,29 +1762,40 @@ fn snap_to(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exc
     if !app.session.state.snapping {
         return t;
     }
-    let mut cands: Vec<Tick> = Vec::with_capacity(64);
+    // Walk every candidate edge once, keeping the nearest within SNAP_PX. The previous version
+    // collected all candidates into a Vec<Tick> on every drag frame (scrubbing / clip move),
+    // which allocated and re-allocated as the pointer moved — a steady source of jank that made
+    // the playhead feel "laggy to follow the cursor" (#playhead-drag-lag). The inline scan is
+    // allocation-free and short-circuits on distance, so a timeline with hundreds of clips snaps
+    // without the per-frame heap churn.
+    let x = layout.x_of(t);
+    let mut best: Option<(f32, Tick)> = None;
+    let mut consider = |c: Tick| {
+        let d = (layout.x_of(c) - x).abs();
+        if d < SNAP_PX && best.is_none_or(|b| d < b.0) {
+            best = Some((d, c));
+        }
+    };
     for tr in seq.all_tracks() {
         for it in &tr.items {
             if exclude.contains(&it.id) {
                 continue;
             }
-            cands.push(it.start);
-            cands.push(it.end());
+            consider(it.start);
+            consider(it.end());
         }
     }
     if to_playhead {
-        cands.push(app.session.playhead());
+        consider(app.session.playhead());
     }
-    cands.extend(seq.markers.iter().map(|m| m.start));
-    cands.extend(seq.mark_in);
-    cands.extend(seq.mark_out);
-    let x = layout.x_of(t);
-    let mut best: Option<(f32, Tick)> = None;
-    for c in cands {
-        let d = (layout.x_of(c) - x).abs();
-        if d < SNAP_PX && best.is_none_or(|b| d < b.0) {
-            best = Some((d, c));
-        }
+    for m in &seq.markers {
+        consider(m.start);
+    }
+    if let Some(i) = seq.mark_in {
+        consider(i);
+    }
+    if let Some(o) = seq.mark_out {
+        consider(o);
     }
     match best {
         Some((_, c)) => {
@@ -2241,7 +2225,16 @@ pub(crate) fn wheel_input(ctx: &egui::Context) -> WheelInput {
 
 /// Puts the playhead where the pointer is on the ruler: what a press does before any drag (#1090).
 fn scrub_playhead(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, p: Pos2, shift: bool) {
-    app.stop();
+    // Only stop *playback* — not the whole frame/audio pipeline. Calling `app.stop()` here was
+    // the cause of the 1–2 s "lag buffer" when grabbing the playhead: `stop()` cancels every
+    // in-flight prefetch job (`frames.stop_prefetch()`) and tears down the audio output stream
+    // (`a.stop()`), so the first move of the playhead had to wait for the workers to re-decode
+    // the new GOP from its keyframe and for the audio device to reopen. Stopping just the
+    // playback clock leaves the frame cache and the scrub stream intact, so the playhead
+    // follows the mouse from the very first frame.
+    if app.playback.playing {
+        app.stop();
+    }
     let mut tt = seq.settings.frame_rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO));
     if shift || app.session.prefs.timeline.snap_playhead {
         tt = snap_playhead(app, seq, layout, tt);
@@ -2354,10 +2347,23 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 (Tool::Slip | Tool::Slide, Grab::Other(Hit::Clip { .. })) => CursorIcon::ResizeHorizontal,
                 (Tool::Hand, _) => CursorIcon::Grab,
                 (Tool::Zoom, _) => CursorIcon::ZoomIn,
+                // Track Select Forward / Backward: paint the two-arrow tool glyph next to the
+                // pointer (below) and keep the OS cursor as the default arrow, exactly as
+                // Premiere Pro does — it shows the same two-arrow cursor glyph whether the
+                // pointer is over a clip, a transition, empty space, or nothing.
+                (Tool::TrackSelectForward | Tool::TrackSelectBackward, _) => CursorIcon::Default,
                 _ => CursorIcon::Default,
             }
         };
         ctx.set_cursor_icon(cur);
+        // Track Select Forward / Backward get a two-arrow cursor glyph painted at the pointer
+        // (Premiere's signature cursor for these tools), so the user can tell at a glance which
+        // direction the next click will select — the missing feedback the video called out.
+        if matches!(tool, Tool::TrackSelectForward | Tool::TrackSelectBackward) {
+            let icon = if tool == Tool::TrackSelectForward { Icon::TrackSelectFwd } else { Icon::TrackSelectBack };
+            let glyph = Rect::from_center_size(p + vec2(10.0, 10.0), vec2(20.0, 20.0));
+            icons::paint(ui.painter(), glyph, icon, app.tokens.text);
+        }
         // the edge a press here would grab, and the trim it starts (#259)
         if let Grab::Edge { track, clip, edge, kind } = g {
             super::trim_monitor::paint_hover_bracket(ui.painter(), seq, layout, track, clip, edge, kind);
@@ -2398,8 +2404,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 let last = ctx.input(|i| i.pointer.press_origin()).unwrap_or(p);
                 Some(Drag::Pan { last, start_scroll: app.ui.timeline.target_scroll, start_v: app.ui.timeline.v_scroll })
             }
-            (_, Grab::Other(Hit::Ruler)) => Some(Drag::Scrub { initial: app.session.playhead() }),
+            // The Hand tool always pans — even over the ruler (a press on the ruler otherwise
+            // becomes a scrub, leaving the user wondering why the picture moves but the timeline
+            // doesn't). It comes before the ruler arm so the Hand tool keeps its promise of
+            // "grab anything and move the view".
             (Tool::Hand, _) => Some(Drag::Pan { last: p, start_scroll: app.ui.timeline.target_scroll, start_v: app.ui.timeline.v_scroll }),
+            (_, Grab::Other(Hit::Ruler)) => Some(Drag::Scrub { initial: app.session.playhead() }),
             (Tool::Zoom, _) => {
                 if resp.clicked() {
                     let f = if mods.alt { 1.0 / 2.0 } else { 2.0 };
@@ -2599,6 +2609,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     tt = snap_playhead(app, seq, layout, tt);
                 }
                 app.session.set_playhead(tt);
+                // Keep the playhead glued to the cursor: ask for the next frame right away so the
+                // ruler redraw is not gated on the (slower) program-monitor frame render that the
+                // playhead move also kicks off. Without this, scrubbing feels "laggy to follow the
+                // cursor" because egui only repaints on input, which can arrive after the monitor's
+                // async frame request has already stalled the pipeline (#playhead-drag-lag).
+                ctx.request_repaint();
                 Some(Drag::Scrub { initial })
             }
             Drag::Pan { last, start_scroll, start_v } => {
@@ -2607,6 +2623,11 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                 v.target_scroll = (v.target_scroll - dx as f64 / v.pps).max(0.0);
                 v.scroll = v.target_scroll;
                 app.ui.timeline.v_scroll += p.y - last.y;
+                // The Hand tool (and middle-button pan) shows the Grabbing cursor while the
+                // drag is live, the same as the monitors (#824) — without this the cursor
+                // drops back to the default arrow the moment the drag begins, which made the
+                // Hand tool feel "broken" even though the pan itself worked.
+                ctx.set_cursor_icon(CursorIcon::Grabbing);
                 Some(Drag::Pan { last: p, start_scroll, start_v })
             }
             Drag::Move { clips, grab_tick, start_track, .. } => {
@@ -3029,17 +3050,36 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         && let Some(p) = ctx.pointer_hover_pos()
         && layout.content.contains(p)
         && app.timeline_drop_target(ui.ctx(), p)
-        && let Hit::Clip { clip, .. } = hit(seq, layout, p)
-        && let Some((tid, it)) = seq.find_item(clip)
-        && let Some(row) = layout.rows.iter().find(|r| r.track == tid)
     {
+        let transition_kind = filmcraft_project::find_effect(&effect).and_then(|d| match d.kind {
+            filmcraft_project::EffectKind::VideoTransition => Some(TrackKind::Video),
+            filmcraft_project::EffectKind::AudioTransition => Some(TrackKind::Audio),
+            _ => None,
+        });
+        // Where the drop aims: the clip under the pointer (its nearer edge), or — for a
+        // transition dropped on the empty track space beside a cut — the nearest cut on that
+        // track within [`DROP_EDGE_PX`]. Dropping a transition "between the segments", in the
+        // gap it belongs to, used to do nothing at all (the drop only registered on a clip), so
+        // the effect seemed to land wherever a later retry happened to hit — the first clip's
+        // left half, at the very head of the sequence — with nothing to grab afterwards.
+        let aimed: Option<(ClipId, &str)> = match hit(seq, layout, p) {
+            Hit::Clip { clip, .. } => {
+                seq.find_item(clip).map(|(_, it)| (clip, if p.x - layout.x_of(it.start) < layout.x_of(it.end()) - p.x { "in" } else { "out" }))
+            }
+            Hit::Empty { track } if transition_kind.is_some_and(|k| seq.track(track).is_some_and(|tr| tr.kind == k)) => seq.track(track).and_then(|tr| {
+                tr.items
+                    .iter()
+                    .flat_map(|it| [(it.id, "in", it.start), (it.id, "out", it.end())])
+                    .filter(|(_, _, t)| (layout.x_of(*t) - p.x).abs() <= DROP_EDGE_PX)
+                    .min_by(|a, b| (layout.x_of(a.2) - p.x).abs().total_cmp(&(layout.x_of(b.2) - p.x).abs()))
+                    .map(|(id, edge, _)| (id, edge))
+            }),
+            _ => None,
+        };
+        if let Some((clip, edge)) = aimed
+            && let Some((tid, it)) = seq.find_item(clip)
+            && let Some(row) = layout.rows.iter().find(|r| r.track == tid)
         {
-            let transition_kind = filmcraft_project::find_effect(&effect).and_then(|d| match d.kind {
-                filmcraft_project::EffectKind::VideoTransition => Some(TrackKind::Video),
-                filmcraft_project::EffectKind::AudioTransition => Some(TrackKind::Audio),
-                _ => None,
-            });
-            let edge = if p.x - layout.x_of(it.start) < layout.x_of(it.end()) - p.x { "in" } else { "out" };
             let params = json!({"effect": effect, "clip": clip.0, "edge": edge});
             if let Some(kind) = transition_kind {
                 if let Ok((_, tr)) = filmcraft_engine::commands::preview_transition(&app.session, &params, kind) {

@@ -117,13 +117,17 @@ impl Tool {
             .find(|t| format!("{t:?}").to_ascii_lowercase() == n || t.label().to_ascii_lowercase().replace([' ', '-'], "").replace("tool", "") == n)
     }
     /// Tools-panel groups (Premiere groups related tools under one button with a flyout).
+    ///
+    /// The razor sits below Slip/Slide, not beside Rate Stretch as Premiere orders it: the
+    /// scissors is the one tool users reach for without knowing its name, and next to the slip
+    /// pair it reads as "cut what is here" rather than another trimming variant.
     pub fn groups() -> Vec<Vec<Tool>> {
         vec![
             vec![Tool::Selection],
             vec![Tool::TrackSelectForward, Tool::TrackSelectBackward],
             vec![Tool::Ripple, Tool::Rolling, Tool::RateStretch, Tool::Remix],
-            vec![Tool::Razor],
             vec![Tool::Slip, Tool::Slide],
+            vec![Tool::Razor],
             vec![Tool::Pen, Tool::Rectangle, Tool::Ellipse],
             vec![Tool::Hand, Tool::Zoom],
             vec![Tool::Type, Tool::VerticalType],
@@ -436,10 +440,6 @@ pub struct UiState {
     pub dock: DockNode,
     #[serde(default)]
     pub floating: Vec<crate::dock::Floating>,
-    /// Where each panel closed while floating was ([x, y, width, height]): opening it again
-    /// brings it back there, floating, instead of docked (#1985).
-    #[serde(default)]
-    pub closed_floating: Vec<(PanelKind, [f32; 4])>,
     /// Focused panel (blue outline, receives shortcuts).
     pub focused: PanelKind,
     pub timeline: TimelineView,
@@ -964,7 +964,6 @@ impl Default for UiState {
             mode: Mode::Edit,
             workspace: "Editing".into(),
             floating: vec![],
-            closed_floating: vec![],
             dock: crate::dock::workspace("Editing"),
             focused: PanelKind::Timeline,
             timeline: TimelineView::default(),

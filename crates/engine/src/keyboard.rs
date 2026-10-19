@@ -130,6 +130,30 @@ fn select_clip_at_playhead(s: &mut Session) -> Result<Value> {
     let tg = s.targeting().targeted;
     let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
     let ids: Vec<ClipId> = seq.all_tracks().filter(|tr| tg.contains(&tr.id)).filter_map(|tr| tr.item_at(t).map(|i| i.id)).collect();
+    // Premiere Pro's "Select Clip at Playhead" (D) also highlights the gap between clips when
+    // the playhead falls in empty time — the same gap selection a click on the empty stretch
+    // produces (#648, #668), so Delete / Ripple Delete work right after pressing D. Without
+    // this branch, D on a gap silently cleared the selection and left nothing for the gap menu
+    // to act on, which is the "I press D but I don't see the gap" complaint.
+    //
+    // Collect the (track, range) up front so we don't hold a borrow of `seq` while we mutate
+    // `s.state` — `seq` is borrowed from `s`.
+    let gap: Option<(TrackId, filmcraft_time::TimeRange)> = if ids.is_empty() {
+        seq.all_tracks()
+            .filter(|tr| tg.contains(&tr.id) && !tr.locked)
+            .find_map(|tr| edit::through::track_gaps(tr).into_iter().find(|g| g.contains(t)).map(|g| (tr.id, g)))
+    } else {
+        None
+    };
+    if let Some((track, range)) = gap {
+        s.state.gap_selection = Some(crate::GapSelection { track, range });
+        s.state.selection.clear();
+        s.state.edit_points.clear();
+        s.state.caption_selection.clear();
+        s.state.transition_selection.clear();
+        return Ok(json!({"selection": [], "gap": {"track": track.0, "start": range.start.0, "end": range.end().0}}));
+    }
+    s.state.gap_selection = None;
     s.state.selection = with_links(s, &ids);
     s.state.edit_points.clear();
     s.state.caption_selection.clear();

@@ -102,7 +102,7 @@ pub(crate) fn track_input_at(
     let range = TimeRange::from_bounds(Tick::from_units(start, sr as i64), Tick::from_units(start + frames as i64, sr as i64));
     let mut tbuf = AudioBuffer::silence(sr, w, frames);
     for item in track.items.iter().filter(|i| i.enabled && i.range().overlaps(&range)) {
-        mix_item(project, item, start, frames, sr, sources, &mut tbuf, 1.0, &live);
+        mix_item(project, item, start, frames, sr, sources, &mut tbuf, 1.0, &live, true);
     }
     // audio transitions: attenuate the covered region of each side
     for tr in &track.transitions {
@@ -127,10 +127,13 @@ pub(crate) fn track_input_at(
         let mut a = AudioBuffer::silence(sr, w, n);
         let mut b = AudioBuffer::silence(sr, w, n);
         if let Some(f) = &from {
-            mix_item(project, f, s0, n, sr, sources, &mut a, 1.0, &live);
+            // No declick on the transition sides: the crossfade gains already shape the signal
+            // over the whole span, and the handle-extended edges sit where `from` / `to` play at
+            // full gain — a fade there would notch every transition's start and end.
+            mix_item(project, f, s0, n, sr, sources, &mut a, 1.0, &live, false);
         }
         if let Some(tt) = &to {
-            mix_item(project, tt, s0, n, sr, sources, &mut b, 1.0, &live);
+            mix_item(project, tt, s0, n, sr, sources, &mut b, 1.0, &live, false);
         }
         let dur = (tr.end() - tr.start).to_units_floor(sr as i64).max(1) as f32;
         let base = (s0 - tr.start.to_units_floor(sr as i64)) as f32;
@@ -173,6 +176,35 @@ struct ClipLive {
     depth: u32,
 }
 
+/// Length of the declick fade at each audio clip's head and tail (seconds).
+///
+/// A clip whose media starts or ends mid-waveform steps from silence to a non-zero sample
+/// value (or between two clips' unrelated waveforms at a cut) — a discontinuity heard as a
+/// click or crackle at every such edit. Premiere Pro micro-fades clip edges for the same
+/// reason. 4 ms matches the grain ramps the scrubbing path already uses; short enough that a
+/// hard cut keeps its character, long enough to remove the step.
+pub(crate) const CLIP_EDGE_FADE_S: f64 = 0.004;
+
+/// Fade the `n` source samples (timeline span `[a0, a1)` of the clip `[item_s0, item_s1)`)
+/// linearly in over the clip's first [`CLIP_EDGE_FADE_S`] and out over its last. Applied to the
+/// source before the channel-layout conversions (all linear per sample), so it lands
+/// identically in every layout. The ramp positions are absolute — from the clip's own sample
+/// bounds — so the fade is identical however callers cut the timeline into mix requests.
+fn declick_edges(channels: &mut [Vec<f32>], n: usize, a0: i64, a1: i64, item_s0: i64, item_s1: i64, sr: u32) {
+    let fade = (CLIP_EDGE_FADE_S * f64::from(sr.max(1))).round() as i64;
+    if fade < 1 || a1 <= a0 || (a0 >= item_s0 + fade && a1 <= item_s1 - fade) {
+        return; // this request does not touch either edge
+    }
+    for c in channels.iter_mut() {
+        for (i, s) in c.iter_mut().take(n).enumerate() {
+            let p = a0 + i as i64;
+            // min of the head and tail ramps (a clip shorter than 2×fade peaks mid-clip)
+            let g = ((p - item_s0) as f32 / fade as f32).min((item_s1 - p) as f32 / fade as f32).min(1.0);
+            *s *= g;
+        }
+    }
+}
+
 /// Balance for stereo signals (clip Panner, stereo track pan): centre = unity on both sides, turning
 /// one way attenuates the other side along the −3 dB constant-power curve (normalised so the
 /// centre is 0 dB); hard left/right silences the opposite side.
@@ -193,6 +225,7 @@ fn mix_item(
     out: &mut AudioBuffer,
     extra: f32,
     live: &ClipLive,
+    declick: bool,
 ) {
     let item_s0 = item.start.to_units_floor(sr as i64);
     let item_s1 = item.end().to_units_floor(sr as i64);
@@ -223,13 +256,13 @@ fn mix_item(
         // The nested sequence is the clip's source: speed, reverse and clip effects apply to its
         // mix exactly as they do to a media clip's sound.
         let read = |m0: i64, len: usize| Some(nested_mix(project, &q, m0, len, sr, sources, w, live.depth));
-        effected(item, &read, a0, n, sr, w)
+        effected(item, &read, a0, n, sr, w, declick)
     } else {
         let Some(src) = sources.source(item.item) else { return };
         if !src.info().has_audio() {
             return;
         }
-        effected(item, &|m0, len| src.audio_stream(item.audio_stream, m0, len, sr).ok(), a0, n, sr, w)
+        effected(item, &|m0, len| src.audio_stream(item.audio_stream, m0, len, sr).ok(), a0, n, sr, w, declick)
     };
     // gains: clip gain × Volume (keyframed, per 64-sample block) × channel volume × panner
     let clip_gain = db_to_gain(item.gain_db);
@@ -327,9 +360,11 @@ fn nested_mix(project: &Project, nested: &Sequence, m0: i64, len: usize, sr: u32
 type SourceAudio<'a> = &'a dyn Fn(i64, usize) -> Option<AudioBuffer>;
 
 /// The clip's audio after speed/reverse and clip effects (before clip gain, Volume and Panner) for
-/// timeline samples `[a0, a0 + n)`, `w` channels.
-fn effected(item: &TrackItem, src: SourceAudio, a0: i64, n: usize, sr: u32, w: usize) -> Vec<Vec<f32>> {
-    let read = |x0: i64, len: usize| raw_channels(item, src, x0, len, sr, w);
+/// timeline samples `[a0, a0 + n)`, `w` channels. `declick` micro-fades the clip's head and tail
+/// ([`CLIP_EDGE_FADE_S`]); callers pass `false` for the handle-extended reads of a transition's
+/// two sides (the crossfade gains already shape those) and for analysis ([`clip_signal`]).
+fn effected(item: &TrackItem, src: SourceAudio, a0: i64, n: usize, sr: u32, w: usize, declick: bool) -> Vec<Vec<f32>> {
+    let read = |x0: i64, len: usize| raw_channels(item, src, x0, len, sr, w, declick);
     if crate::audio_fx::has_effects(item) { crate::audio_fx::process(item, a0, n, sr, &read) } else { read(a0, n) }
 }
 
@@ -349,7 +384,7 @@ pub fn clip_signal(item: &TrackItem, start: i64, frames: usize, sr: u32, sources
         let n = (a1 - a0) as usize;
         let off = (a0 - start) as usize;
         let g = db_to_gain(item.gain_db);
-        let buf = effected(item, &|m0, len| src.audio_stream(item.audio_stream, m0, len, sr).ok(), a0, n, sr, 2);
+        let buf = effected(item, &|m0, len| src.audio_stream(item.audio_stream, m0, len, sr).ok(), a0, n, sr, 2, false);
         for (dst, b) in out.iter_mut().zip(&buf) {
             for (d, x) in dst[off..off + n].iter_mut().zip(b) {
                 *d = x * g;
@@ -373,8 +408,8 @@ pub fn clip_is_mono(item: &TrackItem, sources: &dyn SourceProvider) -> Option<bo
 
 /// The clip's audio (after speed/reverse) for timeline samples `[x0, x0 + len)` as `w` channels
 /// (2: stereo, mono sources on both sides, 5.1 sources folded down; 6: 5.1), with silence outside
-/// the clip.
-fn raw_channels(item: &TrackItem, src: SourceAudio, x0: i64, len: usize, sr: u32, w: usize) -> Vec<Vec<f32>> {
+/// the clip. `declick` fades the clip's head and tail (see [`CLIP_EDGE_FADE_S`]).
+fn raw_channels(item: &TrackItem, src: SourceAudio, x0: i64, len: usize, sr: u32, w: usize, declick: bool) -> Vec<Vec<f32>> {
     let mut out = vec![vec![0.0f32; len]; w];
     let item_s0 = item.start.to_units_floor(sr as i64);
     let item_s1 = item.end().to_units_floor(sr as i64);
@@ -411,9 +446,14 @@ fn raw_channels(item: &TrackItem, src: SourceAudio, x0: i64, len: usize, sr: u32
             b
         })
     };
-    let Some(buf) = buf else { return out };
+    let Some(mut buf) = buf else { return out };
     if buf.channels.is_empty() {
         return out;
+    }
+    // The declick micro-fade goes on the source before the channel-layout conversions below
+    // (every one of them is linear per sample), so it lands identically in every layout.
+    if declick {
+        declick_edges(&mut buf.channels, n, a0, a1, item_s0, item_s1, sr);
     }
     if w == 2 {
         // a 5.1 source (or a six-channel pick) folds down with ITU-R BS.775, as the Mix and the

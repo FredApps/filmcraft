@@ -121,7 +121,11 @@ pub struct View {
 pub type Actions = Vec<(String, Value)>;
 
 const HEADER_H: f32 = 26.0;
-const FOOTER_H: f32 = 32.0;
+/// The Project panel footer holds the view-mode buttons, the thumbnail-size slider, and the
+/// right-side action buttons (delete / new item / new bin / find / automate). Was 32; raised to
+/// 36 so the footer icons can be drawn a touch larger (their hit rects grew from 24×22 to 28×26)
+/// without crowding the row.
+const FOOTER_H: f32 = 36.0;
 const PREVIEW_H: f32 = 92.0;
 
 fn valid_bin(app: &FilmcraftApp, b: Option<u64>) -> Option<BinId> {
@@ -556,12 +560,18 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
     let t = app.tokens;
     let pre = &v.prefix;
     let mut x = bar.min.x + 6.0;
+    // Footer button hit rects are 28×26 (was 24×22) with icons painted at shrink(4.0) (was
+    // shrink(5.0)), so the glyphs read at ~1.1× their native 16-grid scale instead of ~0.75×.
+    // Bigger but not big enough to dominate the bar.
+    const BTN_W: f32 = 30.0;
+    const BTN_H: f32 = 28.0;
+    const BTN_X: f32 = 32.0;
     for (icon, mode, tip) in [
         (Icon::ListView, ViewMode::List, tl!("List View")),
         (Icon::IconView, ViewMode::Icon, tl!("Icon View")),
         (Icon::Freeform, ViewMode::Freeform, tl!("Freeform View")),
     ] {
-        let r = Rect::from_min_size(pos2(x, bar.min.y + 5.0), vec2(26.0, 22.0));
+        let r = Rect::from_min_size(pos2(x, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "pv", tip)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("{pre}.view.{mode:?}"), r, tip);
         if v.mode == mode {
@@ -569,15 +579,15 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
         } else if resp.hovered() {
             ui.painter().rect_filled(r, 4.0, t.hover);
         }
-        icons::paint(ui.painter(), r.shrink(5.0), icon, if v.mode == mode { t.icon_active } else { t.icon });
+        icons::paint(ui.painter(), r.shrink(4.0), icon, if v.mode == mode { t.icon_active } else { t.icon });
         if resp.clicked() {
             set_mode(app, v.inst, mode, actions);
         }
-        x += 28.0;
+        x += BTN_X;
     }
     // thumbnail size: in-memory while dragging, saved on release
-    let sw = (bar.width() - 300.0).clamp(40.0, 120.0);
-    let sr = Rect::from_min_size(pos2(x + 8.0, bar.min.y + 8.0), vec2(sw, 16.0));
+    let sw = (bar.width() - 320.0).clamp(40.0, 120.0);
+    let sr = Rect::from_min_size(pos2(x + 8.0, bar.min.y + 10.0), vec2(sw, 16.0));
     let mut sz = v.icon_size;
     let resp = ui.put(sr, egui::Slider::new(&mut sz, 48.0..=400.0).show_value(false));
     app.auto.add(&format!("{pre}.iconSize"), sr, "Zoom");
@@ -605,13 +615,13 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
     x = sr.max.x + 6.0;
     // Sort Icons (Icon view)
     if v.mode == ViewMode::Icon {
-        let r = Rect::from_min_size(pos2(x, bar.min.y + 5.0), vec2(24.0, 22.0));
+        let r = Rect::from_min_size(pos2(x, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "sortIcons")), Sense::click()).on_hover_text(tl!("Sort Icons"));
         app.auto.add(&format!("{pre}.sortIcons"), r, "Sort Icons");
         if resp.hovered() {
             ui.painter().rect_filled(r, 3.0, t.hover);
         }
-        icons::paint(ui.painter(), r.shrink(5.0), Icon::SortIcons, t.icon);
+        icons::paint(ui.painter(), r.shrink(4.0), Icon::SortIcons, t.icon);
         egui::Popup::menu(&resp).show(|ui| sort_icons_menu(app, ui, pre, actions));
     }
     let mut rx = bar.max.x - 6.0;
@@ -622,13 +632,13 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
         (Icon::Search, "find", tl!("Find")),
         (Icon::Automate, "clip.automateToSequence", tl!("Automate to Sequence")),
     ] {
-        let r = Rect::from_min_size(pos2(rx - 24.0, bar.min.y + 5.0), vec2(24.0, 22.0));
+        let r = Rect::from_min_size(pos2(rx - BTN_W, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "pb", id)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("{pre}.button.{id}"), r, tip);
         if resp.hovered() {
             ui.painter().rect_filled(r, 3.0, t.hover);
         }
-        icons::paint(ui.painter(), r.shrink(5.0), icon, t.icon);
+        icons::paint(ui.painter(), r.shrink(4.0), icon, t.icon);
         if id == "new-item" {
             egui::Popup::menu(&resp).show(|ui| new_item_menu(app, ui, pre, actions));
         } else if resp.clicked() {
@@ -648,7 +658,7 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
                 _ => actions.push((id.into(), json!({}))),
             }
         }
-        rx -= 28.0;
+        rx -= BTN_X;
     }
 }
 

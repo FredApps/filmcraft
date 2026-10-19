@@ -97,23 +97,12 @@ impl FilmcraftApp {
             Action::Activate { panel } => Some(*panel),
             _ => None,
         };
-        // a panel closed while floating remembers where; closed while docked, it forgets (#1985)
-        let closing = match &action {
-            Action::Close { panel } => Some((*panel, self.ui.floating.iter().find(|g| g.panels.contains(panel)).map(|g| g.rect))),
-            _ => None,
-        };
         self.commit_dock(|shared| {
             crate::dock_shared::check_last_docked(shared, &action)?;
             shared.apply(action).map_err(|error| error.to_string())
         })?;
         if let Some(panel) = reveal {
             self.pending_panel_raise = Some(panel);
-        }
-        if let Some((panel, rect)) = closing {
-            self.ui.closed_floating.retain(|(p, _)| *p != panel);
-            if let Some(rect) = rect {
-                self.ui.closed_floating.push((panel, rect));
-            }
         }
         if relocating
             || self.ui.keys.maximized.is_some_and(|panel| !self.ui.dock.contains(panel) && !self.ui.floating.iter().any(|group| group.panels.contains(&panel)))
@@ -351,8 +340,14 @@ impl FilmcraftApp {
 
     fn panel_drag(&mut self, ctx: &egui::Context, body: Rect, targets: &[DropTarget<PanelKind>]) {
         let Some(panel) = ctx.data(|data| data.get_temp::<PanelKind>(drag_id())) else { return };
-        let canceled =
-            ctx.input(|input| input.key_pressed(egui::Key::Escape) || !input.focused || (!input.pointer.primary_down() && !input.pointer.primary_released()));
+        // The drag continues while the primary button is held or was just released this frame
+        // (so the drop still lands). We deliberately do NOT cancel on `!input.focused`: in a
+        // browser/wasm host the egui window can briefly drop OS focus mid-drag (the pointer
+        // crossing an iframe boundary, a notification stealing focus), and abandoning the drag
+        // the moment that happens — leaving the panel "stuck" to the cursor with no way to
+        // commit or cancel cleanly — was the most common "I can't drag panels" complaint.
+        // Escape still cancels, as does the button coming up without a release event this frame.
+        let canceled = ctx.input(|input| input.key_pressed(egui::Key::Escape) || (!input.pointer.primary_down() && !input.pointer.primary_released()));
         if canceled || (!self.ui.dock.contains(panel) && !self.ui.floating.iter().any(|group| group.panels.contains(&panel))) {
             ctx.data_mut(|data| data.remove::<PanelKind>(drag_id()));
             return;

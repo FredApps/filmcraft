@@ -1,5 +1,5 @@
 //! Vector icons drawn in code on a 16×16 design grid (crisp at any DPI, recolourable, no
-//! third-party or Adobe artwork). Shapes follow NLE conventions (ripple brackets, razor blade…).
+//! third-party or Adobe artwork). Shapes follow NLE conventions (ripple brackets, scissors…).
 
 use egui::epaint::{PathShape, PathStroke};
 use egui::{Color32, Painter, Pos2, Rect, Stroke, pos2, vec2};
@@ -282,10 +282,14 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             pen.fill(&[(3.5, 13.5), (5.5, 12.0), (5.5, 14.8)]);
         }
         Razor => {
-            pen.closed(&[(2.5, 5.0), (13.5, 5.0), (13.5, 11.0), (2.5, 11.0)]);
-            pen.circle(8.0, 8.0, 1.3);
-            pen.line(&[(5.0, 8.0), (6.5, 8.0)]);
-            pen.line(&[(9.5, 8.0), (11.0, 8.0)]);
+            // Scissors (our own drawing): two blades crossing at a pivot dot, the shafts running
+            // on into the two finger rings. Reads as "cut here" at a glance — the blade-and-
+            // handle box it replaced was the one tool users did not recognise.
+            pen.line(&[(2.2, 2.2), (8.0, 8.6), (10.4, 10.8)]);
+            pen.line(&[(13.8, 2.2), (8.0, 8.6), (5.6, 10.8)]);
+            pen.dot(8.0, 8.6, 0.9);
+            pen.circle(11.4, 12.4, 1.8);
+            pen.circle(4.6, 12.4, 1.8);
         }
         Slip => {
             pen.line(&[(2.5, 4.0), (2.5, 12.0)]);

@@ -16,8 +16,17 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
 /// Seconds of audio kept queued ahead of the worklet.
-const AHEAD_S: f64 = 0.25;
-/// Frames per posted block.
+///
+/// This used to be 0.25 s, which is enough when the UI thread pumps every frame. But the mixer
+/// runs on the UI thread (wasm has no audio thread of its own here), and a 4K @ 60 fps source
+/// saturates the UI thread with decode + paint work. A frame that takes longer than ~250 ms
+/// (a single dropped vsync plus a slow decode) drains the worklet's queue and the next block
+/// plays as silence — perceived as "garbled" / "laggy" audio. Doubling the lead time gives the
+/// worklet ~500 ms of runway, which absorbs a busy UI frame without audible dropouts while
+/// keeping the latency well below what `interactive` latency_hint targets.
+const AHEAD_S: f64 = 0.5;
+/// Frames per posted block. 2048 at 48 kHz ≈ 43 ms, comfortably above the AudioWorklet
+/// 128-frame render quantum so the worklet never wakes to an empty queue mid-block.
 const BLOCK: usize = 2048;
 
 struct State {
@@ -136,8 +145,12 @@ impl Handle {
             return;
         }
         let target = (AHEAD_S * s.ctx.sample_rate() as f64) as u64;
+        // The guard bounds how long a single frame can spend refilling the queue. With the
+        // larger `AHEAD_S` (0.5 s) the steady-state need is ~12 blocks at 48 kHz, but after the
+        // UI thread stalls on a heavy 4K decode the queue can drain further, so allow up to 32
+        // blocks (~680 ms) in one pump to refill the runway without dropping audio.
         let mut guard = 0;
-        while s.queued.saturating_sub(Self::estimate(&s)) < target && guard < 16 {
+        while s.queued.saturating_sub(Self::estimate(&s)) < target && guard < 32 {
             guard += 1;
             let mut buf = vec![0f32; BLOCK * 2];
             if let Some(f) = s.fill.as_mut() {

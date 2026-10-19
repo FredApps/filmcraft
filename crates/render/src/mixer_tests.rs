@@ -22,6 +22,15 @@ fn dc(_: i64, _: usize) -> f32 {
     0.5
 }
 
+/// The declick fade at a clip edge ([`crate::audio::CLIP_EDGE_FADE_S`]): sample `k` of a clip
+/// that starts at sample 0 (the rigs place every clip at 0) plays at `k / FADE` for the first
+/// `FADE` samples (4 ms at 48 kHz), ramping back down over the clip's last `FADE` samples.
+/// The ramp is absolute, so it is identical however the mix is cut into requests.
+const FADE: f32 = (crate::audio::CLIP_EDGE_FADE_S * 48_000.0) as f32;
+fn edge(k: usize) -> f32 {
+    (k as f32 / FADE).min(1.0)
+}
+
 fn close(a: f32, b: f32, tol: f32) -> bool {
     (a - b).abs() <= tol
 }
@@ -87,7 +96,7 @@ fn audio_clips_from_one_container_mix_distinct_streams() {
         p.sequence_mut(seq).unwrap().audio_tracks[stream].items.push(clip);
     }
     let buffer = crate::audio::mix_sequence(&p, p.sequence(seq).unwrap(), 0, 32, &map);
-    assert!(buffer.channels.iter().all(|c| c.iter().all(|&v| close(v, 0.125, 1e-6))));
+    assert!(buffer.channels.iter().all(|c| c.iter().enumerate().all(|(k, &v)| close(v, 0.125 * edge(k), 1e-6))));
 }
 
 #[test]
@@ -101,11 +110,11 @@ fn fader_gain_is_sample_exact() {
     r.track(0).volume_db = -96.0;
     assert!(r.mix(0, 64)[0].iter().all(|&s| s == 0.0));
     r.track(0).volume_db = 15.0;
-    assert!(close(r.mix(0, 64)[0][10], 0.5 * 10f32.powf(0.75), 1e-5));
+    assert!(close(r.mix(0, 64)[0][10], 0.5 * 10f32.powf(0.75) * edge(10), 1e-5));
     // Mix fader multiplies on top
     r.track(0).volume_db = -6.0;
     r.p.sequence_mut(r.seq).unwrap().master_volume_db = -6.0;
-    assert!(close(r.mix(0, 64)[0][3], 0.5 * 10f32.powf(-12.0 / 20.0), 1e-6));
+    assert!(close(r.mix(0, 64)[0][3], 0.5 * 10f32.powf(-12.0 / 20.0) * edge(3), 1e-6));
 }
 
 #[test]
@@ -122,19 +131,19 @@ fn pan_laws() {
     rig.track(0).pan = 50.0;
     let [l, r] = rig.mix(0, 128);
     let a = 1.5 * std::f32::consts::FRAC_PI_4;
-    assert!(close(l[64], 0.5 * a.cos(), 1e-6) && close(r[64], 0.5 * a.sin(), 1e-6), "{} {}", l[64], r[64]);
+    assert!(close(l[64], 0.5 * a.cos() * edge(64), 1e-6) && close(r[64], 0.5 * a.sin() * edge(64), 1e-6), "{} {}", l[64], r[64]);
     rig.track(0).pan = -100.0;
     let [l, r] = rig.mix(0, 128);
-    assert!(close(l[1], 0.5, 1e-6) && r[1].abs() < 1e-6);
+    assert!(close(l[1], 0.5 * edge(1), 1e-6) && r[1].abs() < 1e-6);
     // stereo track: balance (centre unity, far side attenuated)
     rig.track(0).channels = AudioChannels::Stereo;
     rig.track(0).pan = 0.0;
     let [l, r] = rig.mix(0, 64);
-    assert!(close(l[5], 0.5, 1e-7) && close(r[5], 0.5, 1e-7));
+    assert!(close(l[5], 0.5 * edge(5), 1e-7) && close(r[5], 0.5 * edge(5), 1e-7));
     rig.track(0).pan = 50.0;
     let (bl, br) = balance(0.5);
     let [l, r] = rig.mix(0, 64);
-    assert!(close(l[5], 0.5 * bl, 1e-6) && close(r[5], 0.5 * br, 1e-6) && br == 1.0 && bl < 0.6);
+    assert!(close(l[5], 0.5 * bl * edge(5), 1e-6) && close(r[5], 0.5 * br * edge(5), 1e-6) && br == 1.0 && bl < 0.6);
 }
 
 #[test]
@@ -156,7 +165,7 @@ fn volume_automation_is_sample_accurate_and_block_invariant() {
         } else {
             0.0
         };
-        let want = 0.5 * 10f64.powf(db / 20.0);
+        let want = 0.5 * 10f64.powf(db / 20.0) * edge(k) as f64;
         assert!((whole[0][k] as f64 - want).abs() < 1e-6, "sample {k}: {} vs {want}", whole[0][k]);
     }
     // the same range cut into odd-sized requests is bit-identical
@@ -199,7 +208,7 @@ fn clip_volume_and_track_automation_both_apply() {
         t.lane_mut(LANE_VOLUME).unwrap().keyframes = vec![kf(0, -6.0), kf(48_000, -6.0)];
     }
     let [l, _] = r.mix(100, 64);
-    assert!(close(l[0], 0.5 * 10f32.powf(-12.0 / 20.0), 1e-6), "{}", l[0]);
+    assert!(close(l[0], 0.5 * 10f32.powf(-12.0 / 20.0) * edge(100), 1e-6), "{}", l[0]);
 }
 
 fn level(r: &Rig) -> f32 {
@@ -379,7 +388,7 @@ fn live_override_holds_and_ramps_back() {
     let live = LiveMix::new();
     live.hold(id, LANE_VOLUME, -6.0);
     let b = mix_graph(&r.p, r.p.sequence(r.seq).unwrap(), 0, 64, &r.map, Some(&live));
-    assert!(close(b.channels[0][0], 0.5 * 10f32.powf(-0.3), 1e-6));
+    assert!(close(b.channels[0][63], 0.5 * 10f32.powf(-0.3) * edge(63), 1e-6));
     // released at sample 4800 with a 4800-sample ramp: halfway back at 7200
     live.release(id, LANE_VOLUME, Tick::from_units(4800, SR), Tick::from_units(4800, SR));
     let b = mix_graph(&r.p, r.p.sequence(r.seq).unwrap(), 7200, 1, &r.map, Some(&live));
@@ -473,7 +482,7 @@ fn stereo_and_mono_tracks_into_a_51_mix_use_the_51_panner() {
     // stereo track at the default puck (front centre): L → L, R → R, nothing else
     let m = mix_all(&r, 0, 256);
     assert_eq!(m.len(), 6);
-    let at = |m: &Vec<Vec<f32>>, c: usize| m[c][100];
+    let at = |m: &Vec<Vec<f32>>, c: usize| m[c][100] / edge(100);
     assert!(close(at(&m, 0), 0.1, 1e-6) && close(at(&m, 1), 0.2, 1e-6), "{:?}", m.iter().map(|c| c[100]).collect::<Vec<_>>());
     for c in 2..6 {
         assert!(at(&m, c).abs() < 1e-6, "channel {c} = {}", at(&m, c));
@@ -511,14 +520,14 @@ fn a_51_track_passes_through_a_51_mix_and_folds_into_stereo() {
     set_master_51(&mut r);
     let m = mix_all(&r, 0, 256);
     for (c, ch) in m.iter().enumerate() {
-        assert!(close(ch[17], (c + 1) as f32 * 0.1, 1e-6), "channel {c} = {}", ch[17]);
+        assert!(close(ch[17], (c + 1) as f32 * 0.1 * edge(17), 1e-6), "channel {c} = {}", ch[17]);
     }
     // the same track into a stereo Mix: ITU-R BS.775 downmix (LFE omitted)
     r.p.sequence_mut(r.seq).unwrap().settings.audio_master = AudioChannels::Stereo;
     let k = std::f32::consts::FRAC_1_SQRT_2;
     let st = mix_all(&r, 0, 256);
     assert_eq!(st.len(), 2);
-    assert!(close(st[0][9], 0.1 + k * 0.3 + k * 0.5, 1e-6) && close(st[1][9], 0.2 + k * 0.3 + k * 0.6, 1e-6));
+    assert!(close(st[0][9], (0.1 + k * 0.3 + k * 0.5) * edge(9), 1e-6) && close(st[1][9], (0.2 + k * 0.3 + k * 0.6) * edge(9), 1e-6));
     // mix_sequence of a 5.1 Mix is the BS.775 stereo fold of the 6-channel mix
     set_master_51(&mut r);
     let folded = crate::audio::mix_sequence(&r.p, r.p.sequence(r.seq).unwrap(), 0, 256, &r.map);
@@ -534,7 +543,7 @@ fn a_51_track_passes_through_a_51_mix_and_folds_into_stereo() {
         filmcraft_audio_dsp::channels::Layout::Stereo,
         filmcraft_audio_dsp::channels::Mixdown::Front,
     );
-    assert!(close(front.channels[0][9], 0.1 + k * 0.3, 1e-6));
+    assert!(close(front.channels[0][9], (0.1 + k * 0.3) * edge(9), 1e-6));
     // meters: one per channel of the strip
     let live = LiveMix::new();
     mix_graph(&r.p, r.p.sequence(r.seq).unwrap(), 0, 256, &r.map, Some(&live));
@@ -551,15 +560,15 @@ fn a_51_source_on_a_stereo_track_folds_down_instead_of_dropping_centre_and_surro
     let (lo, ro) = (0.1 + k * 0.3 + k * 0.5, 0.2 + k * 0.3 + k * 0.6);
     let st = mix_all(&r, 0, 256);
     assert_eq!(st.len(), 2);
-    assert!(close(st[0][9], lo, 1e-6) && close(st[1][9], ro, 1e-6), "BS.775 fold, got {} / {}", st[0][9], st[1][9]);
+    assert!(close(st[0][9], lo * edge(9), 1e-6) && close(st[1][9], ro * edge(9), 1e-6), "BS.775 fold, got {} / {}", st[0][9], st[1][9]);
     // a six-channel pick folds the picked channels (here the source reversed: Rs, Ls, LFE, C, R, L)
     r.track(0).items[0].source_channels = vec![5, 4, 3, 2, 1, 0];
     let st = mix_all(&r, 0, 256);
-    assert!(close(st[0][9], 0.6 + k * 0.4 + k * 0.2, 1e-6) && close(st[1][9], 0.5 + k * 0.4 + k * 0.1, 1e-6));
+    assert!(close(st[0][9], (0.6 + k * 0.4 + k * 0.2) * edge(9), 1e-6) && close(st[1][9], (0.5 + k * 0.4 + k * 0.1) * edge(9), 1e-6));
     // a stereo pick still plays exactly those two channels
     r.track(0).items[0].source_channels = vec![2, 4];
     let st = mix_all(&r, 0, 256);
-    assert!(close(st[0][9], 0.3, 1e-6) && close(st[1][9], 0.5, 1e-6));
+    assert!(close(st[0][9], 0.3 * edge(9), 1e-6) && close(st[1][9], 0.5 * edge(9), 1e-6));
 }
 
 #[test]
@@ -573,7 +582,7 @@ fn stereo_track_through_a_51_submix_into_a_stereo_mix() {
     r.track(0).set_lane_static(filmcraft_project::mixer::LANE_PAN51_X, -100.0);
     let st = mix_all(&r, 0, 128);
     let k = std::f32::consts::FRAC_1_SQRT_2;
-    assert!(close(st[0][50], 0.1 + k * 0.2, 1e-6) && close(st[1][50], k * 0.2, 1e-6), "{} {}", st[0][50], st[1][50]);
+    assert!(close(st[0][50], (0.1 + k * 0.2) * edge(50), 1e-6) && close(st[1][50], k * 0.2 * edge(50), 1e-6), "{} {}", st[0][50], st[1][50]);
 }
 
 #[test]

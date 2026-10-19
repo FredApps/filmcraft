@@ -17,7 +17,13 @@ use std::time::Duration;
 
 /// How far ahead of the device the mixer keeps the ring (s). Edits made while playing are heard
 /// this much later.
-pub const LEAD_S: f64 = 0.2;
+///
+/// Was 0.2 s: enough when only audio runs, but with 4K software decode saturating every core the
+/// mixing thread can stall longer than that (it competes with the frame workers and the UI
+/// thread), the ring runs dry and the callback plays silence — the crackle / dropout heard as
+/// "garbled" audio. 0.3 s keeps the edit latency well under what Premiere buffers while giving
+/// the mixer ~50 % more runway to survive a busy stretch.
+pub const LEAD_S: f64 = 0.3;
 /// Frames mixed per block on the mixing thread.
 pub const BLOCK_FRAMES: usize = 1024;
 /// Ceiling on mixed channels (large interfaces and aggregate devices stay well under it).

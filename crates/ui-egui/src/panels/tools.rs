@@ -10,7 +10,10 @@ use crate::state::Tool;
 pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let mut y = rect.min.y + 4.0;
-    let size = 32.0;
+    // 36-point buttons with 21-point glyphs: a touch larger than the old 32/17 pair (the tools
+    // read more clearly at a glance) without swelling the strip past the 64-point column the
+    // dock reserves for it.
+    let size = 36.0;
     let held_id = egui::Id::new("tools-held");
     if ui.input(|i| i.pointer.any_pressed()) {
         ui.data_mut(|d| d.remove::<egui::Id>(held_id));
@@ -35,11 +38,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
         let active = group.contains(&app.ui.tool);
         if active {
-            ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(26.0, 26.0)), 4.0, t.accent);
+            ui.painter().rect_filled(Rect::from_center_size(r.center(), vec2(30.0, 30.0)), 4.0, t.accent);
         } else if resp.hovered() {
             ui.painter().rect_filled(r, 4.0, t.hover);
         }
-        icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(17.0, 17.0)), current.icon(), if active { egui::Color32::WHITE } else { t.icon });
+        icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(21.0, 21.0)), current.icon(), if active { egui::Color32::WHITE } else { t.icon });
         if resp.has_focus() {
             ui.painter().rect_stroke(r.shrink(2.0), 4.0, egui::Stroke::new(1.5, t.focus), egui::StrokeKind::Inside);
         }
@@ -50,6 +53,16 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         let held = ui.data(|d| d.get_temp::<egui::Id>(held_id)) == Some(resp.id);
         if resp.clicked() && !held {
             app.ui.tool = current;
+            // The scissors acts at once as well as arming the tool, like an Add Edit button:
+            // every clip under the playhead — video, audio, graphics, captions, whatever sits on
+            // it — is split in two right there. (The razor stays a tool too: `C` or this button
+            // arms it, and clicking the timeline cuts at the pointer.) Nothing happens when the
+            // playhead rests in empty time.
+            if current == Tool::Razor
+                && let Err(e) = app.session.execute("sequence.addEditAllTracks", serde_json::json!({}))
+            {
+                app.ui.status = e.to_string();
+            }
         }
         if group.len() > 1 {
             let held_for = resp.is_pointer_button_down_on().then(|| ui.input(|i| i.pointer.press_start_time().map(|s| i.time - s))).flatten();

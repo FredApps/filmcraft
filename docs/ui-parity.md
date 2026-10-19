@@ -18,7 +18,7 @@ open interaction reports (about 40 of the 188 open issues).
 |---|---|---|---|---|---|
 | Menus | 366 in-scope menu items | ~338 present (label diff, 92%) | 92% | spelling, Render and Replace, 5 workspaces | 10–20 h |
 | Keyboard | Premiere default keyboard + editor | Premiere-compatible preset (143 keyboard-only commands; 39 cloud / absent-panel keys skipped with reasons), FilmCraft / FCP / Avid presets, editor | 90% | Ctrl chords (#256 fixed), modifier hints on Windows (#270 fixed) | 5–10 h |
-| Timeline editing tools | Selection, Track Select, Ripple / Rolling / Rate Stretch, Razor, Slip / Slide, Pen, Hand, Zoom, Type | all present, trim modes, Trim Monitor, dynamic trimming | 80% | deselect in empty space (#683), gap delete (#648, #668), clip stretch (#653), new tracks by dropping (#483), Escape cancels drag (#580 fixed), delete in timeline (#680, #404) | 30–50 h |
+| Timeline editing tools | Selection, Track Select, Ripple / Rolling / Rate Stretch, Razor, Slip / Slide, Pen, Hand, Zoom, Type | all present, trim modes, Trim Monitor, dynamic trimming; the Razor sits below Slip / Slide as a scissors glyph whose toolbar click also adds an edit at the playhead | 80% | deselect in empty space (#683), gap delete (#648, #668), clip stretch (#653), new tracks by dropping (#483), Escape cancels drag (#580 fixed), delete in timeline (#680, #404) | 30–50 h |
 | Program monitor on-screen controls | Motion / Transform handles, mask handles, safe margins, guides | guides, rulers, safe margins, snapping, mask drawing; **no transform handles** (#639); Button Editor (+) does nothing (#431) | 55% | #639, #431 | 15–25 h |
 | Effect Controls | property rows, keyframe area with zoom, divider, graphs, eyedroppers | rows, keyframes, value / velocity graphs, eyedropper (#518); missing keyframe zoom (#641, #645), draggable divider (#643), row lines (#640), Position curves (#448) | 60% | #412, #640–#645, #448 | 15–25 h |
 | Panels and docking | 17 workspaces, dock / undock / float, drop zones | 11 workspaces, docking; rearranging windows reported missing (#493); multi-monitor floating windows (#466) | 60% | #493, #466 | 20–35 h |
@@ -35,4 +35,5 @@ open interaction reports (about 40 of the 188 open issues).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-20 | minor | Tools: scissors glyph for the Razor, moved below Slip / Slide; its toolbar click adds an edit at the playhead (sequence.addEditAllTracks) |
 | 2026-10-10 | major | Created: UI areas against Premiere 26.5.2, menu label diff, keyboard parity from keyboard.md, open UI issues itemized |

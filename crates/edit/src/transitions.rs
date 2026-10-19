@@ -167,7 +167,24 @@ pub fn drag_span(track: &Track, tr: &Transition, edge: Option<Edge>, delta: Tick
     let one_sided = tr.from.is_none() || tr.to.is_none();
     let unchanged = Some((s0, d0));
     match edge {
-        None if one_sided => unchanged,
+        // A one-sided transition can't slide (its edge is pinned to the clip's start/end), but
+        // dragging its middle still ought to do *something*. Treat a middle grab on a one-sided
+        // transition as a grab of its free end — the only end that can move — so the user can
+        // resize it by dragging anywhere on it, not just on the few-pixel end zone. Without
+        // this, a freshly-dropped fade-in/fade-out felt "stuck" because grabbing its middle
+        // did nothing.
+        None if one_sided && tr.from.is_none() => {
+            // fade-in (from nothing): free end is Out
+            let min_e = cut.max(s0 + frame).min(hi);
+            let en = (e0 + delta).clamp(min_e, hi);
+            Some((s0, en - s0))
+        }
+        None if one_sided && tr.to.is_none() => {
+            // fade-out (to nothing): free end is In
+            let max_s = cut.min(e0 - frame).max(lo);
+            let st = (s0 + delta).clamp(lo, max_s);
+            Some((st, e0 - st))
+        }
         None => {
             let (min_s, max_s) = (lo.max(cut - d0), (hi - d0).min(cut));
             if min_s > max_s { unchanged } else { Some(((s0 + delta).clamp(min_s, max_s), d0)) }
@@ -366,10 +383,12 @@ mod tests {
         assert_eq!(drag(&q, 1, Some(Edge::In), 100), (48, 12), "the start stops at the cut");
         assert_eq!(drag(&q, 1, Some(Edge::Out), 6), (40, 26));
         assert_eq!(drag(&q, 1, Some(Edge::Out), -100), (40, 8), "the end stops at the cut");
-        // a fade in keeps its start, a fade out its end; neither slides
+        // a fade in keeps its start, a fade out its end; neither slides — but a middle grab on
+        // a one-sided transition now resizes it by its free end (the only end that can move),
+        // instead of doing nothing.
         assert_eq!(drag(&q, 2, Some(Edge::In), 3), (0, 12));
         assert_eq!(drag(&q, 2, Some(Edge::Out), 3), (0, 15));
-        assert_eq!(drag(&q, 2, None, 3), (0, 12));
+        assert_eq!(drag(&q, 2, None, 3), (0, 15));
         assert_eq!(drag(&q, 3, Some(Edge::Out), 3), (132, 12));
         assert_eq!(drag(&q, 3, Some(Edge::In), -3), (129, 15));
         // whatever comes out is a span set_span accepts
