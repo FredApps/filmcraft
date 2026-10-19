@@ -145,5 +145,5 @@ fn a_promise_the_source_never_keeps_imports_nothing_and_says_so() {
     assert_eq!(item_names(&h).len(), before, "no stand-in is imported");
     let logged = h.state().session.log.entries.iter().any(|e| e.message.contains("could not be fetched: offline"));
     assert!(logged, "the reason is in the Events panel");
-    assert_eq!(h.state().toast.as_ref().map(|(m, _)| m.as_str()), Some("A dragged file could not be fetched: offline"));
+    assert_eq!(h.state().ui.status, "A dragged file could not be fetched: offline", "and in the status bar, which the user can see today");
 }

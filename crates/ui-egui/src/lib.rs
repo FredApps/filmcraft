@@ -1467,16 +1467,18 @@ impl FilmcraftApp {
             let at = promised.dropped_at.or_else(|| self.drop_pointer(ctx));
             self.import_dropped(promised.paths, at);
         }
-        // A promise the source never kept imports nothing, and it fails long after the drop with
-        // the user's attention elsewhere: an error toast says so where they are looking and
-        // leaves the reason in the Events panel.
+        // A promise the source never kept imports nothing, and it fails long after the drop, so
+        // the user is told twice over: an Events panel entry keeps the reason (`error_toast`,
+        // which is how the engine reports a failure nobody just asked for), and the status bar
+        // shows it, since nothing draws toasts yet.
         for lost in self.hooks.promised_drops.as_ref().map(PromisedDrops::take_lost).unwrap_or_default() {
             let message = if lost.files == 1 {
                 tlf!("A dragged file could not be fetched: {why}", why = lost.reason)
             } else {
                 tlf!("{n} dragged files could not be fetched: {why}", n = lost.files, why = lost.reason)
             };
-            self.session.error_toast("file.import", message);
+            self.session.error_toast("file.import", message.clone());
+            self.ui.status = message;
         }
         let mut paths = Vec::new();
         for f in ctx.input(|i| i.raw.dropped_files.clone()) {
