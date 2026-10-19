@@ -385,4 +385,67 @@ mod mac {
         let Ok(list) = list.downcast::<NSArray>() else { return Vec::new() };
         list.iter().filter_map(|o| o.downcast::<NSString>().ok()).map(|s| PathBuf::from(s.to_string())).collect()
     }
+
+    /// What a drop reports is decided here rather than by AppKit, so it can be tested without a
+    /// drag: the promises are handed to [`finish`] exactly as their readers would, in whatever
+    /// order they land.
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        /// The files `finish` reports for a drop whose promises land in `landing` order, each
+        /// either a path or a failure, with `fallback` as the drag's plain paths.
+        fn reported(landing: &[(usize, Option<&str>)], fallback: &[&str]) -> Vec<Vec<PathBuf>> {
+            let reports = Rc::new(RefCell::new(Vec::new()));
+            let seen = Rc::clone(&reports);
+            HANDLERS.with_borrow_mut(|h| {
+                *h = Some(Handlers {
+                    destination: Box::new(PathBuf::new),
+                    dropped: Box::new(|_, _| {}),
+                    received: Box::new(move |_, files| seen.borrow_mut().push(files)),
+                })
+            });
+            let state = Rc::new(RefCell::new(Pending {
+                id: next_drop(),
+                received: vec![None; landing.len()],
+                outstanding: landing.len(),
+                fallback: fallback.iter().map(PathBuf::from).collect(),
+            }));
+            for (offered, path) in landing {
+                finish(&state, *offered, path.map(PathBuf::from), path.is_none().then(|| "offline".to_string()));
+            }
+            HANDLERS.with_borrow_mut(|h| *h = None);
+            reports.borrow().clone()
+        }
+
+        /// A drop is one import, so its files are reported together once the last has landed —
+        /// in the order the drag offered them, not the order they finished downloading in.
+        #[test]
+        fn a_drops_files_are_reported_once_in_the_order_they_were_offered() {
+            let landed = reported(&[(2, Some("/tmp/third.mov")), (0, Some("/tmp/first.mov")), (1, Some("/tmp/second.mov"))], &[]);
+            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/first.mov"), PathBuf::from("/tmp/second.mov"), PathBuf::from("/tmp/third.mov")]]);
+        }
+
+        /// A promise that fails (an iCloud asset with no connection to download it) loses its own
+        /// file and nothing else.
+        #[test]
+        fn a_failed_promise_leaves_the_files_that_did_arrive() {
+            let landed = reported(&[(0, None), (1, Some("/tmp/second.mov"))], &["/tmp/poster.jpeg"]);
+            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/second.mov")]], "the plain paths stand in for nothing that arrived");
+        }
+
+        /// Once every promise has failed the drag's plain paths stand in, so the drop is not lost.
+        #[test]
+        fn plain_paths_stand_in_when_no_promise_is_kept() {
+            let landed = reported(&[(0, None), (1, None)], &["/tmp/poster.jpeg"]);
+            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/poster.jpeg")]]);
+        }
+
+        /// A drop that promised nothing usable and had no plain path reports nothing at all,
+        /// rather than an empty import.
+        #[test]
+        fn a_drop_with_nothing_to_show_reports_nothing() {
+            assert!(reported(&[(0, None)], &[]).is_empty());
+        }
+    }
 }
