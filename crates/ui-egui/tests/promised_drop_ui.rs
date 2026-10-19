@@ -130,7 +130,8 @@ fn a_promised_file_lands_where_its_drop_did() {
 
 /// A promise the dragging source never keeps (an iCloud video with nothing to download it over)
 /// imports nothing at all: the drag's own path is the poster frame rather than the movie, and
-/// importing that is the bug this exists to fix. The user is told instead.
+/// importing that is the bug this exists to fix. The user is told instead, by the error toast and
+/// Events panel entry that every failure the user did not just ask for goes to.
 #[test]
 fn a_promise_the_source_never_keeps_imports_nothing_and_says_so() {
     let (mut h, promised) = harness();
@@ -138,7 +139,11 @@ fn a_promise_the_source_never_keeps_imports_nothing_and_says_so() {
 
     promised.lost.lock().unwrap().push(PromiseLost { files: 1, reason: "offline".into() });
     step(&mut h);
+    // The toast is raised as an engine event, which the next frame shows.
+    step(&mut h);
 
     assert_eq!(item_names(&h).len(), before, "no stand-in is imported");
-    assert_eq!(h.state().ui.status, "A dragged file could not be fetched: offline");
+    let logged = h.state().session.log.entries.iter().any(|e| e.message.contains("could not be fetched: offline"));
+    assert!(logged, "the reason is in the Events panel");
+    assert_eq!(h.state().toast.as_ref().map(|(m, _)| m.as_str()), Some("A dragged file could not be fetched: offline"));
 }
