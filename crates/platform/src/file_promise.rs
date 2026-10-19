@@ -28,11 +28,13 @@ pub struct Handlers {
     /// open project's scratch disk). Created if it does not exist.
     pub destination: Box<dyn Fn() -> PathBuf>,
     /// A drop whose files are promised, reported on the main thread as it happens, before any of
-    /// them exists. The host records what it has to know about the drop *now*, such as where the
-    /// pointer was: the files can take minutes to arrive (a large iCloud asset is downloaded
-    /// first), by which time the drop is long over. Its [`DropId`] is the one the `received`
-    /// calls for those files carry.
-    pub dropped: Box<dyn Fn(DropId)>,
+    /// them exists, with where it landed in the window: logical points from the window's top-left
+    /// corner, as the UI measures them, or `None` when the drag names no window. The files can
+    /// take minutes to arrive (a large iCloud asset is downloaded first), by which time the drop
+    /// is long over, and the OS reports no pointer motion during a drag, so this is the only
+    /// moment the position can be had. Its [`DropId`] is the one the `received` calls for those
+    /// files carry.
+    pub dropped: Box<dyn Fn(DropId, Option<(f64, f64)>)>,
     /// Files that have finished arriving, one call per file, on the main thread, with the id of
     /// the drop that promised them. The host imports them as if they had been dropped, and must
     /// ask for a repaint: these arrive between frames.
@@ -64,7 +66,7 @@ mod mac {
     use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
     use objc2::{ClassType, MainThreadMarker, msg_send, sel};
     use objc2_app_kit::{NSApplication, NSFilePromiseReceiver, NSPasteboard, NSPasteboardType};
-    use objc2_foundation::{NSArray, NSDictionary, NSError, NSOperationQueue, NSString, NSURL};
+    use objc2_foundation::{NSArray, NSDictionary, NSError, NSOperationQueue, NSPoint, NSRect, NSString, NSURL};
     use std::cell::{Cell, RefCell};
     use std::path::PathBuf;
     use std::rc::Rc;
@@ -194,9 +196,10 @@ mod mac {
             // destination follows the project the files were dropped on.
             let fallback = plain_paths(&pb);
             let drop = TakenDrop { id: next_drop(), destination: HANDLERS.with_borrow(|h| h.as_ref().map(|h| (h.destination)()))?, fallback };
+            let at = dropped_at(sender);
             HANDLERS.with_borrow(|h| {
                 if let Some(h) = h.as_ref() {
-                    (h.dropped)(drop.id);
+                    (h.dropped)(drop.id, at);
                 }
             });
             Some(after_this_event(this, receivers, drop))
@@ -237,6 +240,31 @@ mod mac {
         // touches belongs.
         unsafe { NSOperationQueue::mainQueue().addOperationWithBlock(&block) };
         true
+    }
+
+    /// Where a drag was let go, in logical points from the top-left corner of its window's
+    /// content, which is how the UI measures a position. AppKit reports it in the window's own
+    /// coordinates, whose origin is the *bottom* left, so the content's height flips it.
+    ///
+    /// winit delivers no cursor events while files are dragged over a window, so this is the only
+    /// account of where the drop landed: without it the files are placed wherever the pointer
+    /// last really moved, which for a drag that came from another application is nowhere near.
+    fn dropped_at(sender: *mut AnyObject) -> Option<(f64, f64)> {
+        let sender = std::ptr::NonNull::new(sender)?;
+        // SAFETY: AppKit passes a non-null `NSDraggingInfo`, whose `draggingLocation` is a point
+        // and whose `draggingDestinationWindow` is its window or nil.
+        let (point, window): (NSPoint, *mut AnyObject) =
+            unsafe { (msg_send![sender.as_ptr(), draggingLocation], msg_send![sender.as_ptr(), draggingDestinationWindow]) };
+        let window = std::ptr::NonNull::new(window)?;
+        // SAFETY: a non-nil `NSWindow` has a `contentView`, itself nil only before one is set,
+        // and a view's `frame` is a rectangle.
+        let height = unsafe {
+            let view: *mut AnyObject = msg_send![window.as_ptr(), contentView];
+            let view = std::ptr::NonNull::new(view)?;
+            let frame: NSRect = msg_send![view.as_ptr(), frame];
+            frame.size.height
+        };
+        Some((point.x, height - point.y))
     }
 
     /// The dragging pasteboard of a `NSDraggingInfo` sender.

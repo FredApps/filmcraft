@@ -371,8 +371,11 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
             let dir = destination.lock().unwrap_or_else(PoisonError::into_inner).clone();
             if dir.is_empty() { std::env::temp_dir().join("FilmCraft").join("Dropped Media") } else { std::path::PathBuf::from(dir) }
         }),
-        dropped: Box::new(move |id| {
-            let at = dropped_ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos()));
+        dropped: Box::new(move |id, at| {
+            // The platform layer reports the drop in logical points from the window's top-left,
+            // which is what the UI works in; without one, fall back to the last pointer the UI
+            // saw (the OS reports no motion during a drag, so it may be from before the drag).
+            let at = at.map(|(x, y)| egui::pos2(x as f32, y as f32)).or_else(|| dropped_ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos())));
             let mut positions = dropped_at.lock().unwrap_or_else(PoisonError::into_inner);
             if positions.len() >= REMEMBERED_DROPS {
                 positions.remove(0);
