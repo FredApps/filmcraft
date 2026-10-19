@@ -147,3 +147,35 @@ fn a_promise_the_source_never_keeps_imports_nothing_and_says_so() {
     assert!(logged, "the reason is in the Events panel");
     assert_eq!(h.state().ui.status, "A dragged file could not be fetched: offline", "and in the status bar, which the user can see today");
 }
+
+/// An app driven by the control channel alone is isolated from native input, drops included, and
+/// a promised drop does not come through raw input: a drag on the machine running the automation
+/// must not import into it.
+#[test]
+fn an_automation_owned_app_ignores_a_native_promised_drop() {
+    let mut s = Session::default();
+    s.execute("file.openDemoProject", json!({})).unwrap();
+    let promised = PromisedDrops::default();
+    let hooked = promised.clone();
+    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| {
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut app = FilmcraftApp::new(s).with_control_input_only(rx);
+        app.hooks.promised_drops = Some(hooked);
+        app
+    });
+    for _ in 0..4 {
+        step(&mut h);
+    }
+    let before = item_names(&h).len();
+    let file = fixture("promised-automation.png");
+
+    arrive(&promised, &file, None);
+    promised.lost.lock().unwrap().push(PromiseLost { files: 1, reason: "offline".into() });
+    step(&mut h);
+    step(&mut h);
+
+    assert_eq!(item_names(&h).len(), before, "nothing of a native drop is imported");
+    assert!(h.state().ui.status.is_empty(), "and nothing of one is reported");
+    assert!(promised.arrived.lock().unwrap().is_empty(), "the files are drained rather than left to pile up");
+    assert!(promised.lost.lock().unwrap().is_empty());
+}

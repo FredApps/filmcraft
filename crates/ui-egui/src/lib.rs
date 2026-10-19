@@ -1460,6 +1460,16 @@ impl FilmcraftApp {
         } else {
             None
         };
+        // An automation-owned app is isolated from native input, drops included (`raw_input_hook`
+        // clears them), and a promised drop does not come through raw input: drain it and drop it
+        // on the floor, or a drag on the machine running the automation would import into it.
+        if self.control_input_only {
+            if let Some(promised) = self.hooks.promised_drops.as_ref() {
+                promised.take();
+                promised.take_lost();
+            }
+            return;
+        }
         // Files the host received for a drag that only promised them land after their drop, each
         // batch with where its own drag was dropped: the pointer has moved on long before a large
         // download finishes, so where they go is not read from it now.
