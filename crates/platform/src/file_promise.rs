@@ -135,6 +135,9 @@ mod mac {
         if ORIGINAL_PERFORM.get().is_none() {
             let Some(perform) = class.instance_method(sel!(performDragOperation:)) else { return false };
             let Some(entered) = class.instance_method(sel!(draggingEntered:)) else { return false };
+            if !fits(perform) || !fits(entered) {
+                return false;
+            }
             let ours_perform: DragFn = perform_drag_operation;
             let ours_entered: DragFn = dragging_entered;
             // SAFETY: both replacements have the `(self, _cmd, id) -> BOOL` signature the runtime
@@ -150,6 +153,17 @@ mod mac {
         }
         HANDLERS.with_borrow_mut(|h| *h = Some(handlers));
         true
+    }
+
+    /// Whether a method is the `(self, _cmd, id) -> BOOL` the replacements are written as. A
+    /// windowing layer that declared these differently (an `NSDragOperation` return, say) would
+    /// otherwise be called through the wrong signature, so this is what makes a winit the
+    /// interception no longer fits decline rather than misbehave.
+    fn fits(method: &objc2::runtime::Method) -> bool {
+        let object = method.argument_type(2).is_some_and(|t| t.to_bytes() == b"@");
+        // BOOL is `bool` where the ABI has one and a `signed char` otherwise.
+        let boolean = matches!(method.return_type().to_bytes(), b"B" | b"c");
+        method.arguments_count() == 3 && object && boolean
     }
 
     /// Calls the implementation `install` replaced, or reports the drag unhandled when there is
