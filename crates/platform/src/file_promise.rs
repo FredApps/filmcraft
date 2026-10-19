@@ -35,9 +35,11 @@ pub struct Handlers {
     /// moment the position can be had. Its [`DropId`] is the one the `received` calls for those
     /// files carry.
     pub dropped: Box<dyn Fn(DropId, Option<(f64, f64)>)>,
-    /// Files that have finished arriving, one call per file, on the main thread, with the id of
-    /// the drop that promised them. The host imports them as if they had been dropped, and must
-    /// ask for a repaint: these arrive between frames.
+    /// The files of one drop, on the main thread, once they have all arrived: one call per drop,
+    /// in the order the drag offered them (promises are fulfilled in parallel and land in no
+    /// particular order, and the files of a drop are imported as one, so the last is waited for).
+    /// The host imports them as if they had been dropped, and must ask for a repaint: they arrive
+    /// between frames.
     pub received: Box<dyn Fn(DropId, Vec<PathBuf>)>,
 }
 
@@ -297,17 +299,17 @@ mod mac {
         }
         let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&destination.to_string_lossy()), true);
 
-        let state = Rc::new(RefCell::new(Pending { id, outstanding: receivers.len(), delivered: false, fallback }));
+        let state = Rc::new(RefCell::new(Pending { id, received: vec![None; receivers.len()], outstanding: receivers.len(), fallback }));
         let queue = NSOperationQueue::mainQueue();
         let options = NSDictionary::new();
-        for receiver in receivers {
+        for (offered, receiver) in receivers.iter().enumerate() {
             let state = Rc::clone(&state);
             let reader = block2::RcBlock::new(move |url: std::ptr::NonNull<NSURL>, error: *mut NSError| {
                 // SAFETY: AppKit passes a non-null `NSURL` for a file it has written, and either
                 // null or an `NSError` it owns.
                 let (url, error) = unsafe { (url.as_ref(), error.as_ref()) };
                 let path = error.is_none().then(|| url.path().map(|p| PathBuf::from(p.to_string()))).flatten();
-                finish(&state, path, error.map(|e| e.localizedDescription().to_string()));
+                finish(&state, offered, path, error.map(|e| e.localizedDescription().to_string()));
             });
             // SAFETY: the destination is a file URL for a directory that exists, the options are
             // the empty dictionary the method documents, the queue is AppKit's main queue (where
@@ -327,16 +329,18 @@ mod mac {
         fallback: Vec<PathBuf>,
     }
 
-    /// One drop's promises, so the last one to land can stand in the plain paths if none arrived.
+    /// One drop's promises: the files kept in the order they were offered until the last of them
+    /// lands, and the plain paths to stand in if none does.
     struct Pending {
         id: DropId,
+        received: Vec<Option<PathBuf>>,
         outstanding: usize,
-        delivered: bool,
         fallback: Vec<PathBuf>,
     }
 
-    /// Reports one received file, or the pasteboard's plain paths once every promise has failed.
-    fn finish(state: &Rc<RefCell<Pending>>, path: Option<PathBuf>, error: Option<String>) {
+    /// Takes in the promise offered `offered`th, and once the drop's last one has landed reports
+    /// the files it produced — or the pasteboard's plain paths, if every promise failed.
+    fn finish(state: &Rc<RefCell<Pending>>, offered: usize, path: Option<PathBuf>, error: Option<String>) {
         let mut report = Vec::new();
         let id;
         {
@@ -345,12 +349,17 @@ mod mac {
             state.outstanding = state.outstanding.saturating_sub(1);
             match path {
                 Some(path) => {
-                    state.delivered = true;
-                    report.push(path);
+                    if let Some(slot) = state.received.get_mut(offered) {
+                        *slot = Some(path);
+                    }
                 }
                 None => log::warn!("a dropped file was promised but not written: {}", error.unwrap_or_else(|| "no reason given".into())),
             }
-            if state.outstanding == 0 && !state.delivered {
+            if state.outstanding > 0 {
+                return;
+            }
+            report.extend(state.received.iter_mut().filter_map(Option::take));
+            if report.is_empty() {
                 report.append(&mut state.fallback);
             }
         }
