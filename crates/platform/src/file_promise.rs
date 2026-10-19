@@ -523,20 +523,26 @@ mod pending_tests {
     use super::{DropId, PendingDrops};
 
     /// Any number of drags can be in flight, and the one that started first is as likely as any to
-    /// be the one still downloading: its position has to outlive the drops that overtake it.
+    /// be the one still downloading: its position has to outlive every drop that overtakes it,
+    /// however many of those are outstanding at once.
     #[test]
     fn a_slow_drops_position_outlives_the_drops_that_overtake_it() {
         let pending = PendingDrops::default();
         let slow = DropId(0);
         pending.dropped(slow, Some((120.0, 480.0)));
+
+        // Every one of these is still downloading too, so they are all outstanding together: a
+        // store that only kept the newest few would have let go of the slow drop long before the
+        // last of them was recorded.
         for later in 1..=64 {
-            let id = DropId(later);
-            let at = (later as f64, 0.0);
-            pending.dropped(id, Some(at));
-            assert_eq!(pending.take(id), Some(at));
+            pending.dropped(DropId(later), Some((later as f64, 0.0)));
         }
+        assert_eq!(pending.len(), 65, "a pending drop was forgotten before it was over");
 
         assert_eq!(pending.take(slow), Some((120.0, 480.0)), "the slow drop forgot where it landed");
+        for later in 1..=64 {
+            assert_eq!(pending.take(DropId(later)), Some((later as f64, 0.0)), "drop {later} forgot where it landed");
+        }
         assert!(pending.is_empty(), "a drop that is over is still remembered");
     }
 
