@@ -331,6 +331,8 @@ pub fn panel_menu_popup(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
                         }
                         ui.checkbox(&mut app.ui.timeline.show_thumbnails, tl!("Video Thumbnails"));
                         ui.checkbox(&mut app.ui.timeline.show_waveforms, tl!("Audio Waveforms"));
+                        ui.checkbox(&mut app.ui.timeline.show_video_names, tl!("Video Names"));
+                        ui.checkbox(&mut app.ui.timeline.show_audio_names, tl!("Audio Names"));
                     }
                     if p == PanelKind::Project {
                         ui.separator();
