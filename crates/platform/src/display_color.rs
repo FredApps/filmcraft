@@ -45,10 +45,11 @@ pub fn tag_windows_srgb() -> usize {
         // wgpu (raw-window-metal) puts its CAMetalLayer as a sublayer of the view's layer.
         // SAFETY: called on the main thread (`mtm`), reading the sublayers of a layer we hold a
         // strong reference to; the array is retained and only read.
-        if let Some(subs) = unsafe { root.sublayers() } {
-            for layer in subs.iter() {
-                tagged += tag(&layer);
-            }
+        let subs = unsafe { root.sublayers() };
+        // a snapshot of retained layers: each stays alive while it is tagged, and a change to the
+        // layer tree meanwhile cannot invalidate the loop (enumerating a mutated NSArray panics)
+        for layer in subs.map(|a| a.to_vec()).unwrap_or_default() {
+            tagged += tag(&layer);
         }
     }
     tagged
