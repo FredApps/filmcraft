@@ -551,8 +551,8 @@ impl VideoSamples for AviVideo<'_> {
         let (w, h) = (v.width.min(u32::from(u16::MAX)) as u16, v.height.min(u32::from(u16::MAX)) as u16);
         match &self.src.vcodec {
             VCodec::Jpeg => make_video_decoder(&SampleEntry::jpeg(w, h)),
-            VCodec::H264 => Ok(Box::new(crate::video::H264Decoder::annexb_with(self.src.nal.sets.clone())?)),
-            VCodec::Hevc => Ok(Box::new(crate::video::HevcDecoder::annexb_with(self.src.nal.sets.clone())?)),
+            VCodec::H264 => Ok(Box::new(crate::video::H264Decoder::annexb_with(self.src.nal.sets.clone()))),
+            VCodec::Hevc => Ok(Box::new(crate::video::HevcDecoder::annexb_with(self.src.nal.sets.clone()))),
             VCodec::Raw(f) => Ok(Box::new(RawVideoDecoder::new(*f, v.width, v.height, self.src.bottom_up)?)),
             VCodec::Unsupported(name) => Err(CodecError::Unsupported(format!("no decoder for {name} video"))),
         }

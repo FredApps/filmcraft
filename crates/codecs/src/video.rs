@@ -302,18 +302,23 @@ impl H264Decoder {
     }
     /// A decoder for Annex B byte-stream samples (start codes, in-band parameter sets: MXF, TS).
     pub fn annexb() -> Self {
-        recycle_h264_planes();
-        let threads = Self::threads_now();
-        Self { avcc: Vec::new(), setup: Vec::new(), dec: filmcraft_h264::Decoder::with_threads(threads), length_size: 0, draft: false, threads }
+        Self::annexb_with(Vec::new())
     }
     /// [`Self::annexb`] for a stream whose parameter sets (Annex B) a container's header carries
     /// instead of its samples (AVI written with global headers): the decoder is given them before
-    /// the first sample and again after every reset.
-    pub fn annexb_with(setup: Vec<u8>) -> Result<Self> {
+    /// the first sample and again after every reset. Sets that don't decode are left out, with a
+    /// warning, so a stream that repeats good ones in band still plays.
+    pub fn annexb_with(setup: Vec<u8>) -> Self {
         recycle_h264_planes();
         let threads = Self::threads_now();
-        let dec = Self::make_inner(&[], &setup, threads)?;
-        Ok(Self { avcc: Vec::new(), setup, dec, length_size: 0, draft: false, threads })
+        let (dec, setup) = match Self::make_inner(&[], &setup, threads) {
+            Ok(dec) => (dec, setup),
+            Err(e) => {
+                log::warn!("H.264: the parameter sets in the stream header don't decode ({e}); using those in the samples");
+                (filmcraft_h264::Decoder::with_threads(threads), Vec::new())
+            }
+        };
+        Self { avcc: Vec::new(), setup, dec, length_size: 0, draft: false, threads }
     }
     fn convert(p: filmcraft_h264::Picture) -> DecodedFrame {
         use std::sync::Arc;
@@ -426,14 +431,21 @@ impl HevcDecoder {
     }
     /// A decoder for Annex B byte-stream samples (start codes, in-band parameter sets: TS).
     pub fn annexb() -> Self {
-        Self { hvcc: Vec::new(), setup: Vec::new(), dec: filmcraft_hevc::Decoder::new(), length_size: 0, highest_tid: None }
+        Self::annexb_with(Vec::new())
     }
     /// [`Self::annexb`] for a stream whose parameter sets (Annex B) a container's header carries
     /// instead of its samples: the decoder is given them before the first sample and again after
-    /// every reset.
-    pub fn annexb_with(setup: Vec<u8>) -> Result<Self> {
-        let dec = Self::make_inner(&[], &setup)?;
-        Ok(Self { hvcc: Vec::new(), setup, dec, length_size: 0, highest_tid: None })
+    /// every reset. Sets that don't decode are left out, with a warning (see
+    /// [`H264Decoder::annexb_with`]).
+    pub fn annexb_with(setup: Vec<u8>) -> Self {
+        let (dec, setup) = match Self::make_inner(&[], &setup) {
+            Ok(dec) => (dec, setup),
+            Err(e) => {
+                log::warn!("HEVC: the parameter sets in the stream header don't decode ({e}); using those in the samples");
+                (filmcraft_hevc::Decoder::new(), Vec::new())
+            }
+        };
+        Self { hvcc: Vec::new(), setup, dec, length_size: 0, highest_tid: None }
     }
     fn convert(p: filmcraft_hevc::Picture) -> DecodedFrame {
         use filmcraft_hevc::Plane;
