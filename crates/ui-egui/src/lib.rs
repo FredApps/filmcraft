@@ -188,6 +188,10 @@ pub struct PromisedDrops {
     pub destination: Arc<Mutex<String>>,
     /// Files that have finished arriving, imported on the next frame as a drop of their own.
     pub arrived: Arc<Mutex<Vec<PromisedFiles>>>,
+    /// Drops whose files never arrived, reported in the status bar on the next frame. Nothing is
+    /// imported for them: what such a drag offers outright is a poster frame rather than the
+    /// movie it promised, and importing that is the very thing this exists to stop.
+    pub lost: Arc<Mutex<Vec<PromiseLost>>>,
 }
 
 /// Files of one promised drop that have arrived, with where that drop landed.
@@ -201,11 +205,27 @@ pub struct PromisedFiles {
     pub dropped_at: Option<egui::Pos2>,
 }
 
+/// Promises of one drop that the dragging source never kept.
+#[derive(Clone, Debug, Default)]
+pub struct PromiseLost {
+    /// How many files of the drop were lost.
+    pub files: usize,
+    /// What the source said about the first of them (an iCloud asset with nothing to download it
+    /// over, a destination it could not write to).
+    pub reason: String,
+}
+
 impl PromisedDrops {
     /// Hands over the files received so far, leaving the list empty.
     fn take(&self) -> Vec<PromisedFiles> {
         let mut arrived = self.arrived.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         std::mem::take(&mut arrived)
+    }
+
+    /// Hands over the drops that came to nothing, leaving the list empty.
+    fn take_lost(&self) -> Vec<PromiseLost> {
+        let mut lost = self.lost.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        std::mem::take(&mut lost)
     }
 
     /// Points the host at `dir` for the files of any drag it takes from here on.
@@ -1446,6 +1466,15 @@ impl FilmcraftApp {
         for promised in self.hooks.promised_drops.as_ref().map(PromisedDrops::take).unwrap_or_default() {
             let at = promised.dropped_at.or_else(|| self.drop_pointer(ctx));
             self.import_dropped(promised.paths, at);
+        }
+        // A promise the source never kept imports nothing, so the status bar is all the user has
+        // to tell them the file they dragged in is not there.
+        for lost in self.hooks.promised_drops.as_ref().map(PromisedDrops::take_lost).unwrap_or_default() {
+            self.ui.status = if lost.files == 1 {
+                tlf!("A dragged file could not be fetched: {why}", why = lost.reason)
+            } else {
+                tlf!("{n} dragged files could not be fetched: {why}", n = lost.files, why = lost.reason)
+            };
         }
         let mut paths = Vec::new();
         for f in ctx.input(|i| i.raw.dropped_files.clone()) {

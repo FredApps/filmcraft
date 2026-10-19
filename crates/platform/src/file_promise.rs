@@ -12,7 +12,8 @@
 //! Promises are a drag-time contract: the receiver must be read from the dragging pasteboard
 //! *during* the drop, and the files arrive asynchronously afterwards. So this intercepts the two
 //! dragging-destination methods on winit's window delegate, takes the drop when the pasteboard
-//! carries promises, and reports each file as it lands. Everything else (Finder, a file manager
+//! carries promises, and reports a drop's files once they have all landed (or what was lost, if
+//! the source never produced them). Everything else (Finder, a file manager
 //! on any other platform) keeps going through winit untouched.
 //!
 //! Like [`crate::cursor`], this is OS glue rather than media: it lives here because
@@ -41,6 +42,12 @@ pub struct Handlers {
     /// The host imports them as if they had been dropped, and must ask for a repaint: they arrive
     /// between frames.
     pub received: Box<dyn Fn(DropId, Vec<PathBuf>)>,
+    /// Promises of a drop that were never kept, once the drop is over: how many files were lost
+    /// and what the dragging source said about the first of them. Nothing stands in for them —
+    /// the drag's own paths are a poster frame rather than the movie, for Photos.app, and
+    /// importing that is the very thing this module exists to stop — so the host has only this to
+    /// tell the user with.
+    pub failed: Box<dyn Fn(DropId, usize, String)>,
 }
 
 /// Identifies one promised-file drop, so the host can match the files that eventually arrive to
@@ -193,11 +200,9 @@ mod mac {
             if receivers.is_empty() {
                 return None;
             }
-            // Both are of the drop rather than of the moment the files land: the pasteboard is
-            // gone by then (its plain paths stand in for promises that fail), and the
-            // destination follows the project the files were dropped on.
-            let fallback = plain_paths(&pb);
-            let drop = TakenDrop { id: next_drop(), destination: HANDLERS.with_borrow(|h| h.as_ref().map(|h| (h.destination)()))?, fallback };
+            // Read during the drop rather than when the files land: by then the destination may
+            // follow a different project than the one they were dropped on.
+            let drop = TakenDrop { id: next_drop(), destination: HANDLERS.with_borrow(|h| h.as_ref().map(|h| (h.destination)()))? };
             let at = dropped_at(sender);
             HANDLERS.with_borrow(|h| {
                 if let Some(h) = h.as_ref() {
@@ -291,15 +296,15 @@ mod mac {
     /// every promise fails, so an unusable destination or a source that gives up does not leave
     /// the drop with nothing.
     fn receive(receivers: &[Retained<NSFilePromiseReceiver>], drop: TakenDrop) {
-        let TakenDrop { id, destination, fallback } = drop;
+        let TakenDrop { id, destination } = drop;
         if let Err(e) = std::fs::create_dir_all(&destination) {
             log::warn!("dropped promised files: {} is not writable: {e}", destination.display());
-            deliver(id, fallback);
+            lost_files(id, receivers.len(), format!("{}: {e}", destination.display()));
             return;
         }
         let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&destination.to_string_lossy()), true);
 
-        let state = Rc::new(RefCell::new(Pending { id, received: vec![None; receivers.len()], outstanding: receivers.len(), fallback }));
+        let state = Rc::new(RefCell::new(Pending { id, received: vec![None; receivers.len()], outstanding: receivers.len(), lost: 0, reason: None }));
         let queue = NSOperationQueue::mainQueue();
         let options = NSDictionary::new();
         for (offered, receiver) in receivers.iter().enumerate() {
@@ -326,26 +331,25 @@ mod mac {
     struct TakenDrop {
         id: DropId,
         destination: PathBuf,
-        fallback: Vec<PathBuf>,
     }
 
     /// One drop's promises: the files kept in the order they were offered until the last of them
-    /// lands, and the plain paths to stand in if none does.
+    /// lands, and what became of the ones that were not.
     struct Pending {
         id: DropId,
         received: Vec<Option<PathBuf>>,
         outstanding: usize,
-        fallback: Vec<PathBuf>,
+        lost: usize,
+        reason: Option<String>,
     }
 
     /// Takes in the promise offered `offered`th, and once the drop's last one has landed reports
-    /// the files it produced — or the pasteboard's plain paths, if every promise failed.
+    /// the files it produced and whatever it failed to produce.
     fn finish(state: &Rc<RefCell<Pending>>, offered: usize, path: Option<PathBuf>, error: Option<String>) {
         let mut report = Vec::new();
-        let id;
+        let (id, lost, reason);
         {
             let Ok(mut state) = state.try_borrow_mut() else { return };
-            id = state.id;
             state.outstanding = state.outstanding.saturating_sub(1);
             match path {
                 Some(path) => {
@@ -353,17 +357,36 @@ mod mac {
                         *slot = Some(path);
                     }
                 }
-                None => log::warn!("a dropped file was promised but not written: {}", error.unwrap_or_else(|| "no reason given".into())),
+                None => {
+                    let error = error.unwrap_or_else(|| "no reason given".into());
+                    log::warn!("a dropped file was promised but not written: {error}");
+                    state.lost = state.lost.saturating_add(1);
+                    state.reason.get_or_insert(error);
+                }
             }
             if state.outstanding > 0 {
                 return;
             }
             report.extend(state.received.iter_mut().filter_map(Option::take));
-            if report.is_empty() {
-                report.append(&mut state.fallback);
-            }
+            (id, lost, reason) = (state.id, state.lost, state.reason.take());
         }
         deliver(id, report);
+        if let Some(reason) = reason {
+            lost_files(id, lost, reason);
+        }
+    }
+
+    /// Tells the host about promises the dragging source never kept. Nothing stands in for them:
+    /// what the drag offers outright is a poster frame rather than the movie it promised.
+    fn lost_files(id: DropId, files: usize, reason: String) {
+        if files == 0 {
+            return;
+        }
+        HANDLERS.with_borrow(|h| {
+            if let Some(h) = h.as_ref() {
+                (h.failed)(id, files, reason.clone());
+            }
+        });
     }
 
     /// Hands files to the host to import, if there are any.
@@ -378,14 +401,6 @@ mod mac {
         });
     }
 
-    /// The paths a pasteboard carries outright, as winit reads them.
-    fn plain_paths(pb: &NSPasteboard) -> Vec<PathBuf> {
-        let kind = NSString::from_str("NSFilenamesPboardType");
-        let Some(list) = pb.propertyListForType(&kind) else { return Vec::new() };
-        let Ok(list) = list.downcast::<NSArray>() else { return Vec::new() };
-        list.iter().filter_map(|o| o.downcast::<NSString>().ok()).map(|s| PathBuf::from(s.to_string())).collect()
-    }
-
     /// What a drop reports is decided here rather than by AppKit, so it can be tested without a
     /// drag: the promises are handed to [`finish`] exactly as their readers would, in whatever
     /// order they land.
@@ -393,59 +408,55 @@ mod mac {
     mod tests {
         use super::*;
 
-        /// The files `finish` reports for a drop whose promises land in `landing` order, each
-        /// either a path or a failure, with `fallback` as the drag's plain paths.
-        fn reported(landing: &[(usize, Option<&str>)], fallback: &[&str]) -> Vec<Vec<PathBuf>> {
-            let reports = Rc::new(RefCell::new(Vec::new()));
-            let seen = Rc::clone(&reports);
+        /// What `finish` reports for a drop whose promises land in `landing` order, each either
+        /// a path or a failure: the files imported, and the (count, reason) of what was lost.
+        #[allow(clippy::type_complexity)]
+        fn reported(landing: &[(usize, Option<&str>)]) -> (Vec<Vec<PathBuf>>, Vec<(usize, String)>) {
+            let files = Rc::new(RefCell::new(Vec::new()));
+            let losses = Rc::new(RefCell::new(Vec::new()));
+            let (seen, missing) = (Rc::clone(&files), Rc::clone(&losses));
             HANDLERS.with_borrow_mut(|h| {
                 *h = Some(Handlers {
                     destination: Box::new(PathBuf::new),
                     dropped: Box::new(|_, _| {}),
                     received: Box::new(move |_, files| seen.borrow_mut().push(files)),
+                    failed: Box::new(move |_, count, reason| missing.borrow_mut().push((count, reason))),
                 })
             });
-            let state = Rc::new(RefCell::new(Pending {
-                id: next_drop(),
-                received: vec![None; landing.len()],
-                outstanding: landing.len(),
-                fallback: fallback.iter().map(PathBuf::from).collect(),
-            }));
+            let state =
+                Rc::new(RefCell::new(Pending { id: next_drop(), received: vec![None; landing.len()], outstanding: landing.len(), lost: 0, reason: None }));
             for (offered, path) in landing {
                 finish(&state, *offered, path.map(PathBuf::from), path.is_none().then(|| "offline".to_string()));
             }
             HANDLERS.with_borrow_mut(|h| *h = None);
-            reports.borrow().clone()
+            (files.borrow().clone(), losses.borrow().clone())
         }
 
         /// A drop is one import, so its files are reported together once the last has landed —
         /// in the order the drag offered them, not the order they finished downloading in.
         #[test]
         fn a_drops_files_are_reported_once_in_the_order_they_were_offered() {
-            let landed = reported(&[(2, Some("/tmp/third.mov")), (0, Some("/tmp/first.mov")), (1, Some("/tmp/second.mov"))], &[]);
-            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/first.mov"), PathBuf::from("/tmp/second.mov"), PathBuf::from("/tmp/third.mov")]]);
+            let (imported, lost) = reported(&[(2, Some("/tmp/third.mov")), (0, Some("/tmp/first.mov")), (1, Some("/tmp/second.mov"))]);
+            assert_eq!(imported, vec![vec![PathBuf::from("/tmp/first.mov"), PathBuf::from("/tmp/second.mov"), PathBuf::from("/tmp/third.mov")]]);
+            assert!(lost.is_empty());
         }
 
-        /// A promise that fails (an iCloud asset with no connection to download it) loses its own
-        /// file and nothing else.
+        /// A promise that fails (an iCloud asset with no connection to download it) costs its own
+        /// file and is reported as lost; the files that did arrive are imported.
         #[test]
         fn a_failed_promise_leaves_the_files_that_did_arrive() {
-            let landed = reported(&[(0, None), (1, Some("/tmp/second.mov"))], &["/tmp/poster.jpeg"]);
-            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/second.mov")]], "the plain paths stand in for nothing that arrived");
+            let (imported, lost) = reported(&[(0, None), (1, Some("/tmp/second.mov"))]);
+            assert_eq!(imported, vec![vec![PathBuf::from("/tmp/second.mov")]]);
+            assert_eq!(lost, vec![(1, "offline".to_string())], "the user is told what did not arrive");
         }
 
-        /// Once every promise has failed the drag's plain paths stand in, so the drop is not lost.
+        /// Nothing stands in for a promise the source never kept: the drag's own paths are the
+        /// poster frame rather than the movie, and importing that is the bug this module fixes.
         #[test]
-        fn plain_paths_stand_in_when_no_promise_is_kept() {
-            let landed = reported(&[(0, None), (1, None)], &["/tmp/poster.jpeg"]);
-            assert_eq!(landed, vec![vec![PathBuf::from("/tmp/poster.jpeg")]]);
-        }
-
-        /// A drop that promised nothing usable and had no plain path reports nothing at all,
-        /// rather than an empty import.
-        #[test]
-        fn a_drop_with_nothing_to_show_reports_nothing() {
-            assert!(reported(&[(0, None)], &[]).is_empty());
+        fn a_drop_whose_promises_all_fail_imports_nothing_and_says_so() {
+            let (imported, lost) = reported(&[(0, None), (1, None)]);
+            assert!(imported.is_empty(), "no stand-in is imported");
+            assert_eq!(lost, vec![(2, "offline".to_string())]);
         }
     }
 }

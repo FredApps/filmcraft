@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
 use filmcraft_engine::Session;
-use filmcraft_ui_egui::{FilmcraftApp, PromisedDrops, PromisedFiles};
+use filmcraft_ui_egui::{FilmcraftApp, PromiseLost, PromisedDrops, PromisedFiles};
 use serde_json::json;
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
@@ -126,4 +126,19 @@ fn a_promised_file_lands_where_its_drop_did() {
     step(&mut h);
 
     assert_eq!(timeline_clips(&h), 1, "placed on the Timeline where the drop landed, not where the pointer went");
+}
+
+/// A promise the dragging source never keeps (an iCloud video with nothing to download it over)
+/// imports nothing at all: the drag's own path is the poster frame rather than the movie, and
+/// importing that is the bug this exists to fix. The user is told instead.
+#[test]
+fn a_promise_the_source_never_keeps_imports_nothing_and_says_so() {
+    let (mut h, promised) = harness();
+    let before = item_names(&h).len();
+
+    promised.lost.lock().unwrap().push(PromiseLost { files: 1, reason: "offline".into() });
+    step(&mut h);
+
+    assert_eq!(item_names(&h).len(), before, "no stand-in is imported");
+    assert_eq!(h.state().ui.status, "A dragged file could not be fetched: offline");
 }

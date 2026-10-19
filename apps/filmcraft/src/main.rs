@@ -362,10 +362,12 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
     let shared = filmcraft_ui_egui::PromisedDrops::default();
     let destination = Arc::clone(&shared.destination);
     let arrived = Arc::clone(&shared.arrived);
+    let lost = Arc::clone(&shared.lost);
     // Where each taken drop landed, read as it happens: its files can take minutes to arrive.
     let positions: Arc<Mutex<Vec<(DropId, Option<egui::Pos2>)>>> = Arc::new(Mutex::new(Vec::new()));
     let dropped_at = Arc::clone(&positions);
     let dropped_ctx = ctx.clone();
+    let failed_ctx = ctx.clone();
     let installed = filmcraft_platform::file_promise::install(filmcraft_platform::file_promise::Handlers {
         destination: Box::new(move || {
             let dir = destination.lock().unwrap_or_else(PoisonError::into_inner).clone();
@@ -390,6 +392,10 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
                 .push(filmcraft_ui_egui::PromisedFiles { paths: files.iter().map(|f| f.to_string_lossy().into_owned()).collect(), dropped_at: at });
             // The files arrive between frames: without this the import waits for the next one.
             ctx.request_repaint();
+        }),
+        failed: Box::new(move |_, files, reason| {
+            lost.lock().unwrap_or_else(PoisonError::into_inner).push(filmcraft_ui_egui::PromiseLost { files, reason });
+            failed_ctx.request_repaint();
         }),
     });
     installed.then_some(shared)
