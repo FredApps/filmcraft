@@ -19,7 +19,10 @@ Using it needs FFI into C / Objective-C APIs, which is `unsafe` Rust. The bindin
 
 Allow `unsafe` in exactly one crate, `crates/platform` (`filmcraft-platform`, layer L5), for one
 job: OS media FFI (hardware decoding, and hardware encoding through NVENC). Audio output, dialogs, menus
-and other OS integration do not go in it.
+and other OS integration do not go in it. The exceptions are two small window-system calls that
+need `unsafe` and that no safe binding offers: `cursor` (the pointer position during a drag) and
+`display_color` (tagging the macOS window's Metal layer with its colour space, #2115). They follow
+the same containment rules below.
 
 Containment rules:
 
