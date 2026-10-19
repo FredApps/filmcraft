@@ -49,6 +49,7 @@ pub enum Language {
     It,
     /// Korean; Hangul needs an installed system font ([`korean_font_available`]).
     Ko,
+    /// Lao; requires an installed Lao system font or craft-fonts.
     Lo,
 }
 
@@ -66,7 +67,7 @@ static ITALIAN: OnceLock<Catalog> = OnceLock::new();
 static LAO: OnceLock<Catalog> = OnceLock::new();
 
 impl Language {
-    pub const ALL: [Self; 12] = [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It, Self::Lo];
+    pub const ALL: [Self; 13] = [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It, Self::Lo];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -128,7 +129,7 @@ impl Language {
             ("in", Language::Id),
             ("it", Language::It),
             ("ko", Language::Ko),
-            ("lo", Language::lo),
+            ("lo", Language::Lo),
         ];
         tags.iter()
             .find_map(|tag| {
@@ -180,7 +181,7 @@ impl Language {
             Self::Id => Some(INDONESIAN.get_or_init(|| Catalog::parse(include_str!("id.tsv")))),
             Self::It => Some(ITALIAN.get_or_init(|| Catalog::parse(include_str!("it.tsv")))),
             Self::Ko => Some(KOREAN.get_or_init(|| Catalog::parse(include_str!("ko.tsv")))),
-            Self::Lo => LAO.get_or_init(|| Catalog::parse(include_str!("lo.tsv"))),
+            Some(LAO.get_or_init(|| Catalog::parse(include_str!("lo.tsv")))),
         }
     }
 
@@ -1049,7 +1050,7 @@ mod tests {
             assert_eq!(l(&[tag]), Language::It, "{tag}");
         }
         for tag in ["lo", "LO", "lo-LA", "lo_LA", "lo_LA.UTF-8", "LO-la"] {
-        assert_eq!(l(&[tag]), Language::Lo, "{tag}");
+            assert_eq!(l(&[tag]), Language::Lo, "{tag}");
         }
         assert_eq!(l(&["it-CH", "de-CH", "fr-CH", "en"]), Language::It);
         for none in [&["ita"][..], &["i"], &["-it"]] {
