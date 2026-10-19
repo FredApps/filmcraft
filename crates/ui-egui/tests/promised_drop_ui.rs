@@ -78,18 +78,15 @@ fn an_arrived_file_is_imported_only_once() {
     assert_eq!(imported, 1, "imported {imported} times: {:?}", item_names(&h));
 }
 
-/// A promise is fulfilled into a directory chosen before the drop, so while files hover the host
-/// is pointed at this project's (Project Settings ▸ Scratch Disks ▸ Captured).
+/// A promise is fulfilled into a directory chosen before the drop, and a drag that promises its
+/// files reports nothing as hovering, so the host is pointed at this project's (Project Settings ▸
+/// Scratch Disks ▸ Captured) whether or not anything is over the window.
 #[test]
-fn a_hovering_drag_points_the_host_at_the_projects_media_directory() {
-    let (mut h, promised) = harness();
-    assert_eq!(promised.destination.lock().unwrap().as_str(), "", "nothing is hovering yet");
-
-    h.input_mut().hovered_files.push(Default::default());
-    step(&mut h);
+fn the_host_is_pointed_at_the_projects_media_directory_without_a_hover() {
+    let (h, promised) = harness();
     let expected = filmcraft_engine::voiceover::captured_media_dir(&h.state().session, "Dropped Media");
-    h.input_mut().hovered_files.clear();
 
     assert!(!expected.is_empty());
+    assert!(h.input().hovered_files.is_empty(), "no drag is over the window");
     assert_eq!(promised.destination.lock().unwrap().as_str(), expected);
 }

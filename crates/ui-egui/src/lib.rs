@@ -181,8 +181,10 @@ pub struct HostHooks {
 /// Both are locked only to swap a string or drain a list, never across a frame.
 #[derive(Clone, Default)]
 pub struct PromisedDrops {
-    /// Where the host writes files it receives, kept up to date while a drag hovers so it follows
-    /// the open project (Project Settings ▸ Scratch Disks ▸ Captured).
+    /// Where the host writes files it receives, kept up to date so it follows the open project
+    /// (Project Settings ▸ Scratch Disks ▸ Captured). It cannot wait for files to hover: a drag
+    /// that promises its files has no path for the windowing layer to report as hovering, and the
+    /// host reads this the moment such a drag is dropped.
     pub destination: Arc<Mutex<String>>,
     /// Files that have finished arriving, imported on the next frame as a drop of their own.
     pub arrived: Arc<Mutex<Vec<String>>>,
@@ -195,10 +197,12 @@ impl PromisedDrops {
         std::mem::take(&mut arrived)
     }
 
-    /// Points the host at `dir` for the files of the drag now hovering.
+    /// Points the host at `dir` for the files of any drag it takes from here on.
     fn point_at(&self, dir: String) {
         let mut destination = self.destination.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        *destination = dir;
+        if *destination != dir {
+            *destination = dir;
+        }
     }
 }
 
@@ -1412,11 +1416,11 @@ impl FilmcraftApp {
     fn handle_drops(&mut self, ctx: &egui::Context) {
         // While files hover, the OS sends no cursor events: poll the cursor each frame to draw the Timeline preview.
         let hovering = ctx.input(|i| i.raw.hovered_files.len());
-        // A promise is fulfilled into a directory the host must know before the drop: while files
-        // are over the window, point it at this project's (Scratch Disks ▸ Captured).
-        if hovering > 0
-            && let Some(promised) = self.hooks.promised_drops.as_ref()
-        {
+        // A promise is fulfilled into a directory the host must know before the drop, and a drag
+        // that promises its files reports nothing as hovering (it has no path to report), so the
+        // host is kept pointed at this project's (Scratch Disks ▸ Captured) rather than told once
+        // a drag shows up.
+        if let Some(promised) = self.hooks.promised_drops.as_ref() {
             promised.point_at(filmcraft_engine::voiceover::captured_media_dir(&self.session, "Dropped Media"));
         }
         self.file_drag_hover = if hovering > 0 && self.session.prefs.timeline.drop_import_to_timeline {
