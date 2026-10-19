@@ -352,20 +352,16 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
 /// when the platform layer could not install itself, which leaves winit's drops as they were.
 #[cfg(target_os = "macos")]
 fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops> {
-    use filmcraft_platform::file_promise::DropId;
-    use std::collections::HashMap;
-    use std::sync::{Mutex, PoisonError};
+    use std::sync::PoisonError;
 
     let shared = filmcraft_ui_egui::PromisedDrops::default();
     let destination = Arc::clone(&shared.destination);
     let arrived = Arc::clone(&shared.arrived);
     let lost = Arc::clone(&shared.lost);
-    // Where each drop still waiting for its files landed, read as it happens: they can take
-    // minutes to arrive, however many drags are in flight, and the entry goes when the drop is
-    // over either way. Only a promise that neither lands nor fails leaves one behind.
-    let positions: Arc<Mutex<HashMap<DropId, Option<egui::Pos2>>>> = Arc::new(Mutex::new(HashMap::new()));
-    let dropped_at = Arc::clone(&positions);
-    let failed_at = Arc::clone(&positions);
+    let positions = filmcraft_platform::file_promise::PendingDrops::<egui::Pos2>::default();
+    let dropped_at = positions.clone();
+    let received_at = positions.clone();
+    let failed_at = positions;
     let dropped_ctx = ctx.clone();
     let failed_ctx = ctx.clone();
     let installed = filmcraft_platform::file_promise::install(filmcraft_platform::file_promise::Handlers {
@@ -384,10 +380,10 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
             let at = at
                 .map(|(x, y)| egui::pos2(x as f32 / zoom, y as f32 / zoom))
                 .or_else(|| dropped_ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos())));
-            dropped_at.lock().unwrap_or_else(PoisonError::into_inner).insert(id, at);
+            dropped_at.dropped(id, at);
         }),
         received: Box::new(move |id, files| {
-            let at = positions.lock().unwrap_or_else(PoisonError::into_inner).remove(&id).flatten();
+            let at = received_at.take(id);
             arrived
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
@@ -396,7 +392,7 @@ fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops
             ctx.request_repaint();
         }),
         failed: Box::new(move |id, files, reason| {
-            failed_at.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
+            failed_at.take(id);
             lost.lock().unwrap_or_else(PoisonError::into_inner).push(filmcraft_ui_egui::PromiseLost { files, reason });
             failed_ctx.request_repaint();
         }),

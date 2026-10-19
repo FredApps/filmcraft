@@ -55,6 +55,49 @@ pub struct Handlers {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DropId(pub u64);
 
+/// Where each drop still waiting for its files landed, held until that drop is over.
+///
+/// A promise can take minutes to keep (a 500 MB iCloud video is downloaded first) and any number
+/// of drags can be in flight over that time, so there is no count of pending drops worth guessing
+/// at: an entry goes when its drop lands or fails, and only a promise that does neither leaves
+/// one behind. The position is whatever the host works in — [`Handlers::dropped`] reports window
+/// points, which a host scales to its own before recording them here.
+pub struct PendingDrops<P>(std::sync::Arc<std::sync::Mutex<std::collections::HashMap<DropId, Option<P>>>>);
+
+impl<P> Clone for PendingDrops<P> {
+    fn clone(&self) -> Self {
+        Self(std::sync::Arc::clone(&self.0))
+    }
+}
+
+impl<P> Default for PendingDrops<P> {
+    fn default() -> Self {
+        Self(std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())))
+    }
+}
+
+impl<P> PendingDrops<P> {
+    /// Records where `id` was dropped, as the drop happens.
+    pub fn dropped(&self, id: DropId, at: Option<P>) {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(id, at);
+    }
+
+    /// Hands back where `id` was dropped and forgets it: the drop is over either way.
+    pub fn take(&self, id: DropId) -> Option<P> {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove(&id).flatten()
+    }
+
+    /// How many drops are still waiting for their files.
+    pub fn len(&self) -> usize {
+        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner).len()
+    }
+
+    /// Whether every drop taken so far is over.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 /// Takes over promised-file drops for the application's windows. Returns whether it did: `false`
 /// off macOS, when not on the main thread, or when the windowing layer's drag handling is not
 /// where this expects it (a winit the interception no longer fits) — the caller then keeps
@@ -472,5 +515,42 @@ mod mac {
             assert!(imported.is_empty(), "no stand-in is imported");
             assert_eq!(lost, vec![(2, "offline".to_string())]);
         }
+    }
+}
+
+#[cfg(test)]
+mod pending_tests {
+    use super::{DropId, PendingDrops};
+
+    /// Any number of drags can be in flight, and the one that started first is as likely as any to
+    /// be the one still downloading: its position has to outlive the drops that overtake it.
+    #[test]
+    fn a_slow_drops_position_outlives_the_drops_that_overtake_it() {
+        let pending = PendingDrops::default();
+        let slow = DropId(0);
+        pending.dropped(slow, Some((120.0, 480.0)));
+        for later in 1..=64 {
+            let id = DropId(later);
+            let at = (later as f64, 0.0);
+            pending.dropped(id, Some(at));
+            assert_eq!(pending.take(id), Some(at));
+        }
+
+        assert_eq!(pending.take(slow), Some((120.0, 480.0)), "the slow drop forgot where it landed");
+        assert!(pending.is_empty(), "a drop that is over is still remembered");
+    }
+
+    /// Nothing is left behind by a drop that lands, one that fails, or one with no position at all.
+    #[test]
+    fn a_drop_that_is_over_is_forgotten() {
+        let pending: PendingDrops<(f64, f64)> = PendingDrops::default();
+        pending.dropped(DropId(1), Some((10.0, 10.0)));
+        pending.dropped(DropId(2), None);
+        assert_eq!(pending.len(), 2);
+
+        assert_eq!(pending.take(DropId(2)), None, "a drop with no position reported one");
+        assert_eq!(pending.take(DropId(1)), Some((10.0, 10.0)));
+        assert!(pending.is_empty());
+        assert_eq!(pending.take(DropId(1)), None, "a drop was reported twice");
     }
 }
