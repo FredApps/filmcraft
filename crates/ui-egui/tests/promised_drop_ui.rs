@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
 use filmcraft_engine::Session;
-use filmcraft_ui_egui::{FilmcraftApp, PromisedDrops};
+use filmcraft_ui_egui::{FilmcraftApp, PromisedDrops, PromisedFiles};
 use serde_json::json;
 
 fn step(h: &mut Harness<'static, FilmcraftApp>) {
@@ -45,6 +45,11 @@ fn fixture(name: &str) -> PathBuf {
     p
 }
 
+/// The host reports `file` as having arrived for a drop made at `dropped_at`.
+fn arrive(promised: &PromisedDrops, file: &Path, dropped_at: Option<egui::Pos2>) {
+    promised.arrived.lock().unwrap().push(PromisedFiles { paths: vec![file.to_string_lossy().into_owned()], dropped_at });
+}
+
 fn item_names(h: &Harness<'static, FilmcraftApp>) -> Vec<String> {
     h.state().session.project.items.values().map(|i| i.name.clone()).collect()
 }
@@ -58,7 +63,7 @@ fn promised_files_are_imported_once_the_host_has_them() {
     assert!(!item_names(&h).iter().any(|n| n == "promised-drop.png"));
 
     // The drop itself carries no path (the host took it over), and the file lands a moment later.
-    promised.arrived.lock().unwrap().push(file.to_string_lossy().into_owned());
+    arrive(&promised, &file, None);
     step(&mut h);
 
     assert!(item_names(&h).iter().any(|n| n == "promised-drop.png"), "imported: {:?}", item_names(&h));
@@ -70,7 +75,7 @@ fn promised_files_are_imported_once_the_host_has_them() {
 fn an_arrived_file_is_imported_only_once() {
     let (mut h, promised) = harness();
     let file = fixture("promised-once.png");
-    promised.arrived.lock().unwrap().push(file.to_string_lossy().into_owned());
+    arrive(&promised, &file, None);
     for _ in 0..4 {
         step(&mut h);
     }
@@ -89,4 +94,36 @@ fn the_host_is_pointed_at_the_projects_media_directory_without_a_hover() {
     assert!(!expected.is_empty());
     assert!(h.input().hovered_files.is_empty(), "no drag is over the window");
     assert_eq!(promised.destination.lock().unwrap().as_str(), expected);
+}
+
+fn control_rect(h: &Harness<'static, FilmcraftApp>, id: &str) -> egui::Rect {
+    let [x, y, w, height] = h.state().auto.elements.iter().find(|e| e.id == id).or_else(|| h.state().auto.find(id)).unwrap().rect;
+    egui::Rect::from_min_size(egui::pos2(x, y), egui::vec2(w, height))
+}
+
+/// Clips on the active sequence's video tracks.
+fn timeline_clips(h: &Harness<'static, FilmcraftApp>) -> usize {
+    h.state().session.active_sequence().map(|q| q.video_tracks.iter().map(|t| t.items.len()).sum()).unwrap_or(0)
+}
+
+/// The files of a promised drop are placed where that drop landed, not where the pointer has got
+/// to by the time a long download finishes: here the pointer has left the Timeline entirely, and
+/// the file still lands on the track it was dropped on.
+#[test]
+fn a_promised_file_lands_where_its_drop_did() {
+    let (mut h, promised) = harness();
+    let file = fixture("promised-position.png");
+    let panel = control_rect(&h, "panel.Timeline");
+    let dropped_at = egui::pos2(panel.min.x + h.state().ui.timeline.header_w + 60.0, panel.min.y + 80.0);
+    assert_eq!(timeline_clips(&h), 0);
+
+    // The user moved on while the file downloaded, so the pointer is over the Project panel.
+    let elsewhere = control_rect(&h, "panel.Project").center();
+    h.input_mut().events.push(egui::Event::PointerMoved(elsewhere));
+    step(&mut h);
+    arrive(&promised, &file, Some(dropped_at));
+    step(&mut h);
+    step(&mut h);
+
+    assert_eq!(timeline_clips(&h), 1, "placed on the Timeline where the drop landed, not where the pointer went");
 }

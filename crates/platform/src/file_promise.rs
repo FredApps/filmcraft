@@ -27,10 +27,22 @@ pub struct Handlers {
     /// The directory to write received files to, asked for at each drop (so it can follow the
     /// open project's scratch disk). Created if it does not exist.
     pub destination: Box<dyn Fn() -> PathBuf>,
-    /// Files that have finished arriving, one call per file, on the main thread. The host imports
-    /// them as if they had been dropped, and must ask for a repaint: these arrive between frames.
-    pub received: Box<dyn Fn(Vec<PathBuf>)>,
+    /// A drop whose files are promised, reported on the main thread as it happens, before any of
+    /// them exists. The host records what it has to know about the drop *now*, such as where the
+    /// pointer was: the files can take minutes to arrive (a large iCloud asset is downloaded
+    /// first), by which time the drop is long over. Its [`DropId`] is the one the `received`
+    /// calls for those files carry.
+    pub dropped: Box<dyn Fn(DropId)>,
+    /// Files that have finished arriving, one call per file, on the main thread, with the id of
+    /// the drop that promised them. The host imports them as if they had been dropped, and must
+    /// ask for a repaint: these arrive between frames.
+    pub received: Box<dyn Fn(DropId, Vec<PathBuf>)>,
 }
+
+/// Identifies one promised-file drop, so the host can match the files that eventually arrive to
+/// the drop they belong to. Unique within a run; nothing is implied by its order or value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DropId(pub u64);
 
 /// Takes over promised-file drops for the application's windows. Returns whether it did: `false`
 /// off macOS, when not on the main thread, or when the windowing layer's drag handling is not
@@ -47,13 +59,13 @@ pub use mac::install;
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
 mod mac {
-    use super::Handlers;
+    use super::{DropId, Handlers};
     use objc2::rc::Retained;
     use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
     use objc2::{ClassType, MainThreadMarker, msg_send, sel};
     use objc2_app_kit::{NSApplication, NSFilePromiseReceiver, NSPasteboard, NSPasteboardType};
     use objc2_foundation::{NSArray, NSDictionary, NSError, NSOperationQueue, NSString, NSURL};
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::path::PathBuf;
     use std::rc::Rc;
     use std::sync::OnceLock;
@@ -67,6 +79,20 @@ mod mac {
     /// promises nothing.
     static ORIGINAL_PERFORM: OnceLock<Imp> = OnceLock::new();
     static ORIGINAL_ENTERED: OnceLock<Imp> = OnceLock::new();
+
+    thread_local! {
+        /// Hands out the [`DropId`] of each drop taken here.
+        static DROPS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// The id of the next promised drop.
+    fn next_drop() -> DropId {
+        DROPS.with(|n| {
+            let id = n.get().wrapping_add(1);
+            n.set(id);
+            DropId(id)
+        })
+    }
 
     /// A dragging-destination method: `(self, _cmd, sender) -> BOOL`. winit declares
     /// `draggingEntered:` with a `BOOL` return too, where AppKit reads an `NSDragOperation`; YES
@@ -163,9 +189,17 @@ mod mac {
             if receivers.is_empty() {
                 return None;
             }
-            // The plain paths stand in for promises that fail, so they are read while the
-            // dragging pasteboard still exists.
-            Some(after_this_event(this, receivers, plain_paths(&pb)))
+            // Both are of the drop rather than of the moment the files land: the pasteboard is
+            // gone by then (its plain paths stand in for promises that fail), and the
+            // destination follows the project the files were dropped on.
+            let fallback = plain_paths(&pb);
+            let drop = TakenDrop { id: next_drop(), destination: HANDLERS.with_borrow(|h| h.as_ref().map(|h| (h.destination)()))?, fallback };
+            HANDLERS.with_borrow(|h| {
+                if let Some(h) = h.as_ref() {
+                    (h.dropped)(drop.id);
+                }
+            });
+            Some(after_this_event(this, receivers, drop))
         }));
         match taken {
             Ok(Some(true)) => Bool::YES,
@@ -177,7 +211,7 @@ mod mac {
 
     /// Queues the fulfilment of `receivers` for the next turn of the run loop, once winit has
     /// finished handling the drop. Returns whether it could be queued.
-    fn after_this_event(delegate: *mut AnyObject, receivers: Vec<Retained<NSFilePromiseReceiver>>, fallback: Vec<PathBuf>) -> bool {
+    fn after_this_event(delegate: *mut AnyObject, receivers: Vec<Retained<NSFilePromiseReceiver>>, drop: TakenDrop) -> bool {
         if MainThreadMarker::new().is_none() {
             return false;
         }
@@ -186,9 +220,9 @@ mod mac {
         // is a live object, retained here for as long as the queued block needs it.
         let delegate = unsafe { Retained::retain(delegate.as_ptr()) };
         let Some(delegate) = delegate else { return false };
-        let once = RefCell::new(Some((receivers, fallback, delegate)));
+        let once = RefCell::new(Some((receivers, drop, delegate)));
         let block = block2::RcBlock::new(move || {
-            let Some((receivers, fallback, delegate)) = once.borrow_mut().take() else { return };
+            let Some((receivers, drop, delegate)) = once.borrow_mut().take() else { return };
             // winit clears the files it reported as hovering when it sees the drop or the drag
             // leaving. It sees neither of a drop taken here, and the UI would go on believing
             // files are over the window, so tell it the drag is gone.
@@ -196,7 +230,7 @@ mod mac {
             // SAFETY: the delegate is retained above and implements `draggingExited:`, whose
             // sender may be nil.
             unsafe { msg_send![delegate, draggingExited: std::ptr::null_mut::<AnyObject>()] }
-            receive(&receivers, fallback);
+            receive(&receivers, drop);
         });
         // SAFETY: the block takes no arguments and returns nothing, as the queue calls it, and
         // it is run on the main thread (the main queue's only thread), where everything it
@@ -226,16 +260,16 @@ mod mac {
     /// directory, and reports each one as it lands. The plain paths of the drag stand in when
     /// every promise fails, so an unusable destination or a source that gives up does not leave
     /// the drop with nothing.
-    fn receive(receivers: &[Retained<NSFilePromiseReceiver>], fallback: Vec<PathBuf>) {
-        let Some(destination) = HANDLERS.with_borrow(|h| h.as_ref().map(|h| (h.destination)())) else { return };
+    fn receive(receivers: &[Retained<NSFilePromiseReceiver>], drop: TakenDrop) {
+        let TakenDrop { id, destination, fallback } = drop;
         if let Err(e) = std::fs::create_dir_all(&destination) {
             log::warn!("dropped promised files: {} is not writable: {e}", destination.display());
-            deliver(fallback);
+            deliver(id, fallback);
             return;
         }
         let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(&destination.to_string_lossy()), true);
 
-        let state = Rc::new(RefCell::new(Pending { outstanding: receivers.len(), delivered: false, fallback }));
+        let state = Rc::new(RefCell::new(Pending { id, outstanding: receivers.len(), delivered: false, fallback }));
         let queue = NSOperationQueue::mainQueue();
         let options = NSDictionary::new();
         for receiver in receivers {
@@ -257,8 +291,17 @@ mod mac {
         }
     }
 
+    /// What a taken drop is worth knowing once it is over: everything here is read during the
+    /// drop, because the pasteboard and the drag are gone by the time the files arrive.
+    struct TakenDrop {
+        id: DropId,
+        destination: PathBuf,
+        fallback: Vec<PathBuf>,
+    }
+
     /// One drop's promises, so the last one to land can stand in the plain paths if none arrived.
     struct Pending {
+        id: DropId,
         outstanding: usize,
         delivered: bool,
         fallback: Vec<PathBuf>,
@@ -267,8 +310,10 @@ mod mac {
     /// Reports one received file, or the pasteboard's plain paths once every promise has failed.
     fn finish(state: &Rc<RefCell<Pending>>, path: Option<PathBuf>, error: Option<String>) {
         let mut report = Vec::new();
+        let id;
         {
             let Ok(mut state) = state.try_borrow_mut() else { return };
+            id = state.id;
             state.outstanding = state.outstanding.saturating_sub(1);
             match path {
                 Some(path) => {
@@ -281,17 +326,17 @@ mod mac {
                 report.append(&mut state.fallback);
             }
         }
-        deliver(report);
+        deliver(id, report);
     }
 
     /// Hands files to the host to import, if there are any.
-    fn deliver(files: Vec<PathBuf>) {
+    fn deliver(id: DropId, files: Vec<PathBuf>) {
         if files.is_empty() {
             return;
         }
         HANDLERS.with_borrow(|h| {
             if let Some(h) = h.as_ref() {
-                (h.received)(files);
+                (h.received)(id, files);
             }
         });
     }

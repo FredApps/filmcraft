@@ -187,12 +187,23 @@ pub struct PromisedDrops {
     /// host reads this the moment such a drag is dropped.
     pub destination: Arc<Mutex<String>>,
     /// Files that have finished arriving, imported on the next frame as a drop of their own.
-    pub arrived: Arc<Mutex<Vec<String>>>,
+    pub arrived: Arc<Mutex<Vec<PromisedFiles>>>,
+}
+
+/// Files of one promised drop that have arrived, with where that drop landed.
+#[derive(Clone, Debug, Default)]
+pub struct PromisedFiles {
+    /// The files themselves, which exist by now.
+    pub paths: Vec<String>,
+    /// Where the drag was dropped, in UI points, as the host read it at the drop rather than when
+    /// the files turned up: fulfilling a promise can take minutes (a 500 MB iCloud video is
+    /// downloaded first), and by then the pointer is wherever the user has moved on to.
+    pub dropped_at: Option<egui::Pos2>,
 }
 
 impl PromisedDrops {
     /// Hands over the files received so far, leaving the list empty.
-    fn take(&self) -> Vec<String> {
+    fn take(&self) -> Vec<PromisedFiles> {
         let mut arrived = self.arrived.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         std::mem::take(&mut arrived)
     }
@@ -1429,28 +1440,41 @@ impl FilmcraftApp {
         } else {
             None
         };
-        let dropped = ctx.input(|i| i.raw.dropped_files.clone());
-        // Files the host received for a drag that only promised them land after their drop, so
-        // they arrive as their own import (at the pointer, which has not moved on since).
-        let mut paths: Vec<String> = self.hooks.promised_drops.as_ref().map(PromisedDrops::take).unwrap_or_default();
-        for f in dropped {
+        // Files the host received for a drag that only promised them land after their drop, each
+        // batch with where its own drag was dropped: the pointer has moved on long before a large
+        // download finishes, so where they go is not read from it now.
+        for promised in self.hooks.promised_drops.as_ref().map(PromisedDrops::take).unwrap_or_default() {
+            let at = promised.dropped_at.or_else(|| self.drop_pointer(ctx));
+            self.import_dropped(promised.paths, at);
+        }
+        let mut paths = Vec::new();
+        for f in ctx.input(|i| i.raw.dropped_files.clone()) {
             let p = f.path();
             if p.exists() {
                 paths.push(p.to_string_lossy().to_string());
             }
         }
         if !paths.is_empty() {
-            let pointer = self.drop_pointer(ctx);
-            let imported = self.session.execute("file.import", json!({"paths": paths, "bin": self.import_bin().0}));
-            if let Ok(v) = imported
-                && let Some(pos) = pointer
-                && self.session.prefs.timeline.drop_import_to_timeline
-            {
-                let items: Vec<filmcraft_engine::project::ItemId> =
-                    v["items"].as_array().map(|a| a.iter().filter_map(|i| i.as_u64()).map(filmcraft_engine::project::ItemId).collect()).unwrap_or_default();
-                if !items.is_empty() {
-                    self.pending_timeline_drop = Some((items, pos));
-                }
+            let at = self.drop_pointer(ctx);
+            self.import_dropped(paths, at);
+        }
+    }
+
+    /// Imports files dropped on the window, and with Timeline ▸ drop imports to the timeline
+    /// queues them to be placed where the drop landed.
+    fn import_dropped(&mut self, paths: Vec<String>, at: Option<egui::Pos2>) {
+        if paths.is_empty() {
+            return;
+        }
+        let imported = self.session.execute("file.import", json!({"paths": paths, "bin": self.import_bin().0}));
+        if let Ok(v) = imported
+            && let Some(pos) = at
+            && self.session.prefs.timeline.drop_import_to_timeline
+        {
+            let items: Vec<filmcraft_engine::project::ItemId> =
+                v["items"].as_array().map(|a| a.iter().filter_map(|i| i.as_u64()).map(filmcraft_engine::project::ItemId).collect()).unwrap_or_default();
+            if !items.is_empty() {
+                self.pending_timeline_drop = Some((items, pos));
             }
         }
     }

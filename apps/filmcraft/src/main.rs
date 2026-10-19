@@ -352,17 +352,39 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
 /// when the platform layer could not install itself, which leaves winit's drops as they were.
 #[cfg(target_os = "macos")]
 fn promised_drops(ctx: egui::Context) -> Option<filmcraft_ui_egui::PromisedDrops> {
-    use std::sync::PoisonError;
+    use filmcraft_platform::file_promise::DropId;
+    use std::sync::{Mutex, PoisonError};
+    /// Drops still waiting for their files, oldest first. A drop whose promises never land leaves
+    /// its entry behind, so this is capped rather than cleared: the newest few are all that can
+    /// still be waiting, and an unknown id simply imports without a position.
+    const REMEMBERED_DROPS: usize = 16;
+
     let shared = filmcraft_ui_egui::PromisedDrops::default();
     let destination = Arc::clone(&shared.destination);
     let arrived = Arc::clone(&shared.arrived);
+    // Where each taken drop landed, read as it happens: its files can take minutes to arrive.
+    let positions: Arc<Mutex<Vec<(DropId, Option<egui::Pos2>)>>> = Arc::new(Mutex::new(Vec::new()));
+    let dropped_at = Arc::clone(&positions);
+    let dropped_ctx = ctx.clone();
     let installed = filmcraft_platform::file_promise::install(filmcraft_platform::file_promise::Handlers {
         destination: Box::new(move || {
             let dir = destination.lock().unwrap_or_else(PoisonError::into_inner).clone();
             if dir.is_empty() { std::env::temp_dir().join("FilmCraft").join("Dropped Media") } else { std::path::PathBuf::from(dir) }
         }),
-        received: Box::new(move |files| {
-            arrived.lock().unwrap_or_else(PoisonError::into_inner).extend(files.iter().map(|f| f.to_string_lossy().into_owned()));
+        dropped: Box::new(move |id| {
+            let at = dropped_ctx.input(|i| i.pointer.hover_pos().or(i.pointer.latest_pos()));
+            let mut positions = dropped_at.lock().unwrap_or_else(PoisonError::into_inner);
+            if positions.len() >= REMEMBERED_DROPS {
+                positions.remove(0);
+            }
+            positions.push((id, at));
+        }),
+        received: Box::new(move |id, files| {
+            let at = positions.lock().unwrap_or_else(PoisonError::into_inner).iter().rev().find(|(d, _)| *d == id).and_then(|(_, at)| *at);
+            arrived
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(filmcraft_ui_egui::PromisedFiles { paths: files.iter().map(|f| f.to_string_lossy().into_owned()).collect(), dropped_at: at });
             // The files arrive between frames: without this the import waits for the next one.
             ctx.request_repaint();
         }),
