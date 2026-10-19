@@ -166,7 +166,6 @@ fn main() -> eframe::Result {
 /// The main window's options; built for each start attempt (they hold a one-shot hook).
 fn native_options(agent: bool, data_dir: Option<&std::path::Path>) -> eframe::NativeOptions {
     eframe::NativeOptions {
-        persist_window: true,
         persistence_path: data_dir.map(|dir| dir.join("ui-state.ron")),
         viewport: egui::ViewportBuilder::default()
             .with_title("FilmCraft")
@@ -199,6 +198,12 @@ mod window_persistence_tests {
 
         assert!(options.persist_window);
         assert_eq!(options.persistence_path.as_deref(), Some(expected.as_path()));
+    }
+
+    #[test]
+    fn eframe_does_not_persist_egui_memory() {
+        let app = filmcraft_ui_egui::FilmcraftApp::new(filmcraft_engine::Session::default());
+        assert!(!eframe::App::persist_egui_memory(&app));
     }
 }
 
