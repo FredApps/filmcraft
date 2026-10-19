@@ -485,3 +485,31 @@ fn backspace_in_effect_controls_removes_the_selected_effect_not_the_clip() {
     assert!(has(&mut d, "motion"));
     assert!(d.app().session.active_sequence().unwrap().find_item(ClipId(clip)).is_some(), "the clip stays");
 }
+
+/// Backspace with a mask row selected in Effect Controls removes the mask (one undo step), not the clip.
+#[test]
+fn backspace_in_effect_controls_removes_the_selected_mask_not_the_clip() {
+    let mut d = Driver::demo();
+    let (clip, _) = d.first_clip();
+    d.exec("effects.apply", json!({"clips": [clip], "effect": "transform"}));
+    d.frames(2);
+    for fx in ["motion", "opacity", "time_remap"] {
+        d.click(&format!("effectControls.effect.{fx}.twirl"));
+    }
+    d.click("effectControls.effect.transform");
+    assert_eq!(d.app().ui.focused, filmcraft_ui_egui::dock::PanelKind::EffectControls, "the click focused Effect Controls");
+    d.exec("masks.add", json!({"clip": clip, "effect": "transform", "shape": "ellipse"}));
+    d.frames(2);
+    let st = |d: &mut Driver| {
+        let a = d.app();
+        let masks = a.session.active_sequence().unwrap().find_item(ClipId(clip)).map(|(_, it)| it.effect("transform").map_or(0, |e| e.masks.len()));
+        (masks, a.session.state.selected_mask.is_some(), a.session.state.selected_effect.is_none())
+    };
+    assert_eq!(st(&mut d), (Some(1), true, true), "a mask row is selected, no effect");
+    d.ok("ui.key", json!({"key": "Backspace"}));
+    d.frames(3);
+    assert!(d.app().session.active_sequence().unwrap().find_item(ClipId(clip)).is_some(), "the clip stays");
+    assert_eq!(st(&mut d).0, Some(0), "the mask is gone");
+    d.exec("edit.undo", json!({}));
+    assert_eq!(st(&mut d).0, Some(1), "Undo brings the mask back");
+}

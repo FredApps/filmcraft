@@ -1543,6 +1543,18 @@ impl FilmcraftApp {
                 }
                 continue;
             }
+            // A selected mask row (which clears the effect selection) goes the same way: the mask is
+            // removed, journaled, and never the clip.
+            if self.ui.focused == PanelKind::EffectControls
+                && matches!(id.as_str(), "edit.clear" | "edit.rippleDelete")
+                && self.session.state.selected_effect.is_none()
+                && let Some(m) = self.session.state.selected_mask
+            {
+                if let Err(e) = menus::invoke(self, ctx, "masks.remove", json!({"clip": m.clip.0, "effect": m.effect, "mask": m.mask})) {
+                    self.ui.status = e;
+                }
+                continue;
+            }
             // Mark In/Out in the Source monitor when it has focus.
             let params = if let Some(p) = clear {
                 p
