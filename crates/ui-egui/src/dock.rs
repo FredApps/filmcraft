@@ -189,6 +189,12 @@ pub const WORKSPACES_FILE: &str = "workspaces.json";
 pub struct WorkspacePrefs {
     pub saved: Vec<SavedWorkspace>,
     pub current: String,
+    /// Each workspace's panel arrangement as the app left it, auto-saved (debounced) on
+    /// change and at quit, and reapplied at start-up — separate from `saved`, which only
+    /// `Save Changes to this Workspace` writes and `Reset to Saved Layout` restores. Keyed
+    /// by workspace name, so a corrupt entry falls back to that workspace's saved layout.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub open: Vec<SavedWorkspace>,
 }
 
 /// A named layout. `layout` is a [`DockNode`] kept as JSON, so one unreadable entry (a panel a
@@ -257,6 +263,17 @@ pub fn find(prefs: &WorkspacePrefs, query: &str) -> Option<String> {
 /// The saved layout of a workspace: the user's saved version, else the built-in default.
 pub fn saved_layout(prefs: &WorkspacePrefs, name: &str) -> DockNode {
     saved_docking(prefs, name).root
+}
+
+/// A workspace's auto-saved arrangement (a [`WorkspacePrefs::open`] entry) as a layout, or
+/// why it cannot be used: unreadable, or a tree the dock would refuse (a panel a newer
+/// version removed, absurd sizes). The caller falls back to the saved layout.
+pub fn open_layout(entry: &SavedWorkspace) -> Result<Layout, String> {
+    let root: DockNode = serde_json::from_value(entry.layout.clone()).map_err(|e| e.to_string())?;
+    let floating = if entry.floating.is_null() { Vec::new() } else { serde_json::from_value(entry.floating.clone()).map_err(|e| e.to_string())? };
+    let layout = Layout { root, floating };
+    layout.validate()?;
+    Ok(layout)
 }
 
 pub fn saved_docking(prefs: &WorkspacePrefs, name: &str) -> Layout {
@@ -961,5 +978,39 @@ mod tests {
         d.open_near(PanelKind::Info, PanelKind::Source);
         assert!(d.is_visible(PanelKind::Info));
         assert_eq!(d, hsplit(SplitSize::Ratio(0.5), tabs(&[PanelKind::Effects, PanelKind::Info], 1), tabs(&[PanelKind::Markers], 0)));
+    }
+
+    /// The arrangement the app was left in round-trips through the workspaces file's `open`
+    /// entries, floating windows included; an unreadable entry is an error, so the caller
+    /// falls back to the workspace's saved layout.
+    #[test]
+    fn open_layout_round_trips_and_rejects_the_unreadable() {
+        let mut d = workspace("Editing");
+        assert!(d.activate(PanelKind::Source));
+        let entry = SavedWorkspace {
+            name: "Editing".into(),
+            layout: serde_json::to_value(&d).unwrap(),
+            floating: serde_json::to_value(vec![Floating { panels: vec![PanelKind::LumetriColor], active: 0, rect: [10.0, 20.0, 400.0, 300.0] }]).unwrap(),
+        };
+        // through the file: what `WorkspacePrefs::save` writes, `load` reads back
+        let prefs = WorkspacePrefs { current: "Editing".into(), open: vec![entry.clone()], ..Default::default() };
+        let back: WorkspacePrefs = serde_json::from_slice(&serde_json::to_vec(&prefs).unwrap()).unwrap();
+        assert_eq!(back, prefs);
+        let layout = open_layout(&back.open[0]).unwrap();
+        assert_eq!(layout.root, d);
+        assert_eq!(layout.floating.len(), 1);
+        assert_eq!(layout.floating[0].panels, vec![PanelKind::LumetriColor]);
+
+        // null floating windows (an arrangement without any) read back as none
+        let none = SavedWorkspace { floating: serde_json::Value::Null, ..entry.clone() };
+        assert!(open_layout(&none).unwrap().floating.is_empty());
+
+        // corrupt or foreign entries are errors, never a half-built layout
+        let mut broken = entry.clone();
+        broken.layout = serde_json::json!({"nonsense": true});
+        assert!(open_layout(&broken).is_err());
+        let mut foreign = entry;
+        foreign.layout = serde_json::to_value(DockNode::Tabs { panels: vec![], active: 3 }).unwrap();
+        assert!(open_layout(&foreign).is_err());
     }
 }

@@ -355,18 +355,39 @@ pub fn picture_rect(area: Rect, fw: f32, fh: f32, v: &MonitorView, ppp: f32) -> 
     }
 }
 
+/// How far one frame's wheel zooms the picture: about 10% per wheel notch, exponential in the
+/// travel so a notch out undoes a notch in exactly. A pinch (the trackpad gesture, or egui's own
+/// Cmd + wheel translation) is taken as it comes; a wheel is counted in its notches — classic
+/// wheels (Windows, Linux) say theirs in Line units, while precise wheels and trackpads (macOS,
+/// Windows precision touchpads, `ui.scroll`) report smooth Point travel, which a macOS notch's
+/// ~4 points of used to zoom a bare 1%: the wheel read as doing nothing. Their travel is scaled
+/// by about 8 points a notch so every wheel zooms alike.
+fn wheel_zoom_factor(w: &crate::panels::timeline::WheelInput) -> f32 {
+    const POINTS_PER_NOTCH: f32 = 8.0;
+    if (w.pinch - 1.0).abs() > 1e-4 {
+        return w.pinch;
+    }
+    let notches = w.notches.y + w.smooth.y / POINTS_PER_NOTCH;
+    if !notches.is_finite() || notches == 0.0 {
+        return 1.0;
+    }
+    (notches * 1.1_f32.ln()).exp().clamp(0.5, 2.0)
+}
+
 /// Zoom and pan the picture `pic` shown in `area`: the wheel (or a pinch) zooms about the pointer,
 /// from Fit too, between the zoom menu's 10% and 1600%; a middle-button drag, or a drag with the
 /// Hand tool, pans a magnified picture. `fw` is the picture's width in frame pixels.
 pub fn zoom_pan_input(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area: Rect, pic: Rect, fw: f32, ppp: f32) {
     let ctx = ui.ctx().clone();
-    if ui.rect_contains_pointer(area)
+    // The pointer test must ignore the picture's paint clip: at Fit the monitor clips its painting
+    // to the fitted picture (+12 pt), and `Ui::rect_contains_pointer` intersects with that clip,
+    // so the wheel over the letterbox surround silently did nothing until the view was zoomed.
+    // `Context::rect_contains_pointer` tests the layer and rect alone.
+    if ctx.rect_contains_pointer(ui.layer_id(), area)
         && let Some(p) = ctx.pointer_hover_pos()
     {
-        // about 10% per wheel notch (40 points), exponential in the wheel travel so a notch out
-        // undoes a notch in exactly
         let wheel = crate::panels::timeline::wheel_input(&ctx);
-        let f = if (wheel.pinch - 1.0).abs() > 1e-4 { wheel.pinch } else { (wheel.delta.y * 1.1_f32.ln() / 40.0).exp().clamp(0.5, 2.0) };
+        let f = wheel_zoom_factor(&wheel);
         if (f - 1.0).abs() > 1e-4 && pic.width() > 0.0 && fw > 0.0 {
             let cur = pic.width() * ppp / fw;
             let z = (cur * f).clamp(ZOOMS[0].1, ZOOMS[ZOOMS.len() - 1].1);
@@ -387,7 +408,7 @@ pub fn zoom_pan_input(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area:
     // a middle-button drag that began over the picture pans it, whatever the tool
     let held = egui::Id::new((prefix(w), "middle-pan"));
     let (pressed, down, moved) = ui.input(|i| (i.pointer.button_pressed(egui::PointerButton::Middle), i.pointer.middle_down(), i.pointer.delta()));
-    let panning = down && (ui.data(|m| m.get_temp::<bool>(held)).unwrap_or(false) || (pressed && ui.rect_contains_pointer(area)));
+    let panning = down && (ui.data(|m| m.get_temp::<bool>(held)).unwrap_or(false) || (pressed && ctx.rect_contains_pointer(ui.layer_id(), area)));
     ui.data_mut(|m| m.insert_temp(held, panning));
     if panning {
         ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
@@ -925,6 +946,48 @@ pub fn dialogs(app: &mut FilmcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The wheel zoom factor for a frame carrying these raw events, through the same
+    /// `wheel_input` the panels read.
+    fn zoomed_by(events: Vec<egui::Event>) -> f32 {
+        let ctx = egui::Context::default();
+        let mut raw = egui::RawInput::default();
+        raw.events = events;
+        ctx.begin_pass(raw);
+        wheel_zoom_factor(&crate::panels::timeline::wheel_input(&ctx))
+    }
+
+    fn wheel(unit: egui::MouseWheelUnit, dy: f32) -> egui::Event {
+        egui::Event::MouseWheel { unit, delta: egui::vec2(0.0, dy), modifiers: Default::default(), phase: egui::TouchPhase::Move }
+    }
+
+    /// A notch zooms about a tenth whatever wheel reports it: classic wheels count their notches
+    /// in Line units, precise wheels (macOS, precision touchpads, `ui.scroll`) in ~8 points of
+    /// smooth Point travel each. The old flat 40-points-a-notch read a macOS notch's ~4 points
+    /// as a 1% zoom — "the wheel does nothing".
+    #[test]
+    fn a_wheel_notch_zooms_a_tenth_whatever_reports_it() {
+        let tenth = 1.1_f32;
+        assert!((zoomed_by(vec![wheel(egui::MouseWheelUnit::Line, 1.0)]) - tenth).abs() < 1e-4, "a classic wheel's notch");
+        assert!((zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, 8.0)]) - tenth).abs() < 1e-4, "8 points of precise travel");
+        assert!((zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, 4.0)]) - tenth.sqrt()).abs() < 1e-3, "a macOS notch's ~4 points is now visible");
+        // a notch out undoes a notch in exactly, and nothing at all is exactly 1
+        assert_eq!(zoomed_by(vec![wheel(egui::MouseWheelUnit::Line, 1.0), wheel(egui::MouseWheelUnit::Line, -1.0)]), 1.0);
+        assert_eq!(zoomed_by(Vec::new()), 1.0);
+        assert_eq!(zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, 0.0)]), 1.0);
+        // a wild flick is bounded, hostile travel ignored
+        assert_eq!(zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, 1e6)]), 2.0);
+        assert_eq!(zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, -1e6)]), 0.5);
+        assert_eq!(zoomed_by(vec![wheel(egui::MouseWheelUnit::Point, f32::NAN)]), 1.0);
+    }
+
+    /// A pinch is taken as it comes and wins over any wheel travel of the same frame.
+    #[test]
+    fn a_pinch_is_taken_as_it_comes() {
+        assert!((zoomed_by(vec![egui::Event::Zoom(1.1)]) - 1.1).abs() < 1e-4);
+        assert!((zoomed_by(vec![egui::Event::Zoom(1.1), wheel(egui::MouseWheelUnit::Line, 3.0)]) - 1.1).abs() < 1e-4, "the pinch wins");
+        assert_eq!(zoomed_by(vec![egui::Event::Zoom(0.0), egui::Event::Zoom(f32::NAN)]), 1.0, "hostile pinch factors are dropped by the reader");
+    }
 
     #[test]
     fn snap_axis_picks_the_closest_target_within_reach() {

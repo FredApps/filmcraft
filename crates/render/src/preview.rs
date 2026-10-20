@@ -486,7 +486,8 @@ fn cpu_layer(project: &Project, it: &TrackItem) -> bool {
     let fx = it.effects.iter().any(|e| e.enabled && e.def().is_some_and(|d| !d.intrinsic)) || it.has_opacity_masks();
     let blend = crate::opacity_blend(it, it.source_in).1 != crate::Blend::Normal;
     let nested = project.item(it.item).is_some_and(|p| matches!(p.kind, ItemKind::Sequence(_)));
-    fx || blend || nested
+    // a shutter-sampled Motion (animated intrinsic transform) composites on the CPU too
+    fx || blend || nested || crate::motion_is_animated(it)
 }
 
 fn layer_cost(project: &Project, it: &TrackItem, px: f64, force_cpu: bool) -> f64 {

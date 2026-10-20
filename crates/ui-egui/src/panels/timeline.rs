@@ -30,7 +30,12 @@ const RULER_H: f32 = 44.0;
 const SCROLLBAR_H: f32 = 17.0;
 const DIVIDER_H: f32 = 5.0;
 const MASTER_H: f32 = 34.0;
-const SNAP_PX: f32 = 9.0;
+/// How near (px) a dragged edge or clip snaps to another edit, the playhead, a marker or an
+/// in/out. Kept at or below the clip-edge zone ([`super::timeline_hit::EDGE_PX`]) so snapping
+/// never engages on a press that is really on an edge — a snap radius wider than the edge zone
+/// made presses near a cut land on the clip body and start a move, which felt like trims
+/// refusing to grab.
+pub(crate) const SNAP_PX: f32 = 9.0;
 /// How far from a cut (px) a transition dropped on empty track space still lands on that cut —
 /// the drop aims at the gap between segments, not at a clip's pixels.
 const DROP_EDGE_PX: f32 = 96.0;
@@ -246,6 +251,19 @@ fn new_track_at(seq: &Sequence, layout: &Layout, y: f32, vh: f32, ah: f32) -> Op
     }
 }
 
+/// The row a drop at `y` lands on: the row under the pointer when it takes the drop, else the
+/// nearest row that does. A release over the divider between the video and audio tracks, a
+/// caption row or the Mix row — or over a row of the wrong kind for what is dragged — used to
+/// resolve to no track at all, and the drop was silently swallowed; it now lands on the nearest
+/// row that can take it, which is where it visually belongs. `None` when no row accepts.
+fn nearest_row<'a>(layout: &'a Layout, y: f32, accept: &impl Fn(&Row) -> bool) -> Option<&'a Row> {
+    if let Some(r) = layout.row_at(y).filter(|r| accept(r)) {
+        return Some(r);
+    }
+    // nearest by row centre; a tie stays with the upper row, the first in `rows`
+    layout.rows.iter().filter(|r| accept(r)).min_by(|a, b| (a.rect.center().y - y).abs().total_cmp(&(b.rect.center().y - y).abs()))
+}
+
 /// The top of each of `n` video rows `vh` high, V1 first: V1 sits at the bottom of `area` and the
 /// tracks stack upward; `v_scroll` (clamped here) shifts them up. Also gives the largest `v_scroll`.
 /// The scroll range includes one empty track's height above the top track: without it, tracks that
@@ -352,7 +370,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             v.fit_pending = false;
             v.fit_empty = empty.then_some(v.target_pps);
         }
-        let k = 1.0 - (-dt * 20.0).exp();
+        // Timeline scroll/zoom easing; Interface Animations off snaps every gesture to its end.
+        let k = if app.session.prefs.appearance.animations { 1.0 - (-dt * 20.0).exp() } else { 1.0 };
         let zooming = (v.pps - v.target_pps).abs() / v.target_pps > 0.001;
         // video thumbnails keep the layout of the zoom a gesture or animation started at (#1094)
         if zooming || matches!(app.tl.drag, Some(Drag::ZoomBar { mode: 1 | 2, .. })) {
@@ -600,7 +619,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             for (start, end, ghost) in show {
                 let x0 = layout.x_of(start);
                 let x1 = layout.x_of(end);
-                let tr_rect = Rect::from_min_max(pos2(x0, r.rect.min.y + 17.0), pos2(x1, r.rect.max.y - 1.0));
+                let tr_rect = super::timeline_hit::transition_band(r.rect, x0, x1);
                 let selected = app.session.state.transition_selection.contains(&trn.id);
                 draw_transition(&p, tr_rect, trn, ghost || selected, &t);
                 let suffix = if ghost { ".copy" } else { "" };
@@ -760,22 +779,29 @@ fn empty_state(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             app.ui.status = e.to_string();
         }
     }
-    // OS files dropped on an empty Timeline: import already happened; create a sequence from the first item
-    if let Some((items, p)) = app.pending_timeline_drop.clone()
-        && rect.contains(p)
-        && let Some((first, rest)) = items.split_first()
-    {
-        app.pending_timeline_drop = None;
-        if let Err(e) = app.session.execute("file.newSequence", json!({"fromItem": first.0})) {
-            app.ui.status = e.to_string();
-        } else {
-            let mut t = app.session.project.item(*first).map(|i| i.duration()).unwrap_or(Tick::ZERO);
-            for item in rest {
-                let params = json!({"item": item.0, "time": t.0, "insert": false});
-                if let Err(e) = app.session.execute("timeline.place", params) {
-                    app.ui.status = e.to_string();
-                } else {
-                    t = Tick(t.0.saturating_add(app.session.project.item(*item).map(|i| i.duration().0.max(0)).unwrap_or(0)));
+    // OS files dropped on an empty Timeline: import already happened; create a sequence from the
+    // first item. The Timeline was drawn this frame, so it also owns the pending drop's fate: a
+    // point that was never over this panel cancels it (a bin import is all it ever was); one a
+    // covering panel hides waits here until the panel moves (the drop landed seconds after the
+    // files were let go, and used to be thrown away on any frame the Timeline missed).
+    if let Some((items, p)) = app.pending_timeline_drop.clone() {
+        if !rect.contains(p) {
+            app.pending_timeline_drop = None;
+        } else if app.timeline_drop_target(ui.ctx(), p)
+            && let Some((first, rest)) = items.split_first()
+        {
+            app.pending_timeline_drop = None;
+            if let Err(e) = app.session.execute("file.newSequence", json!({"fromItem": first.0})) {
+                app.ui.status = e.to_string();
+            } else {
+                let mut t = app.session.project.item(*first).map(|i| i.duration()).unwrap_or(Tick::ZERO);
+                for item in rest {
+                    let params = json!({"item": item.0, "time": t.0, "insert": false});
+                    if let Err(e) = app.session.execute("timeline.place", params) {
+                        app.ui.status = e.to_string();
+                    } else {
+                        t = Tick(t.0.saturating_add(app.session.project.item(*item).map(|i| i.duration().0.max(0)).unwrap_or(0)));
+                    }
                 }
             }
         }
@@ -1275,6 +1301,10 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             p.line_segment([pos2(hrect.min.x, hrect.min.y + 0.5), pos2(hrect.max.x, hrect.min.y + 0.5)], Stroke::new(1.0, t.separator));
         }
         let label = format!("{}{}", if r.kind == TrackKind::Video { "V" } else { "A" }, r.index + 1);
+        // the track's label colour: a strip on the header's left edge (Timeline ▸ setTrack label)
+        if let Some(l) = tr.label {
+            p.rect_filled(Rect::from_min_max(hrect.min, pos2(hrect.min.x + 3.0, hrect.max.y)), 0.0, label_color(app, l));
+        }
         let btn_rect = |x0: f32| Rect::from_min_max(pos2(hrect.min.x + x0, hrect.min.y + 1.0), pos2(hrect.min.x + x0 + 24.0, hrect.max.y - 2.0));
         // 1. source patch (absent when unpatched)
         let patched = if r.kind == TrackKind::Video { tg.video_dest == Some(r.track) } else { tg.audio_dest == Some(r.track) };
@@ -1407,6 +1437,30 @@ fn draw_headers(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, rows:
             let h = if r.kind == TrackKind::Video { &mut app.ui.timeline.video_track_h } else { &mut app.ui.timeline.audio_track_h };
             *h = if *h < 50.0 { 64.0 } else { 30.0 };
         }
+        // right-click the name area: the header menu, with the track's label colour
+        resp.context_menu(|ui| {
+            ui.set_min_width(180.0);
+            let menu = ui.menu_button(tl!("Label"), |ui| {
+                let labels = app.session.prefs.labels.clone();
+                let none = ui.selectable_label(tr.label.is_none(), tl!("None"));
+                app.auto.add_response(&format!("timeline.trackMenu.{label}.none"), &none, "None");
+                if none.clicked() {
+                    if let Err(e) = app.session.execute("timeline.setTrack", json!({"track": r.track.0, "label": "None"})) {
+                        app.ui.status = e.to_string();
+                    }
+                    ui.close();
+                }
+                for l in filmcraft_project::Label::ALL {
+                    if crate::menus::label_choice(ui, &mut app.auto, &labels, l, &format!("timeline.trackMenu.{label}")).clicked() {
+                        if let Err(e) = app.session.execute("timeline.setTrack", json!({"track": r.track.0, "label": l.name()})) {
+                            app.ui.status = e.to_string();
+                        }
+                        ui.close();
+                    }
+                }
+            });
+            app.auto.add_response(&format!("timeline.trackMenu.{label}.label"), &menu.response, crate::i18n::t("Label"));
+        });
     }
     // column separator
     ui.painter().line_segment([pos2(rect.min.x + hw - 0.5, vclip.min.y), pos2(rect.min.x + hw - 0.5, aclip.max.y + MASTER_H)], Stroke::new(1.0, t.separator));
@@ -2187,6 +2241,12 @@ fn multicam_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, picked: &[&TrackItem
 pub(crate) struct WheelInput {
     /// Scroll in points (wheel lines and pages converted), positive = content moves right / down.
     pub(crate) delta: egui::Vec2,
+    /// The Point-unit (precise) part of [`Self::delta`]: trackpads and macOS wheels report smooth
+    /// travel, no notch at a time (`ui.scroll`'s synthetic wheel too).
+    pub(crate) smooth: egui::Vec2,
+    /// The Line/Page-unit part as notches: one a click of a classic wheel (Windows and Linux
+    /// mice), ten a page. Precise wheels stay 0 here.
+    pub(crate) notches: egui::Vec2,
     /// Pinch factor (1 = none).
     pub(crate) pinch: f32,
     command: bool,
@@ -2199,17 +2259,24 @@ pub(crate) struct WheelInput {
 /// meaning for both. The modifiers are those of the events (a script's wheel carries its own).
 pub(crate) fn wheel_input(ctx: &egui::Context) -> WheelInput {
     ctx.input(|i| {
-        let mut w = WheelInput { delta: egui::Vec2::ZERO, pinch: 1.0, command: false, alt: false, shift: false };
+        let mut w =
+            WheelInput { delta: egui::Vec2::ZERO, smooth: egui::Vec2::ZERO, notches: egui::Vec2::ZERO, pinch: 1.0, command: false, alt: false, shift: false };
         for e in &i.events {
             match e {
                 egui::Event::MouseWheel { unit, delta, modifiers, .. } => {
-                    let points = match unit {
-                        egui::MouseWheelUnit::Point => 1.0,
-                        egui::MouseWheelUnit::Line => 40.0,
-                        egui::MouseWheelUnit::Page => 400.0,
+                    // egui's own normalisation: a line is 40 points (8 on the web), a page 400
+                    let (points, notches) = match unit {
+                        egui::MouseWheelUnit::Point => (1.0, 0.0),
+                        egui::MouseWheelUnit::Line => (40.0, 1.0),
+                        egui::MouseWheelUnit::Page => (400.0, 10.0),
                     };
                     if delta.x.is_finite() && delta.y.is_finite() {
                         w.delta += *delta * points;
+                        w.smooth += match unit {
+                            egui::MouseWheelUnit::Point => *delta,
+                            _ => egui::Vec2::ZERO,
+                        };
+                        w.notches += *delta * notches;
                     }
                     w.command |= modifiers.command || modifiers.mac_cmd || modifiers.ctrl;
                     w.alt |= modifiers.alt;
@@ -2383,9 +2450,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
     if !app.tl.cancelled && (resp.drag_started() || (resp.clicked() && app.tl.drag.is_none())) {
         let pressed = match app.tl.pressed.take() {
             Some(pr) => pr,
-            // a press and release in the same frame is never stored: it happened where egui says
+            // a press whose frame stored nothing (a press and release in the same frame, or one
+            // that began on a widget above the tracks): decide it where the button went down —
+            // the press origin — not wherever the pointer has since moved past egui's 6 pt drag
+            // threshold, so the grab stays what the press pointed at
             None => {
-                let Some(p) = resp.interact_pointer_pos() else { return };
+                let Some(p) = ctx.input(|i| i.pointer.press_origin()).or(resp.interact_pointer_pos()) else { return };
                 Pressed { pos: p, tick: layout.tick_at(p.x), grab: grab_at(seq, layout, p, tool, mods, roll_ripple) }
             }
         };
@@ -2395,6 +2465,20 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         let grab = match pressed.grab {
             Grab::Volume { .. } if resp.clicked() && !adding => Grab::Other(pressed.grab.hit()),
             g => g,
+        };
+        // A click (not a drag) on a transition's band picks the strip the user can see and
+        // clicks, even where the band is drawn across a clip edge: selection, Set Transition
+        // Duration, the works. A drag from the same point keeps the edge and trims — the cursor
+        // promised a trim there (see `timeline_hit::hit`).
+        let grab = if resp.clicked()
+            && !resp.drag_started()
+            && tool == Tool::Selection
+            && !matches!(grab, Grab::Volume { .. })
+            && let Some(h) = super::timeline_hit::transition_under_pointer(seq, layout, p)
+        {
+            Grab::Other(h)
+        } else {
+            grab
         };
         let started = match (tool, grab) {
             // a middle-button drag pans whatever the tool and whatever it starts on, as in the
@@ -2788,19 +2872,23 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         }
     }
 
-    // ---- double-click a transition: Set Transition Duration (Premiere)
+    // ---- double-click a transition: Set Transition Duration (Premiere). The band wins over
+    // what is under it (a clip edge at the cut, the clip itself) — the strip is what is drawn
+    // and what the user double-clicks.
     if resp.double_clicked()
         && tool == Tool::Selection
         && let Some(p) = resp.interact_pointer_pos()
-        && let Hit::Transition { id, .. } = hit(seq, layout, p)
+        && let Some(Hit::Transition { id, .. }) = super::timeline_hit::transition_under_pointer(seq, layout, p)
     {
         crate::panels::transition_controls::open_duration(app, id);
     }
 
-    // ---- double-click a nested sequence clip: open it in its own Timeline tab
+    // ---- double-click a nested sequence clip: open it in its own Timeline tab (a transition's
+    // band above it belongs to the transition: its double-click is Set Transition Duration)
     if resp.double_clicked()
         && tool == Tool::Selection
         && let Some(p) = resp.interact_pointer_pos()
+        && super::timeline_hit::transition_under_pointer(seq, layout, p).is_none()
         && let Hit::Clip { clip, .. } = hit(seq, layout, p)
         && seq.find_item(clip).is_some_and(|(_, it)| app.session.project.sequence(it.item).is_some())
     {
@@ -2811,10 +2899,12 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
     }
 
     // ---- double-click any other clip (not on its edge): open its media in the Source monitor at
-    // the matching frame (Premiere); graphic clips have no source to show
+    // the matching frame (Premiere); graphic clips have no source to show. A transition's band
+    // over the clip keeps the click for the transition, as above.
     if resp.double_clicked()
         && tool == Tool::Selection
         && let Some(p) = resp.interact_pointer_pos()
+        && super::timeline_hit::transition_under_pointer(seq, layout, p).is_none()
         && let Hit::Clip { clip, edge: None, .. } = hit(seq, layout, p)
         && seq
             .find_item(clip)
@@ -2856,8 +2946,11 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         }
         ctx.data_mut(|d| d.insert_temp(marker_menu_id, marker.map(|m| m.id)));
     }
+    // (a transition's band above a clip keeps the right-click for the clip menu of the current
+    // selection, as before the edge-priority change: only a *press that drags* trims through it)
     if resp.secondary_clicked()
         && let Some(p) = resp.interact_pointer_pos()
+        && super::timeline_hit::transition_under_pointer(seq, layout, p).is_none()
         && let Hit::Clip { clip, edge, track } = hit(seq, layout, p)
     {
         ctx.data_mut(|d| d.insert_temp(menu_clip_id, clip));
@@ -2961,12 +3054,26 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         && app.timeline_drop_target(ui.ctx(), p)
     {
         let source = crate::panels::dragged_source(ui);
-        let row = layout.row_at(p.y).cloned().filter(|r| {
+        // Where the drop lands: the row under the pointer when it takes it; the empty bands that
+        // add a track keep their own meaning (#483); anywhere else — the divider, a caption row,
+        // the Mix row, a row of the wrong kind for what is dragged — the nearest row that takes
+        // it, where the highlight below says it will land (a release there used to resolve to no
+        // target at all, and the drop was silently swallowed).
+        let accepts = |r: &Row| {
             source.is_none_or(|s| match r.kind {
                 TrackKind::Video => s.video,
                 TrackKind::Audio => s.audio,
             })
-        });
+        };
+        let row = match layout.row_at(p.y).filter(|r| accepts(r)) {
+            // the row under the pointer takes the drop
+            Some(r) => Some(r.clone()),
+            // the empty bands above the top video track and below the last audio track are the
+            // new-track gesture's own ground (#483), not a redirect
+            None if new_track_at(seq, layout, p.y, app.ui.timeline.video_track_h, app.ui.timeline.audio_track_h).is_some() => None,
+            // the divider, a caption row, the Mix row, or a row of the wrong kind
+            None => nearest_row(layout, p.y, &accepts).cloned(),
+        };
         let t = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
         let still = app.session.prefs.timeline.still_duration(rate);
         let is_still = app.session.project.item(item).and_then(|i| i.as_media()).is_some_and(|m| m.info.kind == filmcraft_media::MediaKind::Still);
@@ -3023,14 +3130,16 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             crate::panels::clear_drag(ui);
         }
     }
-    // graphics templates from Essential Graphics ▸ Browse: placed on the video track under the pointer
+    // graphics templates from Essential Graphics ▸ Browse: placed on the video track under the
+    // pointer (over the divider, a caption row, the Mix row or an audio track: the nearest video
+    // track, where the highlight says the template will land)
     if let Some(template) = crate::panels::dragged_template(ui)
         && let Some(p) = ctx.pointer_hover_pos()
         && layout.content.contains(p)
         && app.timeline_drop_target(ui.ctx(), p)
     {
         let t = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
-        let row = layout.row_at(p.y).cloned().filter(|r| r.kind == TrackKind::Video);
+        let row = nearest_row(layout, p.y, &|r: &Row| r.kind == TrackKind::Video).cloned();
         if let Some(row) = &row {
             let r = Rect::from_min_max(pos2(layout.x_of(t), row.rect.min.y + 1.0), pos2(layout.x_of(t) + 60.0, row.rect.max.y - 1.0));
             ui.painter().rect_stroke(r, 3.0, Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
@@ -3056,6 +3165,9 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             filmcraft_project::EffectKind::AudioTransition => Some(TrackKind::Audio),
             _ => None,
         });
+        // A release over the divider, a caption row or the Mix row behaves as if released on the
+        // nearest track row (a release there used to aim at nothing, and the drop did nothing).
+        let p = nearest_row(layout, p.y, &|_| true).map_or(p, |row| pos2(p.x, row.rect.center().y));
         // Where the drop aims: the clip under the pointer (its nearer edge), or — for a
         // transition dropped on the empty track space beside a cut — the nearest cut on that
         // track within [`DROP_EDGE_PX`]. Dropping a transition "between the segments", in the
@@ -3122,24 +3234,32 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
             }
         }
     }
-    // ---- OS file drops imported with "drop imports to the timeline": placed at the drop point, one after another
-    if let Some((items, p)) = app.pending_timeline_drop.clone()
-        && layout.content.contains(p)
-        && app.timeline_drop_target(ui.ctx(), p)
-    {
-        app.pending_timeline_drop = None;
-        let row = layout.row_at(p.y).cloned().or_else(|| layout.rows.iter().find(|r| r.kind == TrackKind::Video).cloned());
-        if let Some(row) = row {
-            let (vt, at) = match row.kind {
-                TrackKind::Video => (Some(row.track.0), seq.audio_tracks.get(row.index).or(seq.audio_tracks.first()).map(|t| t.id.0)),
-                TrackKind::Audio => (seq.video_tracks.get(row.index).or(seq.video_tracks.first()).map(|t| t.id.0), Some(row.track.0)),
-            };
-            let start = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
-            // one command, one undo step: the files go end to end from the drop point
-            let ids: Vec<u64> = items.iter().map(|i| i.0).collect();
-            let params = json!({"items": ids, "track": vt, "audioTrack": at, "time": start.0, "insert": false});
-            if let Err(e) = app.session.execute("timeline.place", params) {
-                app.ui.status = e.to_string();
+    // ---- OS file drops imported with "drop imports to the timeline": placed at the drop point, one
+    // after another. The drop point was recorded when the files landed in the import (they can
+    // finish seconds after the OS drop), so the Timeline here decides what becomes of it: place it
+    // when it is over these tracks, hold it while another panel covers the point (it places when
+    // that panel moves), and only cancel it when the point never was over this Timeline's tracks.
+    if let Some((items, p)) = app.pending_timeline_drop.clone() {
+        if !layout.content.contains(p) {
+            // another panel had the point (or the panel moved): a bin import is all it ever was
+            app.pending_timeline_drop = None;
+        } else if app.timeline_drop_target(ui.ctx(), p) {
+            app.pending_timeline_drop = None;
+            // the row under the point, or the nearest one (over the divider, a caption row or the
+            // Mix row) — the same row the drop preview showed
+            let row = nearest_row(layout, p.y, &|_| true).cloned();
+            if let Some(row) = row {
+                let (vt, at) = match row.kind {
+                    TrackKind::Video => (Some(row.track.0), seq.audio_tracks.get(row.index).or(seq.audio_tracks.first()).map(|t| t.id.0)),
+                    TrackKind::Audio => (seq.video_tracks.get(row.index).or(seq.video_tracks.first()).map(|t| t.id.0), Some(row.track.0)),
+                };
+                let start = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
+                // one command, one undo step: the files go end to end from the drop point
+                let ids: Vec<u64> = items.iter().map(|i| i.0).collect();
+                let params = json!({"items": ids, "track": vt, "audioTrack": at, "time": start.0, "insert": false});
+                if let Err(e) = app.session.execute("timeline.place", params) {
+                    app.ui.status = e.to_string();
+                }
             }
         }
     }
@@ -3148,7 +3268,7 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         && layout.content.contains(p)
         && app.timeline_drop_target(ui.ctx(), p)
     {
-        let row = layout.row_at(p.y).cloned().or_else(|| layout.rows.iter().find(|r| r.kind == TrackKind::Video).cloned());
+        let row = nearest_row(layout, p.y, &|_| true);
         if let Some(row) = row {
             let t = snap(app, seq, layout, rate.snap_nearest(layout.tick_at(p.x).max(Tick::ZERO)), &[]);
             let x = layout.x_of(t);

@@ -525,6 +525,18 @@ pub(crate) fn deselect_on_monitor(app: &mut FilmcraftApp, ui: &egui::Ui) {
 
 /// Draw the overlay and handle graphics tools on the Program monitor picture `pic`.
 pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, frame: (u32, u32)) {
+    // A text-edit session that begins, or moves to another layer, takes the keyboard when the
+    // text is drawn next (`text_edit` consumes the "take" marker): typing starts without a
+    // click on the layer, however the session began — the Type tool, a double-click, a command
+    // or the control channel. Watching the session here covers every path that sets `gfx_edit`.
+    let session = app.ui.gfx_edit.as_ref().map(|e| (e.clip, e.layer));
+    let seen = egui::Id::new(TEXT_EDIT_ID).with("session");
+    if ui.data(|d| d.get_temp::<Option<(u64, usize)>>(seen)) != Some(session) {
+        ui.data_mut(|d| d.insert_temp(seen, session));
+        if session.is_some() {
+            ui.data_mut(|d| d.insert_temp(egui::Id::new(TEXT_EDIT_ID).with("take"), true));
+        }
+    }
     let t = app.tokens;
     let views = visible_layers(app, pic, frame);
     let tool = app.ui.tool;
@@ -916,14 +928,19 @@ pub fn monitor_overlay(app: &mut FilmcraftApp, ui: &mut egui::Ui, pic: Rect, fra
         painter.line_segment([a + vec2(1.0, 0.0), b + vec2(1.0, 0.0)], Stroke::new(0.5, Color32::BLACK));
         let er = Rect::from_points(&v.quad()).union(Rect::from_two_pos(a, b));
         app.auto.add("program.textEdit", er, &tp.text);
-        ui.ctx().output_mut(|o| {
-            o.ime = Some(egui::output::IMEOutput {
-                purpose: Default::default(),
-                rect: er,
-                cursor_rect: Rect::from_two_pos(a, b),
-                should_interrupt_composition: false,
-            })
-        });
+        // The IME follows the keyboard: only while the text layer owns the focus does the
+        // candidate window sit at this caret. With the keyboard elsewhere (a panel's search
+        // field), that field's own IME rect must stand — egui keeps one `ime` slot per pass.
+        if ui.memory(|m| m.focused()) == Some(egui::Id::new(TEXT_EDIT_ID)) {
+            ui.ctx().output_mut(|o| {
+                o.ime = Some(egui::output::IMEOutput {
+                    purpose: Default::default(),
+                    rect: er,
+                    cursor_rect: Rect::from_two_pos(a, b),
+                    should_interrupt_composition: false,
+                })
+            });
+        }
     }
     // ---- run
     for (cmd, p) in actions {
@@ -1013,15 +1030,38 @@ fn text_edit(app: &mut FilmcraftApp, ui: &mut egui::Ui, v: &LayerView, mut ed: G
     // a real (non-clickable) widget holds keyboard focus so shortcuts pause while typing
     let fr = ui.interact(Rect::from_points(&v.quad()), eid, Sense::focusable_noninteractive());
     fr.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::TextEdit, true, "Text layer"));
-    // while another field has the keyboard (a value typed in Properties) the keys are its own;
-    // the text takes the keyboard back once nothing has it (#683)
-    if ui.memory(|m| m.focused().is_some_and(|f| f != eid)) {
-        return;
+    // Keyboard capture follows egui's focus: the text layer reads keys only while it owns
+    // the keyboard, takes it only on explicit activation, and never re-grabs it just because
+    // it is free — that is what stuck the tool (#683). The details are on the arms below.
+    let quad = Rect::from_points(&v.quad());
+    let on_text = |ui: &egui::Ui| {
+        let press = ui.input(|i| i.pointer.press_origin());
+        let click = ui.input(|i| i.pointer.any_click()).then(|| ui.input(|i| i.pointer.interact_pos())).flatten();
+        press.is_some_and(|p| quad.contains(p)) || click.is_some_and(|p| quad.contains(p))
+    };
+    let take = eid.with("take");
+    match ui.memory(|m| m.focused()) {
+        // another field has the keyboard: the keys are its own (#683). The take marker is
+        // left standing: a session activated under another field's keyboard (a command run
+        // while a search field was focused) takes it only once that field lets go below —
+        // and a click on another focusable field still wins, because its `request_focus`
+        // lands in the same frame, after this.
+        Some(f) if f != eid => return,
+        Some(_) => {}
+        // a keyboard that nobody owns is NOT taken merely because it is free — that is what
+        // stuck the tool, re-grabbing focus the moment a click released it. Only an explicit
+        // activation takes it: a session that just began (the "take" marker, set whenever
+        // `gfx_edit` changes), or a press on the text itself (placing the caret, dragging a
+        // selection). The marker is consumed only now that it is used.
+        None if ui.data(|d| d.get_temp::<bool>(take)).unwrap_or(false) || on_text(ui) => {
+            ui.data_mut(|d| d.remove::<bool>(take));
+        }
+        None => return,
     }
-    ui.memory_mut(|m| {
-        m.request_focus(eid);
-        m.set_focus_lock_filter(eid, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true });
-    });
+    if ui.memory(|m| m.focused()) != Some(eid) {
+        ui.memory_mut(|m| m.request_focus(eid));
+    }
+    ui.memory_mut(|m| m.set_focus_lock_filter(eid, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));
     let Some(tp) = text_of(&v.spec) else { return };
     let mut text = tp.text.clone();
     ed.caret = ed.caret.min(text.len());
@@ -1069,6 +1109,9 @@ fn text_edit(app: &mut FilmcraftApp, ui: &mut egui::Ui, v: &LayerView, mut ed: G
                 let mut moved = None;
                 match key {
                     egui::Key::Escape => stop = true,
+                    // ⌘/Ctrl+Enter commits the text and ends the session, like Escape; a bare
+                    // Enter is a line break (the text tool edits multi-line paragraphs)
+                    egui::Key::Enter if modifiers.command => stop = true,
                     egui::Key::Enter => {
                         delete_sel(&mut text, &mut ed);
                         text.insert(ed.caret, '\n');

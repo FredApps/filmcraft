@@ -17,8 +17,14 @@ use crate::state::Tool;
 /// "Allow Selection tool to choose Roll and Ripple trims without modifier key" is on.
 pub const ROLL_PX: f32 = 2.5;
 
-/// Widest an edge zone gets (px), on each side of a clip edge.
-pub const EDGE_PX: f32 = 7.0;
+/// Widest an edge zone gets (px), on each side of a clip edge. Comfortably past egui's 6 pt
+/// drag-start threshold (`InputOptions::max_click_dist`): a press within the zone is decided at
+/// the press point, but egui only calls it a drag once the pointer has moved 6 pt, and a
+/// click-vs-drag that is re-decided at the moved-to point (a press that stored nothing) still
+/// has to land in the zone — 7 px left only a pixel of margin, which read as "trims rarely
+/// grab". The snap distance ([`super::timeline::SNAP_PX`]) stays within it, so snapping never
+/// engages on a press that is really on an edge.
+pub const EDGE_PX: f32 = 10.0;
 
 /// The trim the Selection tool starts at an edit point: Cmd+Shift = roll, Cmd = ripple. With the
 /// Trim setting on (`no_modifier`), no modifier is needed: right on the cut (when a clip is on the
@@ -96,6 +102,46 @@ pub fn marker_at(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Tick> {
     marker_under_pointer(seq, layout, pos).map(|m| m.start)
 }
 
+/// The band a transition occupies on its track row: below the 17 px strip where the clip shows
+/// its name, and inside the row's bottom margin — the exact rect the Timeline paints, so what is
+/// hit-tested is what is drawn.
+pub fn transition_band(row: Rect, x0: f32, x1: f32) -> Rect {
+    Rect::from_min_max(pos2(x0, row.min.y + 17.0), pos2(x1, row.max.y - 1.0))
+}
+
+/// The transition whose band covers `pos`, and which of its ends the point is on (`In` / `Out`
+/// within [`EDGE_PX`] of the band's ends, narrower on a short transition so its middle stays
+/// grabbable). Hits nothing above the band: the clip is what is drawn there.
+fn transition_under(tr: &Track, row: Rect, layout: &Layout, pos: Pos2) -> Option<Hit> {
+    tr.transitions.iter().find_map(|trn| {
+        let band = transition_band(row, layout.x_of(trn.start), layout.x_of(trn.end()));
+        band.contains(pos).then(|| {
+            let zone = EDGE_PX.min(band.width() / 3.0);
+            let edge = if pos.x - band.min.x <= zone {
+                Some(Edge::In)
+            } else if band.max.x - pos.x <= zone {
+                Some(Edge::Out)
+            } else {
+                None
+            };
+            Hit::Transition { track: tr.id, id: trn.id, edge }
+        })
+    })
+}
+
+/// The transition strip at `pos`, whatever else is under it: clicks and double-clicks belong to
+/// the strip the user can see (selecting it, Set Transition Duration), while presses that *drag*
+/// follow [`hit`], where a clip edge under a transition still trims. `None` above the band or
+/// with no transition there.
+pub fn transition_under_pointer(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Hit> {
+    if !layout.content.contains(pos) {
+        return None;
+    }
+    let row = layout.row_at(pos.y)?;
+    let tr = seq.track(row.track)?;
+    transition_under(tr, row.rect, layout, pos)
+}
+
 pub fn hit(seq: &Sequence, layout: &Layout, pos: Pos2) -> Hit {
     if layout.ruler.contains(pos) {
         return Hit::Ruler;
@@ -105,24 +151,16 @@ pub fn hit(seq: &Sequence, layout: &Layout, pos: Pos2) -> Hit {
     }
     let Some(row) = layout.row_at(pos.y) else { return Hit::None };
     let Some(tr) = seq.track(row.track) else { return Hit::None };
-    for trn in &tr.transitions {
-        let x0 = layout.x_of(trn.start);
-        let x1 = layout.x_of(trn.end());
-        if pos.x >= x0 && pos.x <= x1 && pos.y > row.rect.min.y + 17.0 {
-            // the ends are edge zones, narrower on a short transition so its middle stays grabbable
-            let zone = EDGE_PX.min((x1 - x0) / 3.0);
-            let edge = if pos.x - x0 <= zone {
-                Some(Edge::In)
-            } else if x1 - pos.x <= zone {
-                Some(Edge::Out)
-            } else {
-                None
-            };
-            return Hit::Transition { track: row.track, id: trn.id, edge };
-        }
-    }
+    // A clip edge first, even where a transition's band is drawn over it: trimming a cut that
+    // carries a transition is the common edit, and it used to be swallowed by the strip (a
+    // press on the cut grabbed the transition and slid it instead of trimming — the "trims
+    // rarely grab" report). The transition keeps its own ends, and its middle away from clip
+    // edges; clicks still pick the strip (see [`transition_under_pointer`]).
     if let Some((clip, edge)) = edge_at(tr, layout, pos.x) {
         return Hit::Clip { track: row.track, clip, edge: Some(edge) };
+    }
+    if let Some(h) = transition_under(tr, row.rect, layout, pos) {
+        return h;
     }
     match tr.item_at(layout.tick_at(pos.x)) {
         Some(it) => Hit::Clip { track: row.track, clip: it.id, edge: None },
@@ -389,8 +427,22 @@ mod tests {
         let (seq, l, tr) = fixture(clips());
         assert_eq!(hit(&seq, &l, at(95.0)), edge_hit(tr, 1, Edge::In));
         assert_eq!(hit(&seq, &l, at(705.0)), edge_hit(tr, 3, Edge::Out));
-        assert_eq!(hit(&seq, &l, at(92.0)), Hit::Empty { track: tr });
+        assert_eq!(hit(&seq, &l, at(85.0)), Hit::Empty { track: tr }, "15 px left of the clip is beyond the 10 px zone");
         assert_eq!(hit(&seq, &l, at(200.0)), Hit::Clip { track: tr, clip: ClipId(1), edge: None });
+    }
+
+    /// The zone reaches past egui's 6 pt drag threshold with margin: a press 8 px from a cut is
+    /// an edge grab even though egui only calls it a drag once the pointer has moved 6 pt, and a
+    /// click-vs-drag re-decided at the moved-to point still lands in the zone.
+    #[test]
+    fn the_edge_zone_reaches_past_eguis_drag_threshold() {
+        let (seq, l, tr) = fixture(clips());
+        assert!(EDGE_PX > 6.0, "the zone must clear egui's max_click_dist");
+        for (x, clip, edge) in [(292.0, 1, Edge::Out), (308.0, 2, Edge::In), (95.0, 1, Edge::In), (708.0, 3, Edge::Out)] {
+            assert_eq!(hit(&seq, &l, at(x)), edge_hit(tr, clip, edge), "{x} px is inside the {EDGE_PX} px zone");
+        }
+        // and the snap distance stays within it, so a snap never engages where a press is an edge
+        assert!(crate::panels::timeline::SNAP_PX <= EDGE_PX);
     }
 
     #[test]
@@ -413,6 +465,75 @@ mod tests {
         assert_eq!(hit(&seq, &l, at(804.5)), Hit::Clip { track: tr, clip: ClipId(4), edge: None });
         // 4 px outside it is beyond its 3 px zone
         assert_eq!(hit(&seq, &l, at(796.0)), Hit::Empty { track: tr });
+    }
+
+    /// A cross dissolve centred on the A / B cut (px 250–350), the shape the Timeline draws.
+    fn crossing(seq: &mut Sequence, track: TrackId, x0: f64, x1: f64) -> TransitionId {
+        let effect = filmcraft_project::find_effect("cross_dissolve").expect("built-in transition").instance();
+        let id = TransitionId(7);
+        seq.track_mut(track).expect("the fixture's track").transitions.push(filmcraft_project::Transition {
+            id,
+            effect,
+            start: Tick::from_seconds_f64(x0 / 100.0),
+            duration: Tick::from_seconds_f64((x1 - x0) / 100.0),
+            from: Some(ClipId(1)),
+            to: Some(ClipId(2)),
+            align: filmcraft_project::TransitionAlign::CenterAtCut,
+            reverse: false,
+        });
+        id
+    }
+
+    /// A point inside the transition band (17 px below the row's top), where the strip is drawn.
+    fn band_at(x: f32) -> Pos2 {
+        pos2(x, TOP + 30.0)
+    }
+
+    /// The cut a transition sits on still trims: a clip edge wins over the strip drawn across
+    /// it, at the cut and within the edge zone either side. Trimming a cut with a transition on
+    /// it used to be impossible — the strip swallowed the press and slid instead.
+    #[test]
+    fn a_clip_edge_wins_over_the_transition_drawn_across_it() {
+        let (mut seq, l, tr) = fixture(clips());
+        let id = crossing(&mut seq, tr, 250.0, 350.0);
+        // the cut itself, and either side of it inside the edge zone
+        assert_eq!(hit(&seq, &l, band_at(300.0)), edge_hit(tr, 2, Edge::In), "right on the cut: the later clip's In edge");
+        assert_eq!(hit(&seq, &l, band_at(293.0)), edge_hit(tr, 1, Edge::Out));
+        assert_eq!(hit(&seq, &l, band_at(307.0)), edge_hit(tr, 2, Edge::In));
+        // and the same press *drags* a trim, not a slide of the transition
+        let grab = grab_at(&seq, &l, band_at(300.0), Tool::Selection, Modifiers::NONE, false);
+        assert_eq!(grab, Grab::Edge { track: tr, clip: ClipId(2), edge: Edge::In, kind: EdgeKind::Trim });
+        // a click still picks the strip the user can see (selection, not a trim)
+        assert_eq!(transition_under_pointer(&seq, &l, band_at(300.0)), Some(Hit::Transition { track: tr, id, edge: None }));
+        // a transition short enough to sit wholly inside the edge zones gives the cut everywhere
+        let (mut seq, l, tr) = fixture(clips());
+        crossing(&mut seq, tr, 295.0, 305.0);
+        assert_eq!(hit(&seq, &l, band_at(296.0)), edge_hit(tr, 1, Edge::Out), "4 px left of the cut is inside clip A");
+        assert_eq!(hit(&seq, &l, band_at(304.0)), edge_hit(tr, 2, Edge::In), "4 px right of it inside clip B");
+    }
+
+    /// Away from clip edges the transition strip keeps its own presses: its ends drag the
+    /// duration, its middle slides it over the cut, and above the band (the clip's name strip)
+    /// the clip is hit, not the transition.
+    #[test]
+    fn a_transition_away_from_clip_edges_takes_its_own_presses() {
+        let (mut seq, l, tr) = fixture(clips());
+        let id = crossing(&mut seq, tr, 250.0, 350.0);
+        let transition = |edge| Hit::Transition { track: tr, id, edge };
+        // the band's ends (px 250 / 350), well inside clips A and B's bodies
+        assert_eq!(hit(&seq, &l, band_at(255.0)), transition(Some(Edge::In)));
+        assert_eq!(hit(&seq, &l, band_at(345.0)), transition(Some(Edge::Out)));
+        // its middle, 30 px either side of the cut — past the 10 px edge zone
+        assert_eq!(hit(&seq, &l, band_at(270.0)), transition(None));
+        assert_eq!(hit(&seq, &l, band_at(330.0)), transition(None));
+        // above the band (the top 17 px of the row) the clip shows: the cut still trims there
+        assert_eq!(hit(&seq, &l, at(300.0)), edge_hit(tr, 2, Edge::In));
+        assert_eq!(hit(&seq, &l, at(270.0)), Hit::Clip { track: tr, clip: ClipId(1), edge: None });
+        // and the click lookup misses above the band too
+        assert_eq!(transition_under_pointer(&seq, &l, at(270.0)), None);
+        // a hostile point never picks up a transition
+        assert_eq!(transition_under_pointer(&seq, &l, pos2(f32::NAN, TOP + 30.0)), None);
+        assert_eq!(transition_under_pointer(&seq, &l, pos2(300.0, f32::NAN)), None);
     }
 
     #[test]

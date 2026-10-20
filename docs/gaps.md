@@ -1,6 +1,6 @@
 # Where FilmCraft falls short of Premiere Pro
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (new file: ROADMAP's "Where we are lacking" re-measured against Premiere Pro 26.5.2 and the open issue list) · **Target:** Adobe Premiere Pro 2026 (26.5.2)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-20 · **Change:** minor (G2 `.prproj` import reverted — the gap is open again; G8 panel docking done with layout persistence) · **Target:** Adobe Premiere Pro 2026 (26.5.2)
 
 Every known shortfall, one entry each, ranked by what most stops an editor using FilmCraft for real
 work. This is the work list: agents should prefer it over adding checklist items. Numbers are in
@@ -21,7 +21,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 | G5 | Hardware acceleration is partial | hardware | partly | 120–200 h |
 | G6 | No real-world media corpus or workflow acceptance tests | measurement | yes | 40–70 h |
 | G7 | No measured parity tool in CI | measurement | no | 10–20 h |
-| G8 | UI fidelity: monitor handles, Effect Controls, docking | UI / UX | partly | 120–200 h |
+| G8 | UI fidelity: monitor handles, Effect Controls (docking done) | UI / UX | partly | 110–180 h |
 | G9 | Windows and Linux at run time | platforms | partly | 50–90 h |
 | G10 | Container and codec gaps on import | file format, codec | partly | 120–200 h |
 | G11 | No plugin hosting | ecosystem | no | 200–400 h |
@@ -156,15 +156,22 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 
 ## G8. UI fidelity: monitor handles, Effect Controls, docking
 
+- **Have:** panel docking rearrangement (#493): panels and tab groups drag, split, dock, float
+  and reorder (craft-ui docking transactions, with drag previews and edge docking), and the
+  arrangement — split sizes, tab order, active tabs, floating windows — is kept across
+  restarts: auto-saved to `workspaces.json` (debounced on change, written at quit), per
+  workspace, restored at start-up and when switching back, alongside `Save Changes to this
+  Workspace`'s explicit layouts (`Reset to Saved Layout` still reverts to those; a corrupt or
+  foreign auto-saved arrangement falls back to the saved layout, never a half-built tree).
 - **Missing:** on-screen transform handles for Motion / Transform in the Program monitor (#639);
-  Effect Controls keyframe zoom bar, draggable divider, row lines (#640–#645); panel docking
-  rearrangement (#493); clicking empty space to deselect (#683); filmstrip thumbnails (#614);
-  marquee selection in the Project panel (#578); Freeform bins and middle-mouse pan (#579);
+  Effect Controls keyframe zoom bar, draggable divider, row lines (#640–#645); clicking empty
+  space to deselect (#683); filmstrip thumbnails (#614); marquee selection in the Project panel
+  (#578); Freeform bins and middle-mouse pan (#579);
   Program monitor Button Editor (+) (#431); keyframe curves for Position (#448); transition
   editing controls (#577: Effect Controls has the transition's own timeline, drag to slide or resize;
   the A/B previews with Start / End sliders remain); track renaming (#654); window controls on macOS (#637); UI scale on
   X11 (#457).
-- **Estimate:** 120–200 h. Doc: [ui-parity.md](ui-parity.md).
+- **Estimate:** 110–180 h. Doc: [ui-parity.md](ui-parity.md).
 
 ## G9. Windows and Linux at run time
 
@@ -289,7 +296,11 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   corner radius: rounding bakes fillets into the path, so a rounded corner cannot be re-rounded later).
 - **Have:** Optical Flow time interpolation synthesises motion-compensated in-between frames (dense
   coarse-to-fine Lucas–Kanade, CPU; #780); Morph Cut morphs the subject along that optical flow
-  instead of cross-dissolving (CPU; #805); Transform shutter angle motion blur (#415); Ultra Key
+  instead of cross-dissolving (CPU; #805); Transform shutter angle motion blur (#415) — and the
+  intrinsic Motion effect (Position / Scale / Rotation keyframes) shutter-samples its transform
+  the same way: 7 taps across a 180° shutter when any Motion parameter is animated, bit-identical
+  single-sample path when static, CPU-composited so it stays exact against the reference render;
+  Ultra Key
   Setting applied as a parameter preset (#458); rectangle and polygon masks round their corners
   with circular fillets (`masks.add` `cornerRadius`, `masks.roundCorners`, every path keyframe;
   #813), from an on-monitor corner-roundness handle with a live preview (one undo step per drag;
@@ -316,3 +327,7 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 | 2026-10-10 | major | Created from ROADMAP.md's "Where we are lacking" (2026-10-05); re-ranked against Premiere 26.5.2 and the 188 open issues; added `.prproj`, 10-bit / 4:2:2 camera decode, launch crashes and missing PR CI, localization, delivery formats |
 | 2026-10-12 | minor | G10: MP1 (`A_MPEG/L1`) in Matroska imports (#1402) |
 | 2026-10-12 | minor | G10: OpenEXR PXR24 import |
+| 2026-10-12 | minor | G2: `.prproj` import done for the documented subset (unsupported effects / transitions / interpolation reported; export still missing) |
+| 2026-10-12 | minor | G8: panel docking rearrangement (#493) done, with the arrangement auto-saved and restored across restarts and workspace switches; parity docs re-measured (ready ~56% → ~57%, beta distance ~400–730 → ~360–660 h) |
+| 2026-10-12 | minor | G18: intrinsic Motion effect shutter-sampled motion blur (7 taps, 180° shutter, exact when static) |
+| 2026-10-20 | minor | G2: `.prproj` import **reverted** by owner request — the importer, its engine / UI wiring and the `flate2` dependency are removed; the gap is open again (60–120 h, beta-blocker). The 2026-10-12 G8 docking and G18 motion-blur work stands; only the `.prproj`-attributed parity numbers (project-files depth ~55% → ~45%, ready ~57% → ~56%, beta distance ~360–660 → ~400–730 h) roll back |

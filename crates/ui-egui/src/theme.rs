@@ -397,6 +397,10 @@ impl Tokens {
 pub const MENU_TEXT_SIZE: f32 = 13.0;
 pub const MENU_TEXT: Color32 = Color32::from_rgb(0xde, 0xde, 0xde);
 
+/// egui's global animation time: how long fades and slides take. `apply_prefs` sets this to 0.0
+/// when Interface Animations is off.
+pub const ANIMATION_TIME: f32 = 0.12;
+
 /// Style of the menu bar's menus and their submenus (on top of egui's own menu style).
 pub fn menu_style(s: &mut egui::Style) {
     egui::containers::menu::menu_style(s);
@@ -507,7 +511,7 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
         s.text_styles.insert(TextStyle::Small, FontId::new(11.0, FontFamily::Proportional));
         s.text_styles.insert(TextStyle::Heading, FontId::new(15.0, FontFamily::Name("semibold".into())));
         s.text_styles.insert(TextStyle::Monospace, FontId::new(12.0, FontFamily::Monospace));
-        s.animation_time = 0.12;
+        s.animation_time = ANIMATION_TIME;
     });
 }
 

@@ -109,6 +109,9 @@ pub struct AppearancePrefs {
     /// "UI Scale": `auto` (default: the scale the operating system reports) or a fixed
     /// percentage of [`UI_SCALES`] (`100` = one point per physical pixel).
     pub ui_scale: String,
+    /// "Interface Animations": smoothed scrolling, zooming and theme fades. Off: every motion
+    /// snaps to its end state, for users who find animation uncomfortable.
+    pub animations: bool,
 }
 
 impl Default for AppearancePrefs {
@@ -122,6 +125,7 @@ impl Default for AppearancePrefs {
             accessible_contrast: false,
             highlight_color: DEFAULT_HIGHLIGHT.into(),
             ui_scale: "auto".into(),
+            animations: true,
         }
     }
 }
@@ -1051,6 +1055,7 @@ static CATEGORIES: &[Category] = &[
             f("appearance.darkTheme", "Dark Theme", Kind::Choice(DARK_THEMES), true),
             f("appearance.colorTheme", "Color Theme", Kind::Choice(THEMES), true),
             b("appearance.accessibleContrast", "Accessible color contrast", true),
+            b("appearance.animations", "Interface Animations", true),
             f("appearance.highlightColor", "Highlight Color", Kind::Color, true),
             f("appearance.uiScale", "UI Scale", Kind::Choice(UI_SCALES), true),
         ],

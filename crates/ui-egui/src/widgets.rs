@@ -263,16 +263,21 @@ pub fn icon_toggle(ui: &mut Ui, rect: Rect, icon: Icon, on: bool, t: &Tokens, id
     resp
 }
 
-/// Search field with a magnifier icon.
-pub fn search_field(ui: &mut Ui, text: &mut String, hint: &str, width: f32, t: &Tokens) -> Response {
+/// Search field with a magnifier icon. `id_salt` gives the field a stable egui id, unique
+/// within its panel: without one the field's auto id follows whatever widgets were drawn
+/// before it that frame, so focus it was given (a click, Select Find Box) can be lost when
+/// the panel's content changes — and a field that silently loses focus lets the next keyboard
+/// grabber (e.g. the monitor's text layer) take the keys meant for it.
+pub fn search_field(ui: &mut Ui, text: &mut String, hint: &str, width: f32, t: &Tokens, id_salt: &str) -> Response {
     let h = 22.0;
     let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
     ui.painter().rect_filled(rect, h / 2.0, t.field_bg);
     ui.painter().rect_stroke(rect, h / 2.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
     icons::paint(ui.painter(), Rect::from_center_size(pos2(rect.min.x + 12.0, rect.center().y), vec2(12.0, 12.0)), Icon::Search, t.text_dim);
     let inner = Rect::from_min_max(pos2(rect.min.x + 22.0, rect.min.y + 2.0), pos2(rect.max.x - 8.0, rect.max.y - 2.0));
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner));
-    let resp = child.add(egui::TextEdit::singleline(text).hint_text(hint).frame(egui::Frame::NONE).desired_width(inner.width()).font(Tokens::ui(12.0)));
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner).id_salt(id_salt));
+    let resp = child
+        .add(egui::TextEdit::singleline(text).hint_text(hint).frame(egui::Frame::NONE).desired_width(inner.width()).font(Tokens::ui(12.0)).id_salt("field"));
     // Select Find Box (Shift+F) / Open Search (Cmd+Shift+F)
     crate::panels::keyboard::take_search_focus(ui, rect, &resp);
     resp

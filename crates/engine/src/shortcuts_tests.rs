@@ -192,13 +192,18 @@ fn panel_shortcuts_override_application_ones_with_focus() {
 }
 
 #[test]
-fn delete_clears_timeline_clips_and_project_items() {
+fn delete_ripples_timeline_clips_and_clears_project_items() {
     // #243: with the Timeline focused, Delete (the forward-delete key, labelled Delete on Windows
     // and Linux keyboards) resolved to Project ▸ Clear and left the selected clips in place.
+    // Both delete keys now ripple on the Timeline — the clips snap backward and later material
+    // follows — the way every current editor expects a fast delete to behave; a plain lift stays
+    // on the clip context menu (#1926).
     let s = Session::default();
     let del = Chord::parse("Delete").unwrap();
+    let bs = Chord::parse("Backspace").unwrap();
     for p in [Platform::Mac, Platform::Windows] {
-        assert_eq!(s.shortcuts.resolve(&del, Some("Timeline"), p).unwrap().command, "edit.clear", "{p:?}");
+        assert_eq!(s.shortcuts.resolve(&del, Some("Timeline"), p).unwrap().command, "edit.rippleDelete", "{p:?}");
+        assert_eq!(s.shortcuts.resolve(&bs, Some("Timeline"), p).unwrap().command, "edit.rippleDelete", "{p:?}");
         assert_eq!(s.shortcuts.resolve(&del, Some("Project"), p).unwrap().command, "project.delete", "{p:?}");
         assert_eq!(s.shortcuts.resolve(&del, None, p).unwrap().command, "project.delete", "{p:?}");
     }

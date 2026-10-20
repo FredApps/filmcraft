@@ -41,6 +41,7 @@ use filmcraft_geom::{Affine, Vec2};
 use filmcraft_media::{FrameRequest, SharedSource};
 use filmcraft_project::{ItemId, ItemKind, ParamValue, Project, Sequence, TrackItem};
 use filmcraft_time::{Tick, TimeDisplay, format_time};
+use rayon::prelude::*;
 
 pub use blend::Blend;
 pub use image::Image;
@@ -426,6 +427,50 @@ pub fn motion_matrix(seq: &Sequence, item: &TrackItem, src: (u32, u32), src_par:
     ))
 }
 
+/// Taps the shutter is sampled at for motion blur: the Transform effect's count
+/// (`vfx::distort::transform_fx`) and the intrinsic Motion effect's ([`motion_blur_taps`]).
+pub(crate) const MOTION_BLUR_TAPS: usize = 7;
+
+/// Motion blur's shutter angle in degrees: the Transform effect's default. The intrinsic Motion
+/// effect carries no shutter parameter (its params are Premiere's fixed set, written by the
+/// interchange importers), so its blur is simply on whenever it animates.
+pub(crate) const MOTION_BLUR_SHUTTER_ANGLE: f64 = 180.0;
+
+/// Whether the intrinsic Motion effect's transform is animated at all: any parameter that shapes
+/// [`motion_matrix`] (position, anchor, scale, scale width, uniform scale, rotation) carries
+/// keyframes. A missing or disabled effect never is.
+pub(crate) fn motion_is_animated(item: &TrackItem) -> bool {
+    let Some(m) = item.effect("motion").filter(|m| m.enabled) else { return false };
+    ["position", "anchor", "scale", "scale_width", "rotation", "uniform_scale"].iter().any(|id| m.param(id).is_some_and(|p| p.is_animated()))
+}
+
+/// The Motion transforms of an animated intrinsic Motion effect for the frame at effect time
+/// `mt`: [`MOTION_BLUR_TAPS`] equal-weight samples across the frame's shutter interval — 180° of
+/// the sequence's frame rate, centred on the frame, in the Transform effect's shutter convention
+/// (`vfx::distort::transform_fx`; offsets rounded to whole Ticks like its sub-frame effect
+/// times) — to be accumulated into one placement (their mean). `None` when the frame keeps the
+/// exact single sample of [`motion_matrix`]: a static Motion, or keyframes whose values hold the
+/// transform constant over the shutter (nothing moves, so there is nothing to blur).
+pub(crate) fn motion_blur_taps(seq: &Sequence, item: &TrackItem, src: (u32, u32), src_par: Option<(u32, u32)>, mt: Tick) -> Option<Vec<Affine>> {
+    if !motion_is_animated(item) {
+        return None;
+    }
+    let span = (MOTION_BLUR_SHUTTER_ANGLE / 360.0) / seq.settings.frame_rate.as_f64().max(1.0);
+    let mut taps = Vec::with_capacity(MOTION_BLUR_TAPS);
+    for i in 0..MOTION_BLUR_TAPS {
+        let k = i as f64 / (MOTION_BLUR_TAPS - 1) as f64 - 0.5;
+        let t = mt + Tick::from_seconds_f64(k * span);
+        taps.push(motion_matrix(seq, item, src, src_par, t));
+    }
+    // Keyframes that hold the transform constant over the shutter (or a shutter shorter than one
+    // Tick) leave every tap the same: keep the single-sample path, bit for bit.
+    let first = *taps.first()?;
+    if taps.iter().all(|m| *m == first) {
+        return None;
+    }
+    Some(taps)
+}
+
 /// Render one track item's layer at timeline time `t` into a canvas-sized image.
 /// Returns (layer, opacity, blend).
 pub(crate) fn item_layer(
@@ -467,13 +512,20 @@ pub(crate) fn item_layer_ex(
     // time inside a frame hold without Hold Filters).
     let mt = item.effect_time_at(t);
     let src_size = source_size(project, item.item)?;
-    let motion = motion_matrix(seq, item, src_size, source_par(project, item.item), mt);
-    // How many output pixels one source pixel covers → request a reduced frame when possible.
-    let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
-    let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
+    let src_par = source_par(project, item.item);
+    let motion = motion_matrix(seq, item, src_size, src_par, mt);
+    // An animated Motion effect is shutter-sampled for motion blur (`motion_blur_taps`); like
+    // standard effects, the blur is off while effects are (fast scrubbing / Toggle Effects).
+    let taps = if opts.effects { motion_blur_taps(seq, item, src_size, src_par, mt) } else { None };
+    // How many output pixels one source pixel covers → request a reduced frame when possible
+    // (the largest over the shutter: a tap can place the layer larger than the frame's midpoint).
+    let lin = |m: &Affine| ((m.a * m.a + m.b * m.b).sqrt()).max((m.c * m.c + m.d * m.d).sqrt());
+    let max_lin = taps.iter().flatten().fold(lin(&motion), |a, m| a.max(lin(m)));
+    let want = (max_lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
     let pi = project.item(item.item)?;
-    if matches!(pi.kind, ItemKind::Graphic { .. }) && !(item.has_opacity_masks() || opts.effects && item.has_standard_effects()) {
-        // vectors straight to the output: no resampling, crisp at any Motion scale
+    if matches!(pi.kind, ItemKind::Graphic { .. }) && taps.is_none() && !(item.has_opacity_masks() || opts.effects && item.has_standard_effects()) {
+        // vectors straight to the output: no resampling, crisp at any Motion scale (an animated
+        // Motion takes the general path below: one rasterisation the taps place and average)
         let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion);
         let mut canvas = Image::new(w, h);
         graphic_clip::render_graphic(item, mt, src_size, &m, &mut canvas);
@@ -491,7 +543,8 @@ pub(crate) fn item_layer_ex(
         let px_scale = lw as f32 / src_size.0.max(1) as f32;
         let m =
             Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion).then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
-        if (lw, lh) == (w, h) && identity_placement(&m) && interpolation_blend(item, t, src.info().frame_rate()).is_none() {
+        // a layer the shutter smears is placed per tap below: no raw-frame shortcut
+        if taps.is_none() && (lw, lh) == (w, h) && identity_placement(&m) && interpolation_blend(item, t, src.info().frame_rate()).is_none() {
             let cs = colorman::source_space(project, item.item, &frame);
             if !colorman::needs_management(&seq.settings.color, cs, &frame) {
                 let (op, bl) = opacity_blend(item, mt);
@@ -506,8 +559,12 @@ pub(crate) fn item_layer_ex(
         None => base_layer(project, seq, item, t, opts, sources, want)?,
     };
     let px_scale = layer.w as f32 / src_size.0.max(1) as f32;
-    // layer px → source px → sequence px → output px
-    let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion).then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
+    // layer px → source px → sequence px → output px: the frame's own placement `m` (the
+    // effects' mapping to the output) and, per Motion tap, the shutter-sampled placements
+    let place = |mo: &Affine| {
+        Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(mo).then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64))
+    };
+    let m = place(&motion);
     if opts.effects {
         let env = vfx::ItemEnv { project, seq, item, t, opts, sources, want, layer_size: (layer.w, layer.h), layer_to_output: m, tc };
         let cx = effects::FxCtx {
@@ -529,7 +586,29 @@ pub(crate) fn item_layer_ex(
         }
     }
     mask::apply_opacity_masks(&mut layer, item, mt, px_scale);
-    let placed = if layer.w == w && layer.h == h && identity_placement(&m) { layer } else { layer.transformed(w, h, &m) };
+    let placed = match taps.as_deref().and_then(|t| t.split_first()) {
+        // static Motion: the one placement, exactly as before (the identity fast path keeps the
+        // layer's own pixels)
+        None => {
+            if layer.w == w && layer.h == h && identity_placement(&m) {
+                layer
+            } else {
+                layer.transformed(w, h, &m)
+            }
+        }
+        // animated Motion: the layer placed at every tap, accumulated with equal weights —
+        // summed, then divided once, as `vfx::distort`'s motion blur composites its taps
+        Some((first, rest)) => {
+            let mut acc = layer.transformed(w, h, &place(first));
+            for tap in rest {
+                let part = layer.transformed(w, h, &place(tap));
+                acc.px.par_iter_mut().zip(&part.px).for_each(|(a, p)| *a += *p);
+            }
+            let inv = 1.0 / (rest.len() + 1) as f32;
+            acc.px.par_iter_mut().for_each(|v| *v *= inv);
+            acc
+        }
+    };
     let (op, bl) = opacity_blend(item, mt);
     Some(Layer::Full { image: placed, opacity: op, blend: bl, opaque: false })
 }

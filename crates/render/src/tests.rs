@@ -1,7 +1,7 @@
 use super::*;
 use filmcraft_media::generators::GeneratorSource;
 use filmcraft_media::{DemoScene, Generator, MediaSource};
-use filmcraft_project::{Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
+use filmcraft_project::{Interpolation, Keyframe, Label, MediaClip, MediaRef, SequenceSettings, TrackKind};
 use filmcraft_time::{FrameRate, TICKS_PER_SECOND, TimeRange};
 
 fn setup() -> (Project, ItemId, ItemId, ItemId, SourceMap) {
@@ -520,4 +520,201 @@ fn a_reversed_clip_shows_exactly_its_source_range() {
     // every timeline frame stays inside the clip's source range, each source frame shown once
     let all: Vec<i64> = (0..20).flat_map(|f| shown(&p, f, false)).collect();
     assert_eq!(all, (10..=29).rev().collect::<Vec<_>>());
+}
+
+// ---------------------------------------------------------------- intrinsic Motion blur
+
+/// Linear position keyframes on `clip`'s intrinsic Motion effect: `from` at frame 0 to `to` at
+/// frame `end_f` of clip time.
+fn motion_position_keys(p: &mut Project, seq: ItemId, clip: filmcraft_project::ClipId, from: (f64, f64), to: (f64, f64), end_f: i64) {
+    let r = FrameRate::FPS_24;
+    let key = |f: i64, v: (f64, f64)| {
+        let mut k = Keyframe::new(r.tick_of(f), ParamValue::Vec2(filmcraft_geom::Vec2::new(v.0, v.1)));
+        k.interp = Interpolation::Linear;
+        k
+    };
+    let it = p.sequence_mut(seq).unwrap().find_item_mut(clip).unwrap().1;
+    let m = it.effect_mut("motion").unwrap();
+    let pos = m.params.get_mut("position").unwrap();
+    pos.value = ParamValue::Vec2(filmcraft_geom::Vec2::new(from.0, from.1));
+    pos.keyframes = vec![key(0, from), key(end_f, to)];
+}
+
+#[test]
+fn motion_blur_taps_sample_the_shutter_like_the_transform_effect() {
+    let (mut p, red, _o, seq, _map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    motion_position_keys(&mut p, seq, clip, (60.0, 90.0), (260.0, 90.0), 48);
+    let r = FrameRate::FPS_24;
+    let p = &p;
+    let s = p.sequence(seq).unwrap();
+    let (_, it) = s.find_item(clip).unwrap();
+    let (src, par) = (p.source_size(it.item).unwrap(), p.source_par(it.item));
+    let mt = r.tick_of(12);
+    // animated: 7 equal-weight taps; the middle one is the frame's own sample, the interval
+    // centred on the frame — the position moves 200 px over the 2 s clip (100 px/s), so the
+    // outer taps span the 180° shutter (half a frame at 24 fps) symmetrically around it
+    let taps = motion_blur_taps(s, it, src, par, mt).expect("animated motion is shutter-sampled");
+    assert_eq!(taps.len(), MOTION_BLUR_TAPS);
+    assert_eq!(taps[3], motion_matrix(s, it, src, par, mt), "the middle tap is the frame's own sample");
+    assert!((taps[6].e - taps[0].e - 100.0 * (0.5 / 24.0)).abs() < 1e-9, "the taps span the shutter: {}", taps[6].e - taps[0].e);
+    assert!((taps[0].e + taps[6].e - 2.0 * taps[3].e).abs() < 1e-9, "the outer taps are centred on the frame");
+}
+
+#[test]
+fn a_static_or_constant_motion_keeps_the_single_sample() {
+    let (mut p, red, _o, seq, _map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    let r = FrameRate::FPS_24;
+    {
+        // no keyframes at all: never animated
+        let s = p.sequence(seq).unwrap();
+        let (_, it) = s.find_item(clip).unwrap();
+        let (src, par) = (p.source_size(it.item).unwrap(), p.source_par(it.item));
+        assert!(motion_blur_taps(s, it, src, par, r.tick_of(12)).is_none(), "a static Motion never blurs");
+    }
+    // keyframes that hold the position constant: nothing moves over the shutter
+    motion_position_keys(&mut p, seq, clip, (120.0, 90.0), (120.0, 90.0), 48);
+    {
+        let s = p.sequence(seq).unwrap();
+        let (_, it) = s.find_item(clip).unwrap();
+        let (src, par) = (p.source_size(it.item).unwrap(), p.source_par(it.item));
+        assert!(motion_blur_taps(s, it, src, par, r.tick_of(12)).is_none(), "constant keyframes keep the single sample");
+    }
+    // keyframes elsewhere: the frame outside them holds one value, inside them it blurs
+    motion_position_keys(&mut p, seq, clip, (60.0, 90.0), (260.0, 90.0), 8);
+    {
+        let s = p.sequence(seq).unwrap();
+        let (_, it) = s.find_item(clip).unwrap();
+        let (src, par) = (p.source_size(it.item).unwrap(), p.source_par(it.item));
+        assert!(motion_blur_taps(s, it, src, par, r.tick_of(36)).is_none(), "outside the keyframes the transform is constant");
+        assert!(motion_blur_taps(s, it, src, par, r.tick_of(4)).is_some(), "inside them it blurs");
+    }
+}
+
+#[test]
+fn motion_blur_taps_of_linear_motion_average_to_the_frame() {
+    let (mut p, red, _o, seq, _map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    motion_position_keys(&mut p, seq, clip, (60.0, 90.0), (260.0, 90.0), 48);
+    let r = FrameRate::FPS_24;
+    let p = &p;
+    let s = p.sequence(seq).unwrap();
+    let (_, it) = s.find_item(clip).unwrap();
+    let (src, par) = (p.source_size(it.item).unwrap(), p.source_par(it.item));
+    let mt = r.tick_of(12);
+    let taps = motion_blur_taps(s, it, src, par, mt).unwrap();
+    let mid = motion_matrix(s, it, src, par, mt);
+    // the taps carry equal weight: their mean is the frame's own transform (the position
+    // animates linearly; scale and rotation are constant, so only the translation moves)
+    let n = taps.len() as f64;
+    for (mean, at) in [
+        (taps.iter().map(|m| m.a).sum::<f64>() / n, mid.a),
+        (taps.iter().map(|m| m.d).sum::<f64>() / n, mid.d),
+        (taps.iter().map(|m| m.e).sum::<f64>() / n, mid.e),
+        (taps.iter().map(|m| m.f).sum::<f64>() / n, mid.f),
+    ] {
+        assert!((mean - at).abs() < 1e-9, "tap mean {mean} vs the frame's {at}");
+    }
+}
+
+#[test]
+fn animated_motion_blurs_the_placed_layer() {
+    let (mut p, red, _o, seq, map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    {
+        let s = p.sequence_mut(seq).unwrap();
+        let (_, it) = s.find_item_mut(clip).unwrap();
+        it.effect_mut("motion").unwrap().params.get_mut("scale").unwrap().value = ParamValue::Float(50.0);
+    }
+    // 25 px a frame: at frame 4 the layer sits at (160, 90) with its right edge at 240, and the
+    // 180° shutter smears it ±6.25 px
+    motion_position_keys(&mut p, seq, clip, (60.0, 90.0), (260.0, 90.0), 8);
+    let r = FrameRate::FPS_24;
+    let t = r.tick_of(4);
+    let blurred = render_sequence(&p, seq, t, RenderOptions::default(), &map);
+    // control: the same clip with the position held at the frame's own value
+    let sharp = {
+        let mut p2 = p.clone();
+        let it = p2.sequence_mut(seq).unwrap().find_item_mut(clip).unwrap().1;
+        let pos = it.effect_mut("motion").unwrap().params.get_mut("position").unwrap();
+        pos.keyframes.clear();
+        pos.value = ParamValue::Vec2(filmcraft_geom::Vec2::new(160.0, 90.0));
+        render_sequence(&p2, seq, t, RenderOptions::default(), &map)
+    };
+    // mid-move the placement smears: the leading edge is partial where the held position is solid
+    let (b, s) = (blurred.get(239, 90), sharp.get(239, 90));
+    assert!((s[3] - 1.0).abs() < 1e-6, "the held position covers the pixel: {s:?}");
+    assert!(b[3] > 0.05 && b[3] < 0.95, "the shutter smears the edge: {b:?}");
+    // the layer's centre stays solid, and the blur changed the picture
+    assert!((blurred.get(160, 90)[3] - 1.0).abs() < 1e-6);
+    let max = blurred.px.iter().zip(&sharp.px).map(|(a, b)| (a - b).abs()).fold(0.0f32, f32::max);
+    assert!(max > 1e-3, "the blur left the render unchanged ({max})");
+}
+
+#[test]
+fn an_animated_motion_plans_one_pre_composited_layer_matching_the_reference() {
+    // The compositor draws each layer once (premultiplied "over"): a multi-tap motion blur is a
+    // mean of placements, which sequential draws cannot express, so an animated Motion's layer is
+    // composited on the CPU and planned as one pre-rendered image — exactly the CPU reference.
+    // A static Motion keeps the direct GPU layer.
+    let (mut p, red, _o, seq, map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    {
+        let s = p.sequence_mut(seq).unwrap();
+        let (_, it) = s.find_item_mut(clip).unwrap();
+        it.effect_mut("motion").unwrap().params.get_mut("scale").unwrap().value = ParamValue::Float(50.0);
+    }
+    motion_position_keys(&mut p, seq, clip, (60.0, 90.0), (260.0, 90.0), 8);
+    let r = FrameRate::FPS_24;
+    for f in [2, 4, 6] {
+        let t = r.tick_of(f);
+        let plan = plan::plan_frame(&p, seq, t, RenderOptions::default(), &map);
+        let plan::FramePlan::Layers { layers, .. } = &plan else { panic!("a simple frame plans as layers") };
+        assert_eq!(layers.len(), 1, "frame {f}");
+        assert_eq!(layers[0].matrix, Affine::IDENTITY, "frame {f}: the shutter-sampled layer is pre-composited");
+        assert_eq!(plan::execute_cpu(&plan).px, render_sequence(&p, seq, t, RenderOptions::default(), &map).px, "frame {f}: the plan matches the reference");
+    }
+    // the same clip with the position held: one direct GPU layer placing the frame itself (its
+    // own matrix, not a pre-composited canvas at identity)
+    let it = p.sequence_mut(seq).unwrap().find_item_mut(clip).unwrap().1;
+    let pos = it.effect_mut("motion").unwrap().params.get_mut("position").unwrap();
+    pos.keyframes.clear();
+    pos.value = ParamValue::Vec2(filmcraft_geom::Vec2::new(160.0, 90.0));
+    let t = r.tick_of(4);
+    let plan = plan::plan_frame(&p, seq, t, RenderOptions::default(), &map);
+    let plan::FramePlan::Layers { layers, .. } = &plan else { panic!("a simple frame plans as layers") };
+    assert_eq!(layers.len(), 1);
+    assert_ne!(layers[0].matrix, Affine::IDENTITY, "a static Motion draws the frame itself");
+    assert!(layers[0].fx.is_none());
+}
+
+#[test]
+fn a_transform_effects_shutter_blur_is_planned_on_the_cpu() {
+    // The GPU effect stage evaluates one Transform resample; its shutter-sampled motion blur
+    // (7 taps, `vfx::distort::transform_fx`) has no shader, so the clip must be planned
+    // pre-rendered and match the CPU reference exactly (a single-tap op used to lose the blur).
+    let (mut p, red, _o, seq, map) = setup();
+    let clip = place(&mut p, seq, 0, red, 0, 48);
+    {
+        let s = p.sequence_mut(seq).unwrap();
+        let (_, it) = s.find_item_mut(clip).unwrap();
+        let mut e = filmcraft_project::find_effect("transform").unwrap().instance();
+        e.params.get_mut("shutter_override").unwrap().value = ParamValue::Bool(true);
+        e.params.get_mut("shutter_angle").unwrap().value = ParamValue::Float(180.0);
+        let r = FrameRate::FPS_24;
+        let key = |f: i64, x: f64, y: f64| {
+            let mut k = Keyframe::new(r.tick_of(f), ParamValue::Vec2(filmcraft_geom::Vec2::new(x, y)));
+            k.interp = Interpolation::Linear;
+            k
+        };
+        e.params.get_mut("position").unwrap().keyframes = vec![key(0, 20.0, 40.0), key(8, 220.0, 40.0)];
+        it.effects.push(e);
+    }
+    let r = FrameRate::FPS_24;
+    for f in [2, 4, 6] {
+        let t = r.tick_of(f);
+        let plan = plan::plan_frame(&p, seq, t, RenderOptions::default(), &map);
+        assert_eq!(plan::execute_cpu(&plan).px, render_sequence(&p, seq, t, RenderOptions::default(), &map).px, "frame {f}");
+    }
 }

@@ -22,8 +22,8 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     let arg = |k: &str| params.get(k).and_then(Value::as_str).map(str::to_string);
     let r = match ws {
         "reset" => {
+            app.reset_workspace();
             let n = app.ui.workspace.clone();
-            app.set_workspace(&n);
             Ok(json!({"workspace": n}))
         }
         "saveChanges" => {
@@ -54,12 +54,15 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
     Some(r)
 }
 
-/// Save the current layout as the saved layout of `name`.
+/// Save the current layout as the saved layout of `name`. The auto-saved arrangement of the
+/// same workspace is dropped: it would repeat what was just saved (a launch falls back to the
+/// saved layout while no `open` entry stands) and go stale the moment the panels move again.
 fn save(app: &mut FilmcraftApp, name: &str) -> Result<(), String> {
     crate::dock::Layout { root: app.ui.dock.clone(), floating: app.ui.floating.clone() }.validate()?;
     let layout = serde_json::to_value(&app.ui.dock).map_err(|e| e.to_string())?;
     let floating = if app.ui.floating.is_empty() { serde_json::Value::Null } else { serde_json::to_value(&app.ui.floating).map_err(|e| e.to_string())? };
     let mut next = app.workspaces.clone();
+    next.open.retain(|s| s.name != name);
     let saved = &mut next.saved;
     match saved.iter_mut().find(|s| s.name == name) {
         Some(s) => {
@@ -106,6 +109,10 @@ fn rename(app: &mut FilmcraftApp, from: &str, to: &str) -> Result<Value, String>
     for s in next.saved.iter_mut().filter(|s| s.name == from) {
         s.name = to.clone();
     }
+    // the auto-saved arrangement follows the workspace it belongs to
+    for s in next.open.iter_mut().filter(|s| s.name == from) {
+        s.name = to.clone();
+    }
     if next.current == from {
         next.current = to.clone();
     }
@@ -117,15 +124,20 @@ fn rename(app: &mut FilmcraftApp, from: &str, to: &str) -> Result<Value, String>
 }
 
 /// Delete a user workspace; on a built-in, drop its saved changes (back to the original).
+/// The workspace's auto-saved arrangement goes with it, so the name cannot come back with a
+/// layout its deletion was meant to remove.
 fn delete(app: &mut FilmcraftApp, name: &str) -> Result<Value, String> {
     let mut next = app.workspaces.clone();
     let before = next.saved.len();
     next.saved.retain(|s| s.name != name);
+    next.open.retain(|s| s.name != name);
     if next.saved.len() == before {
         return Err(if is_builtin(name) { format!("`{name}` is a built-in workspace and can't be deleted") } else { format!("unknown workspace `{name}`") });
     }
     app.set_workspaces(next)?;
     if app.ui.workspace == name {
+        // the deleted workspace's pending arrangement save is moot: the workspace is gone
+        app.dock_save_frames = 0;
         app.set_workspace(if is_builtin(name) { name } else { "Editing" });
     }
     Ok(if is_builtin(name) { json!({"restored": name}) } else { json!({"deleted": name}) })

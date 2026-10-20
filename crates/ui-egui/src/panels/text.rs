@@ -116,7 +116,7 @@ fn captions(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     // ---- toolbar: search, track picker, add / split / merge / delete
     let bar = Rect::from_min_size(rect.min + vec2(10.0, 2.0), vec2(rect.width() - 20.0, 26.0));
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(bar.min, vec2(170.0f32.min(bar.width() * 0.4), 24.0))));
-    let sresp = crate::widgets::search_field(&mut child, &mut app.ui.caption_search, tl!("Search"), 170.0f32.min(bar.width() * 0.4), &t);
+    let sresp = crate::widgets::search_field(&mut child, &mut app.ui.caption_search, tl!("Search"), 170.0f32.min(bar.width() * 0.4), &t, "captions");
     app.auto.add("text.captions.search", sresp.rect, "Search captions");
     let mut x = bar.min.x + 180.0f32.min(bar.width() * 0.4 + 10.0);
     let picker = Rect::from_min_size(pos2(x, bar.min.y + 1.0), vec2(130.0, 22.0));
@@ -395,7 +395,7 @@ fn transcript(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let bar = Rect::from_min_size(rect.min + vec2(10.0, 2.0), vec2(rect.width() - 20.0, 26.0));
     let sw = 170.0f32.min(bar.width() * 0.4);
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(bar.min, vec2(sw, 24.0))));
-    let sresp = crate::widgets::search_field(&mut child, &mut app.ui.transcript_search, tl!("Search"), sw, &t);
+    let sresp = crate::widgets::search_field(&mut child, &mut app.ui.transcript_search, tl!("Search"), sw, &t, "transcript");
     app.auto.add("text.transcript.search", sresp.rect, "Search transcript");
     let highlights = app.transcript_cache.highlights(&app.ui.transcript_search);
     let mut x = bar.min.x + sw + 10.0;

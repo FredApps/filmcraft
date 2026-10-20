@@ -389,6 +389,14 @@ impl FxOp {
                 FxOp::crop_rect(w, h, 0.0, 0.0, 0.0, 0.0, amt)
             }
             "transform" => {
+                // The CPU's shutter-sampled motion blur (`vfx::distort::transform_fx`) has no
+                // single-op GPU equivalent: None keeps such a clip on the CPU path (the plan
+                // pre-renders its layer), so the GPU never loses the blur. (`effects::apply`
+                // runs the blur before it could reach here; only the plan evaluates ops
+                // directly.) The guard is `vfx`'s dispatch, verbatim.
+                if b(e, "shutter_override") && f(e, "shutter_angle", cx) > 0.5 {
+                    return None;
+                }
                 let img = Image { w, h, px: Vec::new() };
                 let anchor = point(e, "anchor", cx, &img);
                 let pos = point(e, "position", cx, &img);

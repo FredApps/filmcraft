@@ -9,7 +9,7 @@
 
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -109,6 +109,13 @@ struct Shared {
     /// frames: compositing, CPU effects. Frames cannot be ready sooner than this after they are
     /// started, and the workers can finish at most `workers / cost` of them per second.
     render_cost: Mutex<f64>,
+    /// Running estimate (s) of the per-frame time playback jobs spend fetching source frames
+    /// (decoding, including waits on a source's decoder lock). Together with `render_cost` it
+    /// is the per-frame cost the playback plan schedules against (see [`playback_plan`]).
+    decode_cost: Mutex<f64>,
+    /// Stride of the most recent playback plan (≥ 1): how far apart the frames the workers can
+    /// finish are spaced. The monitor scales its stand-in search with it ([`monitor_lookback`]).
+    stride: AtomicI64,
     workers: usize,
     /// Always-on counters for `perf.stats`.
     stats: Mutex<FrameStats>,
@@ -374,13 +381,28 @@ pub struct FrameServer {
 /// playhead periodically outruns the prefetch (the "plays smoothly, pauses a few seconds, then
 /// catches up" stutter). Scaling the depth by `speed` keeps the runway in *seconds* roughly
 /// constant, so high-speed playback doesn't starve.
-pub fn prefetch_depth(speed: f64) -> i64 {
+///
+/// The speed-scaled depth is also capped by the machine: at 8x it reaches 256 jobs, which a
+/// 2–6 worker pool cannot drain — the queue grows faster than the workers finish, every job is
+/// late by the time it runs and the monitor holds a stale picture (the over-queue at high
+/// shuttle speeds). The cap is [`DEPTH_PER_WORKER`] jobs per worker, floored at the 24-frame
+/// normal-speed depth so a small pool does not shrink 1x runway. When the cap bites, the frames
+/// in between are dropped on purpose: the plan's stride ([`playback_plan`]) spaces the queued
+/// jobs at what the workers can actually finish, the way a real NLE shuttles — a frame that
+/// cannot be rendered before the playhead reaches it is never queued at all.
+pub fn prefetch_depth(speed: f64, workers: usize) -> i64 {
     let base: f64 = if speed.abs() > 1.5 { 32.0 } else { 24.0 };
     // at least `base` frames; grow with speed but cap so a 100x shuttle doesn't queue thousands.
-    // `clamp` handles NaN/inf safely (returns NaN for NaN input, which `as i64` saturates to 0).
+    // `clamp` handles NaN/inf safely (NaN input stays NaN, which `min`/`as i64` then bound).
     let scaled = base * speed.abs().clamp(1.0, 8.0);
-    scaled as i64
+    let cap = DEPTH_PER_WORKER.saturating_mul(workers.max(1) as i64).max(24);
+    scaled.min(cap as f64) as i64
 }
+
+/// Prefetch jobs each worker is worth queueing ahead of the playhead: the depth cap of
+/// [`prefetch_depth`]. A deeper queue cannot be drained before the playhead passes it, so it is
+/// backlog, not runway.
+pub const DEPTH_PER_WORKER: i64 = 12;
 
 /// Playback starts its clock once this many frames from the playhead are ready, or after
 /// [`PREROLL_TIMEOUT_S`]: otherwise the first frames after Play are due before any decoder had a
@@ -396,25 +418,67 @@ pub const PREROLL_FRAMES: i64 = 10;
 pub const SCRUB_KEEP_S: f64 = 2.0;
 pub const PREROLL_TIMEOUT_S: f64 = 0.5;
 
-/// Which frames playback asks for, given the per-frame render cost (s), the displayed frame rate
+/// Which frames playback asks for, given the per-frame job cost (s), the displayed frame rate
 /// and the worker count: `(lead, stride)`. While the workers keep up, every frame from the
-/// playhead on (`(1, 1)`). When they cannot (CPU effects slower than real time), `lead` is the
-/// first frame ahead of the playhead worth starting (nearer ones would be late however soon they
-/// start) and `stride` the spacing the workers can finish in real time: the frames in between
-/// are dropped on purpose and evenly, instead of every frame arriving late.
+/// playhead on (`(1, 1)`). When they cannot (decoding or CPU effects slower than real time),
+/// `lead` is the first frame ahead of the playhead worth starting (nearer ones would be late
+/// however soon they start) and `stride` the spacing the workers can finish in real time: the
+/// frames in between are dropped on purpose and evenly, instead of every frame arriving late.
+///
+/// `frame_cost` is the *whole* per-frame job: fetching source frames (decoding, SOURCE_TIME)
+/// plus compositing. Decode used to be left out, so a heavy decode looked as cheap as a light
+/// transform, the plan stayed at `(1, 1)` and the queue grew without bound at high shuttle
+/// speeds. Contention on a source's decoder lock inflates the per-job decode wall time by the
+/// number of workers waiting on it, which the division by `workers` below turns back into
+/// (approximately) the per-source throughput the pool really has, so the estimate stays sound
+/// either way.
 ///
 /// The drop-to-stride threshold was `load <= 1.0`: any brief cost spike (the first few frames
 /// after Play, which decode from a distant keyframe) tipped the plan into `(ceil, 2)` and the
 /// monitor showed every other frame — exactly the "looks like 30 fps" complaint. The threshold
 /// is now `1.5`, so the plan only drops frames when the workers are genuinely 50 % overloaded,
 /// and a transient spike at startup keeps stride 1.
-pub fn playback_plan(render_cost: f64, fps: f64, workers: usize) -> (i64, i64) {
-    let frames_per_job = render_cost * fps;
+pub fn playback_plan(frame_cost: f64, fps: f64, workers: usize) -> (i64, i64) {
+    let frames_per_job = frame_cost * fps;
     let load = frames_per_job * 1.15 / workers.max(1) as f64;
     if load <= 1.5 {
         return (1, 1);
     }
     (frames_per_job.ceil() as i64, load.ceil() as i64)
+}
+
+/// How far behind the due frame (in frames, against the playback direction) the monitor looks
+/// for the newest rendered frame to show while the exact one is not ready: the stand-in window.
+///
+/// At 1x and slow speeds it is the 6-frame window scrubbing uses. Shuttle speeds step the
+/// displayed frames by `ceil(|speed|)`, and when the workers fall behind the plan's `stride`
+/// spaces the rendered frames further apart still, so the window must cover
+/// `step × (stride + 2)` frames — with the old fixed 6, at 8x the newest finished frame sat
+/// outside the search and the monitor kept showing a texture from before the speed-up (the
+/// stale picture while shuttling). Bounded so a pathological speed cannot make the search long.
+pub fn monitor_lookback(speed: f64, stride: i64) -> i64 {
+    // NaN `speed` falls back to the 1x window (`f64::max` ignores a NaN operand)
+    let step = speed.abs().max(1.0).ceil().max(1.0) as i64;
+    step.saturating_mul(stride.max(1).saturating_add(2)).clamp(6, 512)
+}
+
+/// Ceiling on the frame-server's job queue (playback, monitors, thumbnails together). Past it,
+/// playback prefetch stops queueing — the frame due now still goes in, as priority 0 wins the
+/// workers — because a queue the workers cannot drain is backlog, not runway.
+const QUEUE_MAX: usize = 512;
+
+/// Farthest playback speed the scheduler plans for: pure defence against hostile input. The
+/// app's own shuttles are bounded to ±8, but `speed` reaches the frame server unvalidated from
+/// the control channel (`ui.playback` `play` takes any number), and a huge magnitude would
+/// saturate `step` to `i64::MAX` and overflow the frame arithmetic in
+/// [`FrameServer::schedule_playback`] and [`FrameServer::preroll_ready`]. At ±1024 every
+/// product there (`step`, `lead + ahead × stride`, `span`) still fits an i64 with room to spare.
+const SCHEDULE_SPEED_MAX: f64 = 1024.0;
+
+/// The playback speed the scheduler actually works with: hostile magnitudes are clamped to
+/// ±[`SCHEDULE_SPEED_MAX`], and a non-finite speed (NaN, ±∞ — just as hostile) plays like 1x.
+fn schedulable_speed(speed: f64) -> f64 {
+    if speed.is_finite() { speed.clamp(-SCHEDULE_SPEED_MAX, SCHEDULE_SPEED_MAX) } else { 1.0 }
 }
 
 impl FrameServer {
@@ -446,6 +510,8 @@ impl FrameServer {
             profiling: AtomicBool::new(false),
             records: Mutex::new(Vec::new()),
             render_cost: Mutex::new(0.0),
+            decode_cost: Mutex::new(0.0),
+            stride: AtomicI64::new(1),
             workers: workers.max(1),
             stats: Mutex::new(FrameStats::default()),
         });
@@ -528,11 +594,21 @@ impl FrameServer {
         }
     }
 
-    /// Nearest cached plan at or before `frame`.
+    /// Nearest cached plan at or before `frame` (within `max_back`): the paused monitor's and
+    /// the benchmarks' stand-in search.
     pub fn nearest_plan(&self, key: FrameKey, max_back: i64) -> Option<(FrameKey, Arc<GpuPlan>)> {
+        self.nearest_plan_dir(key, max_back, 1)
+    }
+
+    /// Nearest cached plan within `max_back` frames of `frame`, searched *against* the playback
+    /// direction (`dir` +1 forward, −1 reverse): the frames shown just before this one, newest
+    /// first. While playing, `max_back` must scale with the speed and the plan's stride
+    /// ([`monitor_lookback`]): at 8x the displayed frames step by 8, so a fixed 6-frame search
+    /// never reached the newest finished plan and the monitor kept a stale texture.
+    pub fn nearest_plan_dir(&self, key: FrameKey, max_back: i64, dir: i64) -> Option<(FrameKey, Arc<GpuPlan>)> {
         let mut g = self.shared.plans.lock().unwrap_or_else(|e| e.into_inner());
         (0..=max_back).find_map(|d| {
-            let k = FrameKey { frame: key.frame - d, ..key };
+            let k = FrameKey { frame: key.frame.saturating_sub(d.saturating_mul(dir)), ..key };
             g.get(&k).map(|p| (k, p))
         })
     }
@@ -544,10 +620,27 @@ impl FrameServer {
     /// non-reference pictures, while nearby frames stay decoded (and cached) for scrubbing back.
     pub fn request(&self, key: FrameKey, time: Tick, scale: f32, project: &Arc<Project>, prio: u32) {
         let late = (prio == 0).then(|| Tick::from_seconds_f64(SCRUB_KEEP_S));
-        self.request_job(key, time, scale, project, prio, false, late);
+        self.request_job(key, time, scale, project, prio, false, late, None);
     }
 
-    fn request_job(&self, key: FrameKey, time: Tick, scale: f32, project: &Arc<Project>, prio: u32, prefetch: bool, catch_up: Option<Tick>) {
+    /// `stale_gap` is how far (in frames) another job for this view may be from `key` and still
+    /// be worth keeping. `None` (scrubbing) drops or cancels every queued and running on-screen
+    /// job at another frame, as before. Playback passes the monitor's stand-in window
+    /// ([`monitor_lookback`]): its due frame moves a few frames per refresh, so the previous due
+    /// job is left to finish — it is the newest frame the monitor can show — and only a job the
+    /// position has moved far past (a seek, a real scrub jump) counts as stale.
+    #[allow(clippy::too_many_arguments)]
+    fn request_job(
+        &self,
+        key: FrameKey,
+        time: Tick,
+        scale: f32,
+        project: &Arc<Project>,
+        prio: u32,
+        prefetch: bool,
+        catch_up: Option<Tick>,
+        stale_gap: Option<i64>,
+    ) {
         let hit = || self.shared.stats.lock().unwrap_or_else(|e| e.into_inner()).request_hits += 1;
         if self.shared.done.lock().unwrap_or_else(|e| e.into_inner()).map.contains_key(&key)
             || self.shared.plans.lock().unwrap_or_else(|e| e.into_inner()).map.contains_key(&key)
@@ -582,10 +675,17 @@ impl FrameServer {
             // dragged asks for a new revision per refresh) is left to finish: it needs the same
             // source frames, so it holds no decoder back, and when frames take longer than a
             // refresh, cancelling each one for the next would show nothing until the mouse rests.
+            //
+            // Playback passes `stale_gap` because its due frame moves only a few frames per
+            // refresh: cancelling the previous due job every time left the workers forever
+            // restarting mid-decode, nothing ever finished, and at high shuttle speeds the
+            // monitor froze on a stale texture. Close jobs are kept (they finish and become the
+            // monitor's stand-in); only jobs the position has moved far past are cancelled.
+            let stale = |f: i64| stale_gap.is_none_or(|g| f.saturating_sub(key.frame).saturating_abs() > g);
             let same_view = |k: &FrameKey| k.target == key.target && k.size == key.size;
-            q.retain(|j| !(j.prio == 0 && !j.prefetch && same_view(&j.key)));
+            q.retain(|j| !(j.prio == 0 && !j.prefetch && same_view(&j.key) && stale(j.key.frame)));
             for (k, c, prefetch) in self.shared.in_flight.lock().unwrap_or_else(|e| e.into_inner()).iter() {
-                if !prefetch && same_view(k) && k.frame != key.frame {
+                if !prefetch && same_view(k) && k.frame != key.frame && stale(k.frame) {
                     c.store(true, Ordering::Relaxed);
                 }
             }
@@ -597,29 +697,50 @@ impl FrameServer {
 
     /// Playback scheduling for the monitor showing `key` (the frame due now): request it first,
     /// then the next frames in display order, and drop queued jobs for this target that are
-    /// stale (old revision, behind the playhead or too far ahead).
+    /// stale (old revision, far behind the playhead or too far ahead).
     ///
-    /// When frames cost more to render than the frame interval (CPU effects), frames that could
-    /// not be ready in time are not started and the workers get evenly spaced frames they can
-    /// finish ([`playback_plan`]). While `preroll` (clock not started yet) every frame is wanted.
+    /// When frames cost more than the frame interval (heavy decoding, CPU effects), frames that
+    /// could not be ready in time are not started, and the workers get evenly spaced frames they
+    /// can finish ([`playback_plan`]) — at high shuttle speeds that means dropping intermediate
+    /// frames on purpose, exactly how a real NLE shuttles. While `preroll` (clock not started
+    /// yet) every frame is wanted. `speed` is treated as hostile input and clamped to a
+    /// schedulable range ([`schedulable_speed`]) before the i64 frame arithmetic.
     pub fn schedule_playback(&self, key: FrameKey, rate: filmcraft_time::FrameRate, scale: f32, project: &Arc<Project>, speed: f64, preroll: bool) {
+        let speed = schedulable_speed(speed);
         let dir = if speed < 0.0 { -1 } else { 1 };
         let step = speed.abs().max(1.0) as i64;
         let fps = rate.as_f64() * speed.abs().max(1.0) / step as f64;
-        let (lead, stride) = if preroll { (1, 1) } else { playback_plan(self.render_cost(), fps, self.shared.workers) };
+        // The plan schedules against the whole per-frame job — decode plus render — so a heavy
+        // decode counts like any other cost (see `playback_plan`).
+        let (lead, stride) = if preroll { (1, 1) } else { playback_plan(self.render_cost() + self.decode_cost(), fps, self.shared.workers) };
+        self.shared.stride.store(stride.max(1), Ordering::Relaxed);
+        // The stand-in window: how far behind the due frame a finished frame still shows. The
+        // monitor's search (`monitor_lookback`), the due request's stale-job grace and the
+        // retain below must all agree on it.
+        let behind = monitor_lookback(speed, stride);
         if lead <= 1 {
             // the frame due now; once the clock runs, the frames before it are late
-            self.request_job(key, rate.tick_of(key.frame), scale, project, 0, false, (!preroll && dir > 0).then_some(Tick::ZERO));
+            self.request_job(key, rate.tick_of(key.frame), scale, project, 0, false, (!preroll && dir > 0).then_some(Tick::ZERO), Some(behind));
         }
         // During preroll the clock has not started: only the frames that gate start, not a
         // prefetch run that walks the rest of a LongGOP and evicts the playhead pictures.
-        let ahead = if preroll { (PREROLL_FRAMES - 1).max(0) } else { prefetch_depth(speed) };
+        //
+        // Otherwise the depth is capped twice: by the machine ([`prefetch_depth`] — a queue the
+        // workers cannot drain is backlog, not runway) and by the queue's free slots
+        // ([`QUEUE_MAX`], thumbnails included). The frame due now above is queued whatever the
+        // free count: priority 0 wins the workers.
+        let ahead = if preroll {
+            (PREROLL_FRAMES - 1).max(0)
+        } else {
+            let free = QUEUE_MAX.saturating_sub(self.queue_len()) as i64;
+            prefetch_depth(speed, self.shared.workers).min(free)
+        };
         for i in 0..ahead {
             let f = key.frame + (lead + i * stride) * dir * step;
             if f >= 0 {
                 // forward play: frames before the playhead are late (reverse play skips nothing)
                 let late = (!preroll && dir > 0).then(|| rate.tick_of(f) - rate.tick_of(key.frame));
-                self.request_job(FrameKey { frame: f, ..key }, rate.tick_of(f), scale, project, i as u32 + 1, true, late);
+                self.request_job(FrameKey { frame: f, ..key }, rate.tick_of(f), scale, project, i as u32 + 1, true, late, None);
             }
         }
         let (target, rev, cur) = (key.target, key.revision, key.frame);
@@ -629,12 +750,18 @@ impl FrameServer {
         // the freshly-queued tail as "too far ahead", and the playhead would stall waiting for
         // the next batch — the "pause then catch up" stutter at Speed/Duration 500%+.
         let span = (lead + ahead * stride) * step + 26;
-        self.retain_queue(|k| k.target != target || (k.revision == rev && (k.frame - cur) * dir >= 0 && (k.frame - cur).abs() < span));
+        // Jobs a little *behind* the playhead are kept, up to `behind`: the frame due one
+        // refresh ago is nearly rendered, and once it lands it is the newest frame the monitor
+        // can show — dropping (and cancelling) it is what left the picture stale at speed while
+        // its best stand-in was still in flight. Farther behind than that is genuinely stale.
+        self.retain_queue(|k| k.target != target || (k.revision == rev && (k.frame - cur) * dir >= -behind && (k.frame - cur).saturating_abs() < span));
     }
 
     /// Whether playback can start at `key`: the next [`PREROLL_FRAMES`] frames (up to `last`)
-    /// are ready.
+    /// are ready. `speed` is clamped like [`Self::schedule_playback`] does, so hostile input
+    /// cannot overflow the step arithmetic.
     pub fn preroll_ready(&self, key: FrameKey, speed: f64, last: i64) -> bool {
+        let speed = schedulable_speed(speed);
         let step = (speed.abs().max(1.0) as i64) * if speed < 0.0 { -1 } else { 1 };
         (0..PREROLL_FRAMES).map(|i| key.frame + i * step).filter(|f| *f >= 0 && *f <= last).all(|f| self.is_ready(&FrameKey { frame: f, ..key }))
     }
@@ -642,6 +769,19 @@ impl FrameServer {
     /// The current per-frame render cost estimate (s), see [`playback_plan`].
     pub fn render_cost(&self) -> f64 {
         *self.shared.render_cost.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The current per-frame decode cost estimate (s): playback jobs' time fetching source
+    /// frames, a moving average like [`Self::render_cost`]. The two together are the per-frame
+    /// cost the playback plan schedules against.
+    pub fn decode_cost(&self) -> f64 {
+        *self.shared.decode_cost.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The stride of the most recent playback plan (1 while the workers keep up). The monitor
+    /// scales its stand-in search with it ([`monitor_lookback`]).
+    pub fn playback_stride(&self) -> i64 {
+        self.shared.stride.load(Ordering::Relaxed).max(1)
     }
 
     /// Drop queued jobs that fail `keep` (e.g. stale revisions or frames far from the playhead).
@@ -665,6 +805,18 @@ impl FrameServer {
                 c.store(true, Ordering::Relaxed);
             }
         }
+    }
+
+    /// Playback is starting again — Play pressed, a shuttle speed change, a loop restart — so
+    /// the monitor and playback jobs still queued belong to the previous speed and position:
+    /// their step and stride spacing are wrong for the schedule that starts now, and rendering
+    /// them only delays the frames the new speed will actually show. Drop them and start fresh;
+    /// jobs already running for the view's current frame are left to finish (that frame is still
+    /// due), in-flight prefetch jobs are cancelled as on [`Self::stop_prefetch`], and background
+    /// work (thumbnails) is untouched.
+    pub fn flush_playback(&self) {
+        self.shared.queue.lock().unwrap_or_else(|e| e.into_inner()).retain(|j| j.prio >= BACKGROUND_PRIO);
+        self.stop_prefetch();
     }
 
     pub fn queue_len(&self) -> usize {
@@ -887,6 +1039,18 @@ fn run_job(sh: &Shared, job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Ser
         // not saved by skipping frames, so it is left out of the estimate). A cancelled job
         // only tells that the work takes at least this long.
         let cost = started.elapsed().saturating_sub(SOURCE_TIME.with(|s| s.get()).0).as_secs_f64();
+        // The source-fetch half (decode) gets the same moving average: it is part of what a
+        // frame costs the plan (`playback_plan`), and it used to be invisible to it. Under
+        // contention on one source's decoder the per-job wait grows with the workers waiting
+        // on it — which the plan's division by the worker count turns back into the pool's real
+        // per-source throughput.
+        let src = SOURCE_TIME.with(|s| s.get()).0.as_secs_f64();
+        {
+            let mut d = sh.decode_cost.lock().unwrap_or_else(|e| e.into_inner());
+            if !cancelled || src > *d {
+                *d = if *d == 0.0 { src } else { *d * 0.9 + src * 0.1 };
+            }
+        }
         let mut c = sh.render_cost.lock().unwrap_or_else(|e| e.into_inner());
         if !cancelled || cost > *c {
             // The moving average was 80/20, which let a handful of slow startup frames (each one
@@ -1010,7 +1174,9 @@ fn render_job(job: &Job, pool: &Arc<MediaPool>, services: &Arc<dyn Services>, pr
 
 #[cfg(test)]
 mod tests {
-    use super::{PlaybackMeter, Target, background_work, playback_plan};
+    use super::{
+        DEPTH_PER_WORKER, PlaybackMeter, SCHEDULE_SPEED_MAX, Target, background_work, monitor_lookback, playback_plan, prefetch_depth, schedulable_speed,
+    };
     use filmcraft_project::ItemId;
 
     #[test]
@@ -1044,6 +1210,65 @@ mod tests {
         // 0.5 s of effects per frame at 24 fps on 6 workers: 12 frames pass while one renders,
         // so start 12 ahead, and every 3rd frame is what 6 workers can finish
         assert_eq!(playback_plan(0.5, 24.0, 6), (12, 3));
+    }
+
+    #[test]
+    fn playback_plan_counts_decode_cost_like_any_other_cost() {
+        // A heavy decode (0.25 s of SOURCE_TIME per frame) is scheduled exactly like 0.25 s of
+        // CPU effects: at 24 fps on 4 workers the plan starts 6 frames ahead (a nearer frame
+        // would be late however soon it starts) and keeps every 2nd displayed frame, which is
+        // what the pool can finish. Before decode was counted, this plan stayed at (1, 1) and
+        // the queue grew without bound at high shuttle speeds.
+        assert_eq!(playback_plan(0.25, 24.0, 4), (6, 2));
+        // a light decode stays at stride 1: normal-speed playback is unchanged
+        assert_eq!(playback_plan(0.02, 24.0, 4), (1, 1));
+    }
+
+    #[test]
+    fn prefetch_depth_is_capped_by_the_worker_pool() {
+        // normal speed: the 24-frame runway whatever the pool (no 1x regression)
+        assert_eq!(prefetch_depth(1.0, 2), 24);
+        assert_eq!(prefetch_depth(1.0, 6), 24);
+        // high speed: the speed-scaled depth (8x → 256) cannot exceed what the workers drain
+        assert_eq!(prefetch_depth(8.0, 6), 6 * DEPTH_PER_WORKER);
+        assert_eq!(prefetch_depth(8.0, 2), 24);
+        // the cap never shrinks the normal-speed runway on a small pool
+        assert!(prefetch_depth(5.0, 2) >= prefetch_depth(1.0, 2));
+        // hostile speeds and worker counts stay bounded and sane
+        assert_eq!(prefetch_depth(f64::NAN, 6), 6 * DEPTH_PER_WORKER);
+        assert!(prefetch_depth(100.0, 4) <= 4 * DEPTH_PER_WORKER);
+        assert_eq!(prefetch_depth(8.0, 0), 24);
+    }
+
+    #[test]
+    fn hostile_speeds_clamp_before_the_frame_arithmetic() {
+        // real speeds pass through untouched, fractional and reverse included
+        assert_eq!(schedulable_speed(1.0), 1.0);
+        assert_eq!(schedulable_speed(0.25), 0.25);
+        assert_eq!(schedulable_speed(-8.0), -8.0);
+        // the control channel's `play` takes any number: a magnitude that would saturate the
+        // i64 step arithmetic (`frame + i * i64::MAX`) clamps to the bound instead
+        assert_eq!(schedulable_speed(1e300), SCHEDULE_SPEED_MAX);
+        assert_eq!(schedulable_speed(-1e300), -SCHEDULE_SPEED_MAX);
+        // non-finite speeds play like 1x
+        assert_eq!(schedulable_speed(f64::NAN), 1.0);
+        assert_eq!(schedulable_speed(f64::INFINITY), 1.0);
+    }
+
+    #[test]
+    fn monitor_lookback_scales_with_shuttle_speed_and_stride() {
+        // 1x and slow speeds keep the scrub window
+        assert_eq!(monitor_lookback(1.0, 1), 6);
+        assert_eq!(monitor_lookback(0.25, 1), 6);
+        // 8x steps 8 frames per displayed frame: the newest rendered frame is 8 or 16 behind
+        // the due frame, outside the old fixed 6-frame search
+        assert!(monitor_lookback(8.0, 1) >= 16);
+        // a loaded machine drops to the plan's stride: the window covers the wider spacing
+        assert!(monitor_lookback(8.0, 3) > monitor_lookback(8.0, 1));
+        // bounded, and hostile inputs fall back to the 1x window
+        assert!(monitor_lookback(1000.0, 8) <= 512);
+        assert_eq!(monitor_lookback(f64::NAN, 1), 6);
+        assert_eq!(monitor_lookback(8.0, 0), monitor_lookback(8.0, 1));
     }
 
     #[test]

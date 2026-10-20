@@ -127,6 +127,9 @@ impl FilmcraftApp {
         crate::dock_shared::encode(&layout.root, &layout.floating)?;
         self.ui.dock = layout.root;
         self.ui.floating = layout.floating;
+        // the arrangement changed (every docking mutation funnels through here): auto-save
+        // it once the changes settle, so a restart reopens the panels as they were left
+        self.dock_save_frames = crate::DOCK_SAVE_DELAY_FRAMES;
         Ok(())
     }
 

@@ -232,10 +232,13 @@ pub fn rotate_3d(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
 }
 
 /// Transform: affine place, with optional shutter-angle motion blur when the override is on.
+///
+/// The intrinsic Motion effect samples the same shutter for its own animation
+/// (`crate::motion_blur_taps`); keep the tap count and interval conventions in sync.
 pub fn transform_fx(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
     let fps = cx.frame_rate.max(1.0);
     let angle = fv(e, "shutter_angle", cx);
-    let n = if bv(e, "shutter_override") && angle > 0.5 { 7 } else { 1 };
+    let n = if bv(e, "shutter_override") && angle > 0.5 { crate::MOTION_BLUR_TAPS } else { 1 };
     let span = (angle as f64 / 360.0) / fps;
     motion_blurred(img, n, |im, k| {
         let t = cx.t + Tick::from_seconds_f64(k * span);

@@ -138,6 +138,20 @@ impl Interpolation {
             Interpolation::EaseOut => "Ease Out",
         }
     }
+
+    /// Whether a keyframe with this interpolation carries an outgoing (right) influence
+    /// handle: the segment leaving it eases out of the keyframe. One rule shared by the easing
+    /// math ([`ease`]) and the handles the Effect Controls graphs draw and drag, so the graph
+    /// shows exactly the handles the interpolation uses — no more and no fewer.
+    pub fn eases_out(self) -> bool {
+        matches!(self, Interpolation::Bezier | Interpolation::AutoBezier | Interpolation::ContinuousBezier | Interpolation::EaseOut)
+    }
+
+    /// Whether a keyframe with this interpolation carries an incoming (left) influence handle:
+    /// a segment arriving at it eases into the keyframe.
+    pub fn eases_in(self) -> bool {
+        matches!(self, Interpolation::Bezier | Interpolation::AutoBezier | Interpolation::ContinuousBezier | Interpolation::EaseIn)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -327,10 +341,14 @@ impl Param {
 }
 
 /// Temporal easing for u∈[0,1] between two keyframes (1D cubic Bezier in time/value space).
+/// Each end follows its own keyframe: `a`'s outgoing handle ([`Interpolation::eases_out`])
+/// shapes the start of the segment, and `b`'s incoming handle ([`Interpolation::eases_in`])
+/// its arrival. A Bezier leaving a keyframe no longer also forces a flat, invisible arrival
+/// on a Linear one: `b`'s own interpolation decides how the segment comes in, exactly as
+/// `a`'s decides how it leaves — the handles the graph draws are the ones used.
 fn ease(a: &Keyframe, b: &Keyframe, u: f64) -> f64 {
-    let out_ease = matches!(a.interp, Interpolation::Bezier | Interpolation::AutoBezier | Interpolation::ContinuousBezier | Interpolation::EaseOut);
-    let in_ease = matches!(b.interp, Interpolation::Bezier | Interpolation::AutoBezier | Interpolation::ContinuousBezier | Interpolation::EaseIn)
-        || matches!(a.interp, Interpolation::Bezier | Interpolation::ContinuousBezier);
+    let out_ease = a.interp.eases_out();
+    let in_ease = b.interp.eases_in();
     if !out_ease && !in_ease {
         return u;
     }
@@ -402,6 +420,44 @@ mod tests {
             let v = p.vec2_at(Tick(i * 10)).x;
             assert!(v >= last - 1e-9);
             last = v;
+        }
+    }
+
+    /// An interpolation has an out-handle exactly for the modes that ease out of a keyframe,
+    /// an in-handle exactly for those that ease into one — the rule the easing math and the
+    /// Effect Controls handles share.
+    #[test]
+    fn interpolation_handle_visibility() {
+        let handles = |i: Interpolation| (i.eases_out(), i.eases_in());
+        assert_eq!(handles(Interpolation::Linear), (false, false));
+        assert_eq!(handles(Interpolation::Hold), (false, false));
+        assert_eq!(handles(Interpolation::Bezier), (true, true));
+        assert_eq!(handles(Interpolation::AutoBezier), (true, true));
+        assert_eq!(handles(Interpolation::ContinuousBezier), (true, true));
+        assert_eq!(handles(Interpolation::EaseIn), (false, true));
+        assert_eq!(handles(Interpolation::EaseOut), (true, false));
+    }
+
+    /// A Bezier keyframe leaving into a Linear one used to force a flat, invisible arrival on
+    /// the Linear keyframe (the graph draws no in-handle there, so nothing could control it);
+    /// the arrival now follows `b`'s own interpolation, as the start follows `a`'s.
+    #[test]
+    fn a_segment_arrives_on_its_own_keyframes_handles() {
+        let key = |interp| Keyframe { interp, out_influence: 1.0 / 3.0, in_influence: 1.0 / 3.0, ..Keyframe::new(Tick(0), ParamValue::Float(0.0)) };
+        let a = key(Interpolation::Bezier);
+        let linear = key(Interpolation::Linear);
+        let bezier = key(Interpolation::Bezier);
+        // b Linear: no in-handle, so the segment may not flatten as it arrives — it keeps
+        // coming in on b's own slope (it still leaves a slowly; only a's handle is flat).
+        let end = ease(&a, &linear, 0.99) - ease(&a, &linear, 0.95);
+        assert!(end > 0.02, "a Linear b arrives still moving, not flat: {end}");
+        // b Bezier: an in-handle exists, and the segment eases in flat against it.
+        let flat = ease(&a, &bezier, 0.99) - ease(&a, &bezier, 0.95);
+        assert!(flat < end, "a Bezier b flattens where a Linear b keeps coming: {flat} < {end}");
+        // and the eased position stays within the segment for the whole run
+        for i in 0..=100 {
+            let eased = ease(&a, &linear, i as f64 / 100.0);
+            assert!((0.0..=1.0).contains(&eased), "easing stays between the keyframes: {eased}");
         }
     }
 

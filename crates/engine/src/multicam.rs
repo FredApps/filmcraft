@@ -673,6 +673,13 @@ fn create_multicam(s: &mut Session, p: &Value) -> Result<Value> {
 
 // ---------------------------------------------------------------- multi-camera clips
 
+/// The project-panel selection filtered to clips that can be synchronized, merged or turned into
+/// a multi-camera source sequence (media-backed items only, subclips included), in selection
+/// order. The Synchronize / Merge / Multi-Camera dialogs offer exactly these.
+pub fn selected_items(s: &Session) -> Vec<filmcraft_project::ItemId> {
+    s.state.project_selection.iter().filter(|i| sync::project_clip(&s.project, **i).is_some()).copied().collect()
+}
+
 /// The topmost enabled multi-camera video clip at `t` (targeted tracks first) in the active
 /// sequence: (track, clip).
 ///

@@ -171,8 +171,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 }
                 ui.separator();
                 if ui.button(tl!("Reset to Saved Layout")).clicked() {
-                    let n = app.ui.workspace.clone();
-                    app.set_workspace(&n);
+                    app.reset_workspace();
                     ui.ctx().data_mut(|d| d.insert_temp(popup_id, false));
                 }
             });

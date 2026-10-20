@@ -176,6 +176,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if show_picture {
         ui.painter().rect_filled(pic, 0.0, t.monitor_bg);
         let playing = if which == Which::Program { app.playback.playing } else { app.source_playback.clock.playing };
+        let speed = if which == Which::Program { app.playback.speed } else { app.source_playback.clock.speed };
         let res = mv.effective_res(playing);
         // frame pixels per screen pixel along the axis that needs the most of them
         let screen_scale = (pic.width() * ppp / frame_size.0.max(1) as f32).max(pic.height() * ppp / frame_size.1.max(1) as f32).min(1.0);
@@ -199,7 +200,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         let project = app.session.project.clone();
         if playing {
             let preroll = which == Which::Program && app.playback.preroll.is_some();
-            let speed = if which == Which::Program { app.playback.speed } else { app.source_playback.clock.speed };
             app.frames.schedule_playback(key, rate, scale, &project, speed, preroll);
             if preroll {
                 app.playback.preroll_ready = app.frames.preroll_ready(key, app.playback.speed, rate.frame_at(duration) - 1);
@@ -208,20 +208,27 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
             app.frames.request(key, rate.tick_of(frame), scale, &project, 0);
         }
         let asked = asked_before(app, prefix, key, playing);
+        // The stand-in search while the exact frame renders: paused (scrubbing) keeps the fixed
+        // 6-frame window behind the playhead. While playing, the newest finished frame is the
+        // stand-in, and at shuttle speeds it sits `ceil(|speed|)` (× the plan's stride) frames
+        // behind the due frame — a fixed 6-frame search never reached it and the monitor kept a
+        // stale texture at 8x — so the window scales with both and follows the play direction.
+        let (back, dir) =
+            if playing { (crate::frames::monitor_lookback(speed, app.frames.playback_stride()), if speed < 0.0 { -1 } else { 1 }) } else { (6, 1) };
         let tex_name = if channel { format!("monitor-{prefix}-{display:?}") } else { format!("monitor-{prefix}") };
         let (shown, on_screen) = if use_gpu {
             let found = app
                 .frames
                 .get_plan(&key)
                 .map(|p| (key, p))
-                .or_else(|| app.frames.nearest_plan(key, 6))
+                .or_else(|| app.frames.nearest_plan_dir(key, back, dir))
                 .or_else(|| asked.iter().find_map(|k| app.frames.get_plan(k).map(|p| (*k, p))));
             match found {
                 Some((k, plan)) => (app.gpu_present(k, &plan).map(|(id, _)| id), Some(k)),
                 None => (app.gpu.as_ref().and_then(|g| g.texture), app.gpu.as_ref().and_then(|g| g.last_key)),
             }
         } else {
-            cpu_texture(app, &ctx, &tex_name, key, &asked, display)
+            cpu_texture(app, &ctx, &tex_name, key, &asked, display, back, dir)
         };
         let exact = on_screen == Some(key);
         if which == Which::Program {
@@ -248,7 +255,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
             app.frames.request(rkey, rate.tick_of(rf), scale, &project, 1);
             let rpic = fit(ra, display_w, frame_size.1 as f32);
             ui.painter().rect_filled(rpic, 0.0, t.monitor_bg);
-            if let (Some(tex), _) = cpu_texture(app, &ctx, &format!("monitor-{prefix}-ref"), rkey, &[], DisplayMode::Composite) {
+            if let (Some(tex), _) = cpu_texture(app, &ctx, &format!("monitor-{prefix}-ref"), rkey, &[], DisplayMode::Composite, 6, 1) {
                 ui.painter().image(tex, rpic, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
             }
             app.auto.add("program.compare.reference", rpic, "reference frame");
@@ -476,9 +483,13 @@ fn asked_before(app: &mut FilmcraftApp, prefix: &str, key: FrameKey, playing: bo
     before
 }
 
-/// A monitor texture from the CPU frame path: the exact frame, else the nearest cached one before
-/// it, else the newest ready one of `asked` (see [`asked_before`]), with the display mode's
-/// channel mapping. Returns the texture and the frame it shows.
+/// A monitor texture from the CPU frame path: the exact frame, else the nearest cached one
+/// within `back` frames against the playback direction `dir` (+1 forward, −1 reverse — the
+/// frames shown just before this one), else the newest ready one of `asked` (see
+/// [`asked_before`]), with the display mode's channel mapping. Returns the texture and the
+/// frame it shows. Paused monitors pass the scrub window (6, 1); while playing `back` scales
+/// with the shuttle speed and the plan's stride (`crate::frames::monitor_lookback`).
+#[allow(clippy::too_many_arguments)]
 fn cpu_texture(
     app: &mut FilmcraftApp,
     ctx: &egui::Context,
@@ -486,12 +497,16 @@ fn cpu_texture(
     key: FrameKey,
     asked: &[FrameKey],
     mode: DisplayMode,
+    back: i64,
+    dir: i64,
 ) -> (Option<egui::TextureId>, Option<FrameKey>) {
     let found = app
         .frames
         .get(&key)
         .map(|img| (key, img))
-        .or_else(|| (1..=6).map(|d| FrameKey { frame: key.frame.saturating_sub(d), ..key }).find_map(|k| app.frames.get(&k).map(|img| (k, img))))
+        .or_else(|| {
+            (1..=back).map(|d| FrameKey { frame: key.frame.saturating_sub(d.saturating_mul(dir)), ..key }).find_map(|k| app.frames.get(&k).map(|img| (k, img)))
+        })
         .or_else(|| asked.iter().find_map(|k| app.frames.get(k).map(|img| (*k, img))));
     match found {
         Some((k, img)) => {
@@ -873,7 +888,13 @@ fn mini_timeline(
     if let Some(tk) = scrub {
         match which {
             Which::Program => {
-                app.stop();
+                // Only stop *playback*, and only once: an unconditional `app.stop()` every drag
+                // frame cancels in-flight prefetch jobs and tears down the audio output on each
+                // move — the lag dragging the playhead here fought (the EC ruler and the
+                // Timeline's ruler guard the same way).
+                if app.playback.playing {
+                    app.stop();
+                }
                 app.session.set_playhead(tk);
             }
             Which::Source => {

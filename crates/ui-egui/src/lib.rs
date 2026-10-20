@@ -44,6 +44,7 @@ pub mod graphics_notice;
 pub mod header;
 pub mod i18n;
 pub mod icons;
+mod importing;
 pub mod links;
 pub mod menus;
 pub mod native_dialogs;
@@ -353,6 +354,12 @@ pub struct FilmcraftApp {
     pending_timeline_drop: Option<(Vec<filmcraft_engine::project::ItemId>, egui::Pos2)>,
     /// Files being dragged over the window from the OS (count, pointer): the Timeline previews where they would land.
     file_drag_hover: Option<(usize, egui::Pos2)>,
+    /// Background import batches in flight (menu Import, OS file and folder drops; see [`importing`]).
+    pub(crate) imports: Vec<importing::Batch>,
+    /// OS drops importing onto the timeline whose batches have not all landed (see [`importing`]):
+    /// each holds the items its batches imported until every one of them has landed, then places
+    /// them on the timeline together, at the point of the drop.
+    pub(crate) import_drops: Vec<importing::HeldDrop>,
     timeline_view_last: Option<filmcraft_engine::project::SequenceView>,
     pub fps: f32,
     last_time: f64,
@@ -386,6 +393,9 @@ pub struct FilmcraftApp {
     pub workspaces: dock::WorkspacePrefs,
     /// Workspace names and the current one, as last handed to the native menu.
     menu_workspaces: (Vec<String>, String),
+    /// Frames until a changed panel arrangement is written to the workspaces file's `open`
+    /// entries (see [`FilmcraftApp::save_open_layout`]); 0 = nothing waiting to be saved.
+    dock_save_frames: u32,
 }
 
 pub struct GpuState {
@@ -529,6 +539,11 @@ impl FilmcraftApp {
     }
 }
 
+/// How long after the last docking change (a drag, a tab switch, a gutter resize) the panel
+/// arrangement is auto-saved to the workspaces file: long enough that a drag is one write,
+/// not one per frame. The arrangement is also written when the app quits.
+const DOCK_SAVE_DELAY_FRAMES: u32 = 120;
+
 impl FilmcraftApp {
     pub fn new(mut session: Session) -> Self {
         session.shortcuts.register_external(menus::external_commands());
@@ -583,6 +598,8 @@ impl FilmcraftApp {
             timeline_view_of: None,
             pending_timeline_drop: None,
             file_drag_hover: None,
+            imports: Vec::new(),
+            import_drops: Vec::new(),
             timeline_view_last: None,
             fps: 60.0,
             last_time: 0.0,
@@ -604,6 +621,7 @@ impl FilmcraftApp {
             workspace_restored: false,
             workspaces,
             menu_workspaces: Default::default(),
+            dock_save_frames: 0,
         }
     }
 
@@ -706,6 +724,11 @@ impl FilmcraftApp {
             let k = self.appearance_kind(ctx);
             self.set_theme(ctx, k);
         }
+        // Interface Animations: 0.0 makes every fade and slide snap to its end state.
+        if prev.as_ref().is_none_or(|q| q.appearance.animations != p.appearance.animations) {
+            let animation = if p.appearance.animations { crate::theme::ANIMATION_TIME } else { 0.0 };
+            ctx.global_style_mut(|s| s.animation_time = animation);
+        }
         if prev.as_ref().is_none_or(|q| q.general.interface_language != p.general.interface_language) {
             let language = match i18n::Language::parse(&p.general.interface_language) {
                 Some(l) => l,
@@ -753,7 +776,9 @@ impl FilmcraftApp {
             self.ui.status = note;
         }
         if prev.is_none() && !self.workspace_restored {
-            // reopen the workspace in use when the app last closed
+            // reopen the workspace in use when the app last closed, with the arrangement it
+            // was left in (`set_workspace` applies the auto-saved `open` entry; `Save Changes`
+            // layouts are what Reset to Saved Layout goes back to)
             self.workspace_restored = true;
             if let Some(w) = dock::find(&self.workspaces, &self.workspaces.current) {
                 self.set_workspace(&w);
@@ -829,9 +854,24 @@ impl FilmcraftApp {
         }
     }
 
+    /// Switch to (or launch into) workspace `name`: the arrangement as it was left — the
+    /// auto-saved `open` entry — over its saved layout, which is what a workspace without one
+    /// (first use, or after Reset to Saved Layout dropped it) falls back to. A switch first
+    /// keeps the arrangement of the workspace being left, if its auto-save is still waiting.
     pub fn set_workspace(&mut self, name: &str) {
+        if self.dock_save_frames > 0 && self.ui.workspace != name {
+            self.save_open_layout();
+        }
         self.ui.workspace = name.to_string();
-        let layout = dock::saved_docking(&self.workspaces, name);
+        let mut layout = dock::saved_docking(&self.workspaces, name);
+        if let Some(entry) = self.workspaces.open.iter().find(|s| s.name == name) {
+            match dock::open_layout(entry) {
+                Ok(open) => layout = open,
+                // an entry that cannot be read back (a hand-edited file, a tree this version
+                // rejects) is skipped with a note; the saved layout loaded above stays
+                Err(e) => self.ui.status = format!("{e}: the workspace's saved layout is used"),
+            }
+        }
         self.ui.dock = layout.root;
         self.ui.floating = layout.floating;
         self.pending_panel_raise = None;
@@ -848,9 +888,57 @@ impl FilmcraftApp {
         }
     }
 
+    /// Window ▸ Workspaces ▸ Reset to Saved Layout: the workspace's saved layout, not the
+    /// arrangement as it was left (which a switch or a launch applies). The reset arrangement
+    /// is what a later launch reopens, so it is auto-saved like any change.
+    pub fn reset_workspace(&mut self) {
+        let name = self.ui.workspace.clone();
+        let layout = dock::saved_docking(&self.workspaces, &name);
+        self.ui.dock = layout.root;
+        self.ui.floating = layout.floating;
+        self.pending_panel_raise = None;
+        self.ui.keys.maximized = None;
+        if name == "Color" {
+            self.ui.show_scopes = false;
+        }
+        self.dock_save_frames = DOCK_SAVE_DELAY_FRAMES;
+    }
+
+    /// Write the panel arrangement in use to the workspaces file (`open` entries), so the
+    /// next launch reopens the panels as they were left. Auto-saved: unlike Window ▸
+    /// Workspaces ▸ Save Changes to this Workspace it never overwrites the layout Reset to
+    /// Saved Layout restores. An arrangement that would not load back is not written.
+    /// `current` stays as it is: only `set_workspace` changes which workspace is in use.
+    fn save_open_layout(&mut self) {
+        let name = self.ui.workspace.clone();
+        let layout = dock::Layout { root: self.ui.dock.clone(), floating: self.ui.floating.clone() };
+        if let Err(e) = layout.validate() {
+            self.ui.status = format!("saving panel layout: {e}");
+            return;
+        }
+        let (Ok(root), Ok(floating)) =
+            (serde_json::to_value(&layout.root), if layout.floating.is_empty() { Ok(serde_json::Value::Null) } else { serde_json::to_value(&layout.floating) })
+        else {
+            self.ui.status = tl!("saving panel layout failed").into();
+            return;
+        };
+        let entry = dock::SavedWorkspace { name, layout: root, floating };
+        let mut next = self.workspaces.clone();
+        match next.open.iter_mut().find(|s| s.name == entry.name) {
+            Some(slot) => *slot = entry,
+            None => next.open.push(entry),
+        }
+        match self.set_workspaces(next) {
+            // saved: the arrangement as it now stands is in the file, nothing more pending
+            Ok(()) => self.dock_save_frames = 0,
+            Err(e) => self.ui.status = e,
+        }
+    }
+
     pub fn show_panel(&mut self, p: PanelKind) {
         if p == PanelKind::Timeline && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             self.ui.dock.restore_timeline();
+            self.dock_save_frames = DOCK_SAVE_DELAY_FRAMES;
         }
         if !self.ui.dock.contains(p) && !self.ui.floating.iter().any(|group| group.panels.contains(&p)) {
             let near = match p {
@@ -872,6 +960,7 @@ impl FilmcraftApp {
                 _ => PanelKind::Project,
             };
             self.ui.dock.open_near(p, near);
+            self.dock_save_frames = DOCK_SAVE_DELAY_FRAMES;
         }
         let _ = self.apply_dock(craft_ui::docking::Action::Activate { panel: p });
         self.ui.focused = p;
@@ -934,6 +1023,10 @@ impl FilmcraftApp {
     }
 
     pub fn play(&mut self, speed: f64) {
+        // Jobs still queued belong to the previous speed and position (a paused scrub, an 8x
+        // shuttle's deep step-8 run): their spacing is wrong for the schedule that starts now,
+        // and rendering them only delays the frames the new speed will actually show.
+        self.frames.flush_playback();
         self.stop_source();
         if self.session.active_sequence().is_none() {
             return;
@@ -1273,23 +1366,17 @@ impl FilmcraftApp {
                     .iter()
                     .chain(filmcraft_media::AUDIO_EXTENSIONS)
                     .chain(filmcraft_media::STILL_EXTENSIONS)
-                    .chain(&["srt", "vtt", "scc", "edl", "xml", "fcpxml", "otio", "aaf", "omf", "prproj"])
+                    .chain(&["srt", "vtt", "scc", "edl", "xml", "fcpxml", "otio", "aaf", "omf"])
                     .copied()
                     .collect();
-                let bin = params.get("bin").cloned();
+                let bin = params.get("bin").and_then(Value::as_u64).map(filmcraft_project::BinId);
                 self.pick(FileDialog::open_files(&exts), move |app, paths| {
                     if paths.is_empty() {
                         return Ok(Value::Null);
                     }
-                    let bin = bin.unwrap_or_else(|| json!(app.import_bin().0));
-                    let r = app.session.execute("file.import", json!({"paths": paths, "bin": bin})).map_err(|e| e.to_string());
-                    if let Ok(v) = &r
-                        && let Some(errs) = v.get("errors").and_then(Value::as_array)
-                        && !errs.is_empty()
-                    {
-                        app.ui.status = errs.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("; ");
-                    }
-                    r
+                    let bin = bin.unwrap_or_else(|| app.import_bin());
+                    // large media opens on a worker; the rest imports here, as before
+                    importing::start(app, None, paths, bin, None)
                 })
             }
             // File ▸ Import with Image Sequence: choose the first numbered still
@@ -1389,26 +1476,38 @@ impl FilmcraftApp {
             None
         };
         let dropped = ctx.input(|i| i.raw.dropped_files.clone());
-        let mut paths = Vec::new();
+        let mut files = Vec::new();
+        let mut folders = Vec::new();
         for f in dropped {
             let p = f.path();
-            if p.exists() {
-                paths.push(p.to_string_lossy().to_string());
+            if !p.exists() {
+                continue;
+            }
+            // a folder imports as a bin tree (the engine's folder import structure)
+            if p.is_dir() {
+                folders.push(p.to_string_lossy().to_string());
+            } else {
+                files.push(p.to_string_lossy().to_string());
             }
         }
-        if !paths.is_empty() {
+        if !files.is_empty() || !folders.is_empty() {
             let pointer = self.drop_pointer(ctx);
-            let imported = self.session.execute("file.import", json!({"paths": paths, "bin": self.import_bin().0}));
-            if let Ok(v) = imported
-                && let Some(pos) = pointer
-                && self.session.prefs.timeline.drop_import_to_timeline
+            let drop_at = pointer.filter(|_| self.session.prefs.timeline.drop_import_to_timeline);
+            let bin = self.import_bin();
+            // the drop's batches (its files and its folders) hold what they import until every
+            // one of them has landed, then place on the timeline together, at the point of the drop
+            let drop = importing::begin_drop(self, drop_at);
+            if !files.is_empty()
+                && let Err(e) = importing::start(self, Some(ctx), files, bin, drop)
             {
-                let items: Vec<filmcraft_engine::project::ItemId> =
-                    v["items"].as_array().map(|a| a.iter().filter_map(|i| i.as_u64()).map(filmcraft_engine::project::ItemId).collect()).unwrap_or_default();
-                if !items.is_empty() {
-                    self.pending_timeline_drop = Some((items, pos));
+                self.ui.status = e;
+            }
+            for dir in folders {
+                if let Err(e) = importing::start_folder(self, Some(ctx), dir, bin, drop) {
+                    self.ui.status = e;
                 }
             }
+            importing::end_drop(self, drop);
         }
     }
 
@@ -1739,6 +1838,7 @@ impl FilmcraftApp {
                     self.timeline_view_of = None;
                     if !self.ui.floating.iter().any(|group| group.panels.contains(&PanelKind::Timeline)) {
                         self.ui.dock.restore_timeline();
+                        self.dock_save_frames = DOCK_SAVE_DELAY_FRAMES;
                     }
                     let _ = self.apply_dock(craft_ui::docking::Action::Activate { panel: PanelKind::Timeline });
                 }
@@ -1752,6 +1852,12 @@ impl FilmcraftApp {
         }
         self.sync_timeline_view();
         self.handle_drops(&ctx);
+        // landed imports apply the frame they arrive (see `importing`); poll while a batch runs,
+        // so they land promptly also where the worker holds no repaint context (the menu's dialog)
+        importing::pump(self);
+        if !self.imports.is_empty() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
         if let Some(rx) = self.command_inbox.take() {
             while let Ok(id) = rx.try_recv() {
                 if self.control_input_only {
@@ -1789,8 +1895,11 @@ impl FilmcraftApp {
             state::Mode::Import => panels::import_mode::show(self, ui, body),
             state::Mode::Export => panels::export_mode::show(self, ui, body),
         }
-        // the Timeline has had its chance to place a file drop this frame; anything left stays a bin import
-        self.pending_timeline_drop = None;
+        // A file drop the Timeline is still holding (`pending_timeline_drop`) stays held: the
+        // Timeline panel consumes or cancels it when it is drawn (see `timeline::interact` and
+        // `timeline::empty_state`), and clearing it here would throw away a drop that landed
+        // while the Timeline was hidden — on another tab, closed, or covered — the frames the
+        // import's background batches were still running.
         panels::dialogs::show(self, &ctx);
         if !self.ui.show_status_bar {
             // no bar to draw the job in, but a finished preview render still plays
@@ -2089,6 +2198,15 @@ impl eframe::App for FilmcraftApp {
         }
         let settled = !std::mem::take(&mut self.monitor_inexact) && self.timeline_still > 0;
         self.issue_screenshots(ctx, settled);
+        // A changed panel arrangement is auto-saved once the changes settle (see
+        // `save_open_layout`); keep frames coming until then.
+        if self.dock_save_frames > 0 {
+            self.dock_save_frames -= 1;
+            ctx.request_repaint_after(std::time::Duration::from_millis(16));
+            if self.dock_save_frames == 0 {
+                self.save_open_layout();
+            }
+        }
         self.collect_screenshots(ctx);
     }
 
@@ -2096,6 +2214,10 @@ impl eframe::App for FilmcraftApp {
         // Flush the recovery journal and stop the auto-save worker; a session with nothing unsaved
         // removes its journal, one with unsaved changes keeps it for the next launch.
         self.session.shutdown();
+        // The panel arrangement as it was left reopens at the next launch.
+        if self.dock_save_frames > 0 {
+            self.save_open_layout();
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -2810,5 +2932,81 @@ mod native_menu_tests {
         app.sync_native_menu();
         assert_eq!(last(&sent, "edit.undo"), Some(false));
         assert_eq!(last(&sent, "edit.redo"), Some(true), "the undone edit can be redone");
+    }
+}
+
+#[cfg(test)]
+mod playback_queue_tests {
+    use super::*;
+
+    /// Play pressed (or a shuttle speed change, which routes through `play` too) must flush the
+    /// jobs queued for the previous speed and position: at 8x that is a deep step-8 prefetch run
+    /// whose spacing is wrong for the new schedule, and rendering it only delays the frames the
+    /// new speed will actually show (the over-queue at high shuttle speeds).
+    #[test]
+    fn play_flushes_the_previous_speeds_prefetch_queue() {
+        let mut session = Session::default();
+        session.execute("file.openDemoProject", json!({})).unwrap();
+        let mut app = FilmcraftApp::new(session);
+        let seq = app.session.state.active_sequence.unwrap();
+        let rate = app.session.sequence_rate();
+        let project = app.session.project.clone();
+        let key =
+            FrameKey { target: Target::Sequence(seq), frame: rate.frame_at(app.session.playhead()), size: 500, revision: app.session.revision, draft: false };
+        // 8x shuttle queues a prefetch run (the workers may already be running a few of them)
+        app.frames.schedule_playback(key, rate, 0.5, &project, 8.0, false);
+        assert!(app.frames.queue_len() > 0, "8x shuttle queues a prefetch run");
+        // a speed change through play() starts the new schedule from a flushed queue
+        app.play(1.0);
+        assert_eq!(app.frames.queue_len(), 0, "play() flushes the previous speed's queued jobs");
+        app.stop();
+    }
+
+    /// A stopped playback keeps the monitor's own (non-prefetch) request: the paused monitor
+    /// still needs the frame under the playhead, which `stop` already dropped the prefetch for.
+    #[test]
+    fn flush_keeps_background_work_but_drops_monitor_jobs() {
+        let mut session = Session::default();
+        session.execute("file.openDemoProject", json!({})).unwrap();
+        let mut app = FilmcraftApp::new(session);
+        let seq = app.session.state.active_sequence.unwrap();
+        let rate = app.session.sequence_rate();
+        let project = app.session.project.clone();
+        let frame = rate.frame_at(app.session.playhead());
+        let key = FrameKey { target: Target::Sequence(seq), frame, size: 500, revision: app.session.revision, draft: false };
+        // a paused monitor's scrub request (priority 0, not prefetch) plus its prefetch run
+        app.frames.request(key, rate.tick_of(frame), 0.5, &project, 0);
+        app.frames.schedule_playback(key, rate, 0.5, &project, 1.0, false);
+        assert!(app.frames.queue_len() > 0);
+        // flushing for a new play drops both: the scrub job is re-requested by the schedule
+        // that starts immediately, and the prefetch jobs belong to the old spacing
+        app.frames.flush_playback();
+        assert_eq!(app.frames.queue_len(), 0, "monitor and playback jobs are dropped; thumbnails (none here) would stay");
+        app.stop();
+    }
+
+    /// The control channel's `ui.playback` `play` accepts any `speed` number, so the scheduler
+    /// treats it as hostile input: before the clamp, `frame + i * step` saturated `step` to
+    /// `i64::MAX` and overflowed (a debug panic). Now the speed is clamped
+    /// (`frames::schedulable_speed`) and the plan stays bounded and schedulable.
+    #[test]
+    fn hostile_playback_speeds_still_schedule_a_bounded_plan() {
+        let mut session = Session::default();
+        session.execute("file.openDemoProject", json!({})).unwrap();
+        let mut app = FilmcraftApp::new(session);
+        let seq = app.session.state.active_sequence.unwrap();
+        let rate = app.session.sequence_rate();
+        let project = app.session.project.clone();
+        let frame = rate.frame_at(app.session.playhead());
+        let key = FrameKey { target: Target::Sequence(seq), frame, size: 500, revision: app.session.revision, draft: false };
+        for speed in [1e300, -1e300, f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            app.frames.flush_playback();
+            app.frames.schedule_playback(key, rate, 0.5, &project, speed, false);
+            assert!(app.frames.queue_len() <= 512, "{speed}: the queue stays within frames' QUEUE_MAX");
+            assert!(app.frames.playback_stride() >= 1, "{speed}: the plan stays schedulable");
+            // the preroll step arithmetic gets the same hostile speeds
+            let _ = app.frames.preroll_ready(key, speed, frame + 10_000);
+        }
+        app.stop();
     }
 }

@@ -357,6 +357,9 @@ fn push_item(
         && let Some(angle) = item.multicam_angle(nested)
         && !(opts.effects && item.has_standard_effects())
         && (nested.settings.width, nested.settings.height) == (seq.settings.width, seq.settings.height)
+        // a shutter-sampled Motion (animated intrinsic transform) composites on the CPU: no
+        // push-through shortcut for it (see the gpu_chain branch below)
+        && !(opts.effects && crate::motion_blur_taps(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt).is_some())
         && near_identity(&motion_matrix(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt))
         && let Some(tr) = nested.angle_video_track_index(angle).and_then(|i| nested.video_tracks.get(i))
         && !tr.transitions.iter().any(|x| x.range().contains(ft))
@@ -379,6 +382,9 @@ fn push_item(
         && !item.has_opacity_masks()
         && bl == Blend::Normal
         && extra_opacity * op >= 1.0 - 1e-6
+        // a shutter-sampled Motion (animated intrinsic transform) composites on the CPU: no
+        // push-through shortcut for it (see the gpu_chain branch below)
+        && !(opts.effects && crate::motion_blur_taps(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt).is_some())
         && near_identity(&motion_matrix(seq, item, (nested.settings.width, nested.settings.height), Some(nested.settings.par), mt))
         && nest_is_plain(project, seq, nested, ft)
     {
@@ -395,75 +401,88 @@ fn push_item(
         return;
     }
     // Graphic clips without standard effects: the layers are rasterised (cached) into one tight
-    // image the GPU places as a layer.
+    // image the GPU places as a layer. An animated Motion is shutter-sampled (multi-tap): the
+    // tight image would need a placement per tap, so such a graphic falls through to the
+    // CPU-rendered layer below.
     if !(opts.effects && item.has_standard_effects() || item.has_opacity_masks())
         && project.item(item.item).is_some_and(|p| matches!(p.kind, ItemKind::Graphic { .. }))
     {
         let Some(size) = crate::source_size(project, item.item) else { return };
-        let (w, h) = output_size(seq, opts.scale);
-        let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion_matrix(seq, item, size, None, mt));
-        if let Some((img, x, y)) = crate::graphic_clip::render_graphic_tight(item, mt, size, &m, w, h) {
-            out.push(PlanLayer::new(cpu_frame(img), Affine::translate(x as f64, y as f64), op * extra_opacity, bl));
+        let motion_blur = opts.effects && crate::motion_blur_taps(seq, item, size, None, mt).is_some();
+        if !motion_blur {
+            let (w, h) = output_size(seq, opts.scale);
+            let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion_matrix(seq, item, size, None, mt));
+            if let Some((img, x, y)) = crate::graphic_clip::render_graphic_tight(item, mt, size, &m, w, h) {
+                out.push(PlanLayer::new(cpu_frame(img), Affine::translate(x as f64, y as f64), op * extra_opacity, bl));
+            }
+            return;
         }
-        return;
     }
     if let Some(chain) = gpu_chain(project, item, opts) {
         let Some(src) = sources.source(item.item) else { return };
         let Some(size) = crate::source_size(project, item.item) else { return };
-        let motion = motion_matrix(seq, item, size, crate::source_par(project, item.item), mt);
-        let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
-        let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
-        let time = crate::video_source_time(item, t, src.info().frame_rate());
-        let Ok(frame) = src.video_frame(FrameRequest { time, scale: want }) else { return };
-        let cs = crate::colorman::source_space(project, item.item, &frame);
-        // HDR and wide-gamut media on a Rec. 709 sequence is converted on the GPU too (#965); log
-        // media and other pipelines are converted on the CPU (below), and so are blended
-        // in-between frames (Frame Blending / Optical Flow on speed-changed clips)
-        let pipe = &seq.settings.color;
-        let input = if crate::colorman::needs_management(pipe, cs, &frame) { crate::colorman::gpu_input(project, item.item, pipe, cs, &frame) } else { None };
-        let plain =
-            (input.is_some() || !crate::colorman::needs_management(pipe, cs, &frame)) && crate::interpolation_blend(item, t, src.info().frame_rate()).is_none();
-        if plain && !chain.is_empty() {
-            // GPU effect stage: the working image the CPU would decode (`base_layer`), the
-            // effects evaluated for it, placed as `item_layer` places it
-            let n = crate::decimation(frame.width as f32, size.0 as f32 * want);
-            let (lw, lh) = ((frame.width as usize / n).max(1), (frame.height as usize / n).max(1));
-            let px_scale = lw as f32 / size.0.max(1) as f32;
-            let tc = "";
-            let cx = crate::effects::FxCtx {
-                t: mt,
-                px_scale,
-                seconds: (t - item.start).seconds(),
-                timecode: tc,
-                clip_name: &item.name,
-                project: Some(project),
-                env: None,
-                frame_rate: seq.settings.frame_rate.as_f64(),
-                working: seq.settings.color.working,
-            };
-            let ops: Option<Vec<FxOp>> = chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect();
-            if let Some(ops) = ops {
-                let m = Affine::scale(opts.scale as f64, opts.scale as f64)
-                    .then_apply(&motion)
-                    .then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
-                let fx = LayerFx { size: (lw as u32, lh as u32), decimation: n as u32, ops };
-                out.push(PlanLayer { frame, matrix: m, opacity: op * extra_opacity, blend: bl, fx: Some(Arc::new(fx)), input });
+        let src_par = crate::source_par(project, item.item);
+        // A shutter-sampled Motion (an animated intrinsic transform) is a multi-tap average, which
+        // the compositor's sequential layer draws cannot express exactly: such a layer is
+        // composited on the CPU and handed over pre-rendered — the convention for anything the
+        // shaders don't cover — matching the CPU reference exactly. Effects off: no blur, the
+        // frame draws directly as before.
+        if !(opts.effects && crate::motion_blur_taps(seq, item, size, src_par, mt).is_some()) {
+            let motion = motion_matrix(seq, item, size, src_par, mt);
+            let lin = ((motion.a * motion.a + motion.b * motion.b).sqrt()).max((motion.c * motion.c + motion.d * motion.d).sqrt());
+            let want = (lin * opts.scale as f64).clamp(1.0 / 64.0, 1.0) as f32;
+            let time = crate::video_source_time(item, t, src.info().frame_rate());
+            let Ok(frame) = src.video_frame(FrameRequest { time, scale: want }) else { return };
+            let cs = crate::colorman::source_space(project, item.item, &frame);
+            // HDR and wide-gamut media on a Rec. 709 sequence is converted on the GPU too (#965); log
+            // media and other pipelines are converted on the CPU (below), and so are blended
+            // in-between frames (Frame Blending / Optical Flow on speed-changed clips)
+            let pipe = &seq.settings.color;
+            let input = if crate::colorman::needs_management(pipe, cs, &frame) { crate::colorman::gpu_input(project, item.item, pipe, cs, &frame) } else { None };
+            let plain =
+                (input.is_some() || !crate::colorman::needs_management(pipe, cs, &frame)) && crate::interpolation_blend(item, t, src.info().frame_rate()).is_none();
+            if plain && !chain.is_empty() {
+                // GPU effect stage: the working image the CPU would decode (`base_layer`), the
+                // effects evaluated for it, placed as `item_layer` places it
+                let n = crate::decimation(frame.width as f32, size.0 as f32 * want);
+                let (lw, lh) = ((frame.width as usize / n).max(1), (frame.height as usize / n).max(1));
+                let px_scale = lw as f32 / size.0.max(1) as f32;
+                let tc = "";
+                let cx = crate::effects::FxCtx {
+                    t: mt,
+                    px_scale,
+                    seconds: (t - item.start).seconds(),
+                    timecode: tc,
+                    clip_name: &item.name,
+                    project: Some(project),
+                    env: None,
+                    frame_rate: seq.settings.frame_rate.as_f64(),
+                    working: seq.settings.color.working,
+                };
+                let ops: Option<Vec<FxOp>> = chain.iter().map(|e| FxOp::eval(e, &cx, lw, lh).filter(FxOp::gpu_ok)).collect();
+                if let Some(ops) = ops {
+                    let m = Affine::scale(opts.scale as f64, opts.scale as f64)
+                        .then_apply(&motion)
+                        .then_apply(&Affine::scale(1.0 / px_scale as f64, 1.0 / px_scale as f64));
+                    let fx = LayerFx { size: (lw as u32, lh as u32), decimation: n as u32, ops };
+                    out.push(PlanLayer { frame, matrix: m, opacity: op * extra_opacity, blend: bl, fx: Some(Arc::new(fx)), input });
+                    return;
+                }
+            } else if plain {
+                // Draft playback at reduced resolution: hand over planes box-filtered to the size
+                // drawn instead of the full picture (a quarter at 1/2, a sixteenth at 1/4 of the
+                // upload and sampling). The mean is taken over Y'CbCr codes, not linear light as
+                // the shader's supersampling does, so this stays limited to the opt-in draft mode.
+                let n = if filmcraft_media::cancel::draft() { crate::decimation(frame.width as f32, size.0 as f32 * want) } else { 1 };
+                let frame = match frame.box_decimated(n) {
+                    Some(small) => Arc::new(small),
+                    None => frame,
+                };
+                let px_scale = frame.width as f64 / size.0.max(1) as f64;
+                let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion).then_apply(&Affine::scale(1.0 / px_scale, 1.0 / px_scale));
+                out.push(PlanLayer { input, ..PlanLayer::new(frame, m, op * extra_opacity, bl) });
                 return;
             }
-        } else if plain {
-            // Draft playback at reduced resolution: hand over planes box-filtered to the size
-            // drawn instead of the full picture (a quarter at 1/2, a sixteenth at 1/4 of the
-            // upload and sampling). The mean is taken over Y'CbCr codes, not linear light as
-            // the shader's supersampling does, so this stays limited to the opt-in draft mode.
-            let n = if filmcraft_media::cancel::draft() { crate::decimation(frame.width as f32, size.0 as f32 * want) } else { 1 };
-            let frame = match frame.box_decimated(n) {
-                Some(small) => Arc::new(small),
-                None => frame,
-            };
-            let px_scale = frame.width as f64 / size.0.max(1) as f64;
-            let m = Affine::scale(opts.scale as f64, opts.scale as f64).then_apply(&motion).then_apply(&Affine::scale(1.0 / px_scale, 1.0 / px_scale));
-            out.push(PlanLayer { input, ..PlanLayer::new(frame, m, op * extra_opacity, bl) });
-            return;
         }
     }
     // CPU-rendered layer (standard effects): drawn by the GPU as a pre-rendered canvas image.

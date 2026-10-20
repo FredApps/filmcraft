@@ -1,13 +1,13 @@
 # UI and interaction parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** major (new file: tools, handles, panels, keyboard and feel against Premiere Pro 26.5.2, with the open UI issues) · **Target:** Adobe Premiere Pro 2026 (26.5.2, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-12 · **Change:** minor (panel docking rearrangement (#493) done, layout persisted across restarts and switches) · **Target:** Adobe Premiere Pro 2026 (26.5.2, macOS)
 
 How FilmCraft looks, feels and responds compared with Premiere: tools, on-screen handles, snapping,
 nudging, modifier keys, shortcuts, drag behaviour, numeric entry, panels, context menus. Keyboard
 detail is in [keyboard.md](keyboard.md), monitor view options in [monitors.md](monitors.md).
 Reference screenshots and behaviour notes are maintainer-local (`plan/premiere/`, never committed).
 
-**UI / UX dimension: ~60% ready, breadth ~88%, 120–200 h** ([target-app-parity.md](target-app-parity.md#by-dimension)).
+**UI / UX dimension: ~60% ready, breadth ~88%, 110–180 h** ([target-app-parity.md](target-app-parity.md#by-dimension)).
 UI fidelity was compared with Premiere reference screenshots by the agents that built it; that
 comparison has not been repeated independently. The ready figure is pulled down by the volume of
 open interaction reports (about 40 of the 188 open issues).
@@ -21,7 +21,7 @@ open interaction reports (about 40 of the 188 open issues).
 | Timeline editing tools | Selection, Track Select, Ripple / Rolling / Rate Stretch, Razor, Slip / Slide, Pen, Hand, Zoom, Type | all present, trim modes, Trim Monitor, dynamic trimming; the Razor sits below Slip / Slide as a scissors glyph whose toolbar click also adds an edit at the playhead | 80% | deselect in empty space (#683), gap delete (#648, #668), clip stretch (#653), new tracks by dropping (#483), Escape cancels drag (#580 fixed), delete in timeline (#680, #404) | 30–50 h |
 | Program monitor on-screen controls | Motion / Transform handles, mask handles, safe margins, guides | guides, rulers, safe margins, snapping, mask drawing; **no transform handles** (#639); Button Editor (+) does nothing (#431) | 55% | #639, #431 | 15–25 h |
 | Effect Controls | property rows, keyframe area with zoom, divider, graphs, eyedroppers | rows, keyframes, value / velocity graphs, eyedropper (#518); missing keyframe zoom (#641, #645), draggable divider (#643), row lines (#640), Position curves (#448) | 60% | #412, #640–#645, #448 | 15–25 h |
-| Panels and docking | 17 workspaces, dock / undock / float, drop zones | 11 workspaces, docking; rearranging windows reported missing (#493); multi-monitor floating windows (#466) | 60% | #493, #466 | 20–35 h |
+| Panels and docking | 17 workspaces, dock / undock / float, drop zones | 11 workspaces, full docking rearrangement (#493): panels and tab groups drag, split, dock, float and reorder, and the arrangement (split sizes, tab order, active tabs, floating windows) is auto-saved per workspace and restored at launch and on switching back; multi-monitor floating windows (#466) missing | 80% | #466 | 5–15 h |
 | Project panel | List / Icon / Freeform, hover scrub, marquee | all three views, hover scrub, view presets; no marquee (#578), Freeform bins and pan (#579), bins can't be left on Windows (#587), duplicate imports allowed (#356) | 75% | #578, #579, #587, #456 | 10–20 h |
 | Timeline display | filmstrip thumbnails, waveforms, track heights, renaming | clip thumbnails, waveforms, heights; no continuous filmstrip (#614), no track rename (#654), wheel scroll in audio area (#400) | 70% | #614, #654, #400 | 8–15 h |
 | Transitions | drag, resize, alignment, edit in Effect Controls | drag / select / resize (#503); settings and the transition's own timeline in Effect Controls, drag to slide or resize (#577); no A/B previews with Start / End sliders | 70% | #577 | 5–10 h |
@@ -35,5 +35,6 @@ open interaction reports (about 40 of the 188 open issues).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-12 | minor | Panels and docking (#493): rearrangement done — drag, split, dock, float, reorder — with the arrangement auto-saved to workspaces.json (debounced, at quit) and restored at launch and on switching back; area 60% → 80%, dimension hours 120–200 → 110–180 |
 | 2026-10-20 | minor | Tools: scissors glyph for the Razor, moved below Slip / Slide; its toolbar click adds an edit at the playhead (sequence.addEditAllTracks) |
 | 2026-10-10 | major | Created: UI areas against Premiere 26.5.2, menu label diff, keyboard parity from keyboard.md, open UI issues itemized |

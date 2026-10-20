@@ -690,9 +690,26 @@ fn import_source(
     identity: filmcraft_project::MediaIdentity,
     bin: Option<filmcraft_project::BinId>,
 ) -> Result<ItemId> {
+    let label = format!("Import {name}");
+    put_source(s, path, &name, src, identity, bin, &label, None)
+}
+
+/// The shared tail of every import path: add the item (undoably) and register the open source.
+/// `merge` names an undo-merge key; imports that pass one share a single undo step with the
+/// imports before them that used it, so a batch landed from background workers is one Undo.
+fn put_source(
+    s: &mut Session,
+    path: &str,
+    name: &str,
+    src: filmcraft_media::SharedSource,
+    identity: filmcraft_project::MediaIdentity,
+    bin: Option<filmcraft_project::BinId>,
+    label: &str,
+    merge: Option<&str>,
+) -> Result<ItemId> {
     let mut info = src.info().clone();
     // Settings ▸ Labels ▸ Label Defaults
-    let label = s.prefs.labels.for_media(info.kind, info.has_video(), info.has_audio());
+    let label_color = s.prefs.labels.for_media(info.kind, info.has_video(), info.has_audio());
     // Settings ▸ Media ▸ Indeterminate Media Timebase: the frame rate stills report
     if info.kind == filmcraft_media::MediaKind::Still
         && let Some(v) = info.video.as_mut()
@@ -701,10 +718,10 @@ fn import_source(
     }
     let path_s = path.to_string();
     s.media.allow(path);
-    let id = s.edit(&format!("Import {name}"), |p, _| {
+    let add = |p: &mut Project, _: &mut crate::EditorState| {
         Ok(p.add_item(
-            &name,
-            label,
+            name,
+            label_color,
             ItemKind::Media(MediaClip {
                 media: MediaRef::File { path: path_s },
                 info,
@@ -718,9 +735,32 @@ fn import_source(
             }),
             bin,
         ))
-    })?;
+    };
+    let id = match merge {
+        Some(key) => s.edit_merged(label, key, add)?,
+        None => s.edit(label, add)?,
+    };
     s.media.insert_file(id, path, src);
     Ok(id)
+}
+
+impl Session {
+    /// Import a media source a background worker opened off the UI thread (the frontend's
+    /// `importing`): the cheap tail of [`import_source`] after the slow part — reading the file's
+    /// identity and opening the container — already ran. `merge` names the batch's undo-merge key;
+    /// imports that share it (and nothing else edited in between) are one undo step, so a batch
+    /// landed from background workers is one Undo.
+    pub fn import_opened_source(
+        &mut self,
+        path: &str,
+        src: filmcraft_media::SharedSource,
+        identity: filmcraft_project::MediaIdentity,
+        bin: Option<filmcraft_project::BinId>,
+        merge: &str,
+    ) -> Result<ItemId> {
+        let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
+        put_source(self, path, &name, src, identity, bin, "Import", Some(merge))
+    }
 }
 
 fn new_generator(s: &mut Session, g: Generator, name: &str, label: Label, p: &Value) -> Result<Value> {
@@ -2872,7 +2912,7 @@ fn build() -> Vec<CommandSpec> {
             "Track Settings",
             [],
             None,
-            r#"{"track":"V1"|id,"locked":bool?,"syncLock":bool?,"enabled":bool?,"muted":bool?,"solo":bool?,"name":str?,"volumeDb":f64?,"pan":f64?}"#,
+            r#"{"track":"V1"|id,"locked":bool?,"syncLock":bool?,"enabled":bool?,"muted":bool?,"solo":bool?,"name":str?,"volumeDb":f64?,"pan":f64?,"label":"Violet|Iris|…|None"?}"#,
             has_seq,
             |s, p| {
                 let tr = track_p(s, p, "track", "timeline.setTrack")?.ok_or_else(|| bad("timeline.setTrack", "need `track`"))?;
@@ -2902,6 +2942,10 @@ fn build() -> Vec<CommandSpec> {
                     }
                     if let Some(v) = f64_p(&p, "pan") {
                         t.pan = v.clamp(-100.0, 100.0);
+                    }
+                    // The header label colour: `"None"` clears it.
+                    if let Some(v) = str_p(&p, "label") {
+                        t.label = if v.eq_ignore_ascii_case("none") { None } else { Label::from_name(v) };
                     }
                     Ok(())
                 })?;

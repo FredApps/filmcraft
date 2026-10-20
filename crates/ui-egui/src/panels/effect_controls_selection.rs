@@ -112,6 +112,13 @@ impl Interaction {
         if cancelled {
             state.gesture = None;
         }
+        // A gesture whose pointer is no longer down — and was not released this frame, whose
+        // stop key()/finish() still have to see — is over. One left by a drag that ended
+        // without that frame being drawn here (the panel closed mid-drag, the tool changed)
+        // would go on translating its points on the next redraw.
+        if !ui.input(|i| i.pointer.any_down()) && !ui.input(|i| i.pointer.any_released()) {
+            state.gesture = None;
+        }
         let background = ui.interact(area, Id::new(("ec-select", clip)), Sense::click_and_drag());
         if background.clicked_by(egui::PointerButton::Primary) && !ui.input(|i| i.modifiers.shift) {
             app.ui.keyframe_selection.clear();

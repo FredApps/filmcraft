@@ -741,6 +741,9 @@ pub struct Track {
     pub id: TrackId,
     pub kind: TrackKind,
     pub name: String,
+    /// Header label colour (`None`: the track has no label colour of its own).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<Label>,
     pub items: Vec<TrackItem>,
     pub transitions: Vec<Transition>,
     pub locked: bool,
@@ -768,6 +771,7 @@ impl Track {
             id,
             kind,
             name,
+            label: None,
             items: Vec::new(),
             transitions: Vec::new(),
             locked: false,

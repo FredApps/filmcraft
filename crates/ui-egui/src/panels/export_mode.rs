@@ -1210,7 +1210,7 @@ fn preset_manager(app: &mut FilmcraftApp, ctx: &egui::Context) {
         .default_pos(ctx.content_rect().center())
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let r = crate::widgets::search_field(ui, &mut m.query, tl!("Search presets"), 300.0, &t);
+                let r = crate::widgets::search_field(ui, &mut m.query, tl!("Search presets"), 300.0, &t, "presetManager");
                 reg.add("presetManager.search", r.rect, "Search");
                 check(ui, &mut reg, "presetManager.favoritesOnly", &mut m.favorites_only, tl!("Favorites only"));
             });

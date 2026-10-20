@@ -124,9 +124,92 @@ const HEADER_H: f32 = 26.0;
 /// The Project panel footer holds the view-mode buttons, the thumbnail-size slider, and the
 /// right-side action buttons (delete / new item / new bin / find / automate). Was 32; raised to
 /// 36 so the footer icons can be drawn a touch larger (their hit rects grew from 24×22 to 28×26)
-/// without crowding the row.
+/// without crowding the row. The footer wraps onto further rows of this height when the panel
+/// is too narrow for one ([`footer_plan`]).
 const FOOTER_H: f32 = 36.0;
 const PREVIEW_H: f32 = 92.0;
+
+// ------------------------------------------------------------------ footer layout (pure)
+
+/// Footer metrics, shared by the drawer and the tests: buttons hit 30×28 on a 32 advance,
+/// inset 6 from the bar's edges.
+const BTN_W: f32 = 30.0;
+const BTN_H: f32 = 28.0;
+const BTN_STEP: f32 = 32.0;
+const FOOT_PAD: f32 = 6.0;
+/// Right edge of the three view-mode buttons (bar-local x).
+const VIEW_END: f32 = FOOT_PAD + 2.0 * BTN_STEP + BTN_W;
+/// Full width of the right action group: five buttons and the trailing inset.
+const ACTIONS_W: f32 = 4.0 * BTN_STEP + BTN_W + FOOT_PAD;
+/// The thumbnail-size slider's usable width range, and the gaps around the footer's groups.
+const SLIDER_MIN: f32 = 40.0;
+const SLIDER_MAX: f32 = 120.0;
+/// View buttons → slider (the original layout put the slider at bar-local 110).
+const SLIDER_GAP: f32 = 10.0;
+/// Slider → Sort Icons (the original `sr.max.x + 6.0`).
+const SORT_GAP: f32 = 6.0;
+/// Minimum breathing room between two groups and from the bar's right edge.
+const GROUP_GAP: f32 = 8.0;
+
+/// Where the footer's controls go in a bar `width` points wide, in bar-local x (0 = the bar's
+/// left edge). Pure, so the wrapping decisions are unit-tested (`tests` below).
+///
+/// While everything fits the footer keeps its single row (view buttons, slider, Sort Icons,
+/// the action group at the right edge — the arrangement it always had). A narrower bar first
+/// shrinks the slider to `SLIDER_MIN`, then wraps the slider and Sort Icons onto the row below,
+/// then wraps the action group; a bar too narrow for the slider even alone leaves it out. The
+/// buttons never overlap each other and never disappear — only the slider may.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FooterPlan {
+    /// Rows the bar needs (1–3).
+    rows: usize,
+    /// The thumbnail-size slider: `(row, x, width)`; `None` when the bar is too narrow for it.
+    slider: Option<(usize, f32, f32)>,
+    /// The Sort Icons button of Icon view: `(row, x)`; `None` in List / Freeform view.
+    sort: Option<(usize, f32)>,
+    /// The right action group: `(row, x)`. `ACTIONS_W` wide, ending `FOOT_PAD` from the right
+    /// edge, right-aligned on whichever row it is on.
+    actions: (usize, f32),
+}
+
+fn footer_plan(width: f32, icon_mode: bool) -> FooterPlan {
+    // The action group keeps the view buttons' row while it fits beside them; below that it is
+    // right-aligned on the row below (still at the bar's right edge, as it always was).
+    let actions = if width >= VIEW_END + GROUP_GAP + ACTIONS_W { (0, width - ACTIONS_W) } else { (1, width - ACTIONS_W) };
+    // The slider, with the Sort Icons button behind it, takes the first row where it fits at
+    // its minimum width: row 0 between the view buttons and the action group (or the right
+    // edge), else the row below, before whatever is already there.
+    let sort_w = if icon_mode { GROUP_GAP + BTN_STEP } else { 0.0 };
+    let mut slider = None;
+    let mut sort = None;
+    for row in 0..2 {
+        let start = if row == 0 { VIEW_END + SLIDER_GAP } else { FOOT_PAD };
+        let end = if actions.0 == row { actions.1 - GROUP_GAP } else { width - FOOT_PAD };
+        let avail = end - start;
+        if avail >= SLIDER_MIN + sort_w {
+            let w = SLIDER_MAX.min(avail - sort_w).max(SLIDER_MIN);
+            slider = Some((row, start, w));
+            if icon_mode {
+                sort = Some((row, start + w + SORT_GAP));
+            }
+            break;
+        }
+    }
+    if slider.is_none() && icon_mode {
+        // No room for the slider anywhere, but Sort Icons is a button and stays: right after
+        // the view buttons when it fits, else on a row of its own.
+        let end = if actions.0 == 0 { actions.1 - GROUP_GAP } else { width - FOOT_PAD };
+        sort = if end >= VIEW_END + GROUP_GAP + BTN_STEP { Some((0, VIEW_END + GROUP_GAP)) } else { Some((2, FOOT_PAD)) };
+    }
+    let rows = [Some(actions.0), slider.map(|(r, _, _)| r), sort.map(|(r, _)| r)].into_iter().flatten().max().map_or(1, |r| r + 1);
+    FooterPlan { rows, slider, sort, actions }
+}
+
+/// The footer's height for a bar `width` points wide: one [`FOOTER_H`] row per row the plan
+/// needs. `icon_mode` is whether the Sort Icons button shows (Icon view).
+fn footer_height(width: f32, icon_mode: bool) -> f32 {
+    FOOTER_H * footer_plan(width, icon_mode).rows as f32
+}
 
 fn valid_bin(app: &FilmcraftApp, b: Option<u64>) -> Option<BinId> {
     b.map(BinId).filter(|b| app.session.project.root.find_bin(*b).is_some())
@@ -429,7 +512,7 @@ fn body(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions
     let search_rect = Rect::from_min_size(row.min, vec2(sw, 22.0));
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(search_rect).id_salt((&pre, "search")));
     let mut q = app.ui.project_search.clone();
-    crate::widgets::search_field(&mut child, &mut q, tl!("Search"), search_rect.width(), &t);
+    crate::widgets::search_field(&mut child, &mut q, tl!("Search"), search_rect.width(), &t, &pre);
     app.ui.project_search = q;
     app.auto.add(&format!("{pre}.search"), search_rect, "Search");
     let find = Rect::from_min_size(pos2(search_rect.max.x + 8.0, row.min.y), vec2(24.0, 22.0));
@@ -455,7 +538,9 @@ fn body(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions
         preview_area(app, ui, pr, &pre);
         y = pr.max.y + 6.0;
     }
-    let content = Rect::from_min_max(pos2(rect.min.x + 4.0, y), pos2(rect.max.x - 4.0, rect.max.y - FOOTER_H));
+    // the footer grows rows when the panel is narrow, so the buttons wrap instead of stacking
+    let fh = footer_height(rect.width(), v.mode == ViewMode::Icon);
+    let content = Rect::from_min_max(pos2(rect.min.x + 4.0, y), pos2(rect.max.x - 4.0, rect.max.y - fh));
     ui.painter().rect_filled(content, 4.0, t.panel_bg.gamma_multiply(0.92));
     let mut cui = ui.new_child(egui::UiBuilder::new().max_rect(content).id_salt((&pre, "content")));
     cui.set_clip_rect(content.intersect(ui.clip_rect()));
@@ -464,7 +549,7 @@ fn body(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, v: &View, actions
         ViewMode::Icon => crate::panels::project_views::icon_view(app, &mut cui, content, v, &filter, actions),
         ViewMode::Freeform => crate::panels::project_views::freeform_view(app, &mut cui, content, v, &filter, actions),
     }
-    footer(app, ui, Rect::from_min_max(pos2(rect.min.x, rect.max.y - FOOTER_H), rect.max), v, actions);
+    footer(app, ui, Rect::from_min_max(pos2(rect.min.x, rect.max.y - fh), rect.max), v, actions);
 }
 
 fn bin_path(root: &filmcraft_project::Bin, target: BinId) -> Vec<String> {
@@ -559,19 +644,19 @@ pub fn quantize(t: filmcraft_time::Tick) -> filmcraft_time::Tick {
 fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, actions: &mut Actions) {
     let t = app.tokens;
     let pre = &v.prefix;
-    let mut x = bar.min.x + 6.0;
     // Footer button hit rects are 28×26 (was 24×22) with icons painted at shrink(4.0) (was
     // shrink(5.0)), so the glyphs read at ~1.1× their native 16-grid scale instead of ~0.75×.
-    // Bigger but not big enough to dominate the bar.
-    const BTN_W: f32 = 30.0;
-    const BTN_H: f32 = 28.0;
-    const BTN_X: f32 = 32.0;
+    // Bigger but not big enough to dominate the bar. Below ~360 pt the old absolute layout
+    // stacked the groups onto each other; the plan wraps rows instead (unit-tested).
+    let plan = footer_plan(bar.width(), v.mode == ViewMode::Icon);
+    let row_top = |row: usize| bar.min.y + row as f32 * FOOTER_H + 4.0;
+    let mut x = bar.min.x + FOOT_PAD;
     for (icon, mode, tip) in [
         (Icon::ListView, ViewMode::List, tl!("List View")),
         (Icon::IconView, ViewMode::Icon, tl!("Icon View")),
         (Icon::Freeform, ViewMode::Freeform, tl!("Freeform View")),
     ] {
-        let r = Rect::from_min_size(pos2(x, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
+        let r = Rect::from_min_size(pos2(x, row_top(0)), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "pv", tip)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("{pre}.view.{mode:?}"), r, tip);
         if v.mode == mode {
@@ -583,39 +668,42 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
         if resp.clicked() {
             set_mode(app, v.inst, mode, actions);
         }
-        x += BTN_X;
+        x += BTN_STEP;
     }
-    // thumbnail size: in-memory while dragging, saved on release
-    let sw = (bar.width() - 320.0).clamp(40.0, 120.0);
-    let sr = Rect::from_min_size(pos2(x + 8.0, bar.min.y + 10.0), vec2(sw, 16.0));
-    let mut sz = v.icon_size;
-    let resp = ui.put(sr, egui::Slider::new(&mut sz, 48.0..=400.0).show_value(false));
-    app.auto.add(&format!("{pre}.iconSize"), sr, "Zoom");
-    // a drag ended by Escape goes back to the size it started from (#580)
-    let orig_id = egui::Id::new((pre, "icon-size-before-drag"));
-    if resp.drag_started() {
-        ui.data_mut(|d| d.insert_temp(orig_id, v.icon_size));
-    }
-    let escaped = resp.drag_stopped() && ui.input(|i| i.key_pressed(egui::Key::Escape));
-    if resp.drag_stopped()
-        && let Some(before) = ui.data_mut(|d| d.remove_temp(orig_id))
-        && escaped
-    {
-        sz = before;
-    }
-    if sz != v.icon_size {
-        match v.inst {
-            Inst::Main => app.session.prefs.project_panel.view.icon_size = sz,
-            Inst::Tab(k) => app.ui.project_panel.tabs[k].icon_size = sz,
+    // thumbnail size: in-memory while dragging, saved on release. A bar too narrow for the
+    // slider at its minimum leaves it out for now (the buttons, which never overlap, stay).
+    if let Some((row, sx, sw)) = plan.slider {
+        let sr = Rect::from_min_size(pos2(bar.min.x + sx, bar.min.y + row as f32 * FOOTER_H + 10.0), vec2(sw, 16.0));
+        let mut sz = v.icon_size;
+        // a stable id (the panel instance), so the slider keeps its state and focus however
+        // many controls the rows above it hold this frame
+        let resp = ui.push_id(pre, |ui| ui.put(sr, egui::Slider::new(&mut sz, 48.0..=400.0).show_value(false))).inner;
+        app.auto.add(&format!("{pre}.iconSize"), sr, "Zoom");
+        // a drag ended by Escape goes back to the size it started from (#580)
+        let orig_id = egui::Id::new((pre, "icon-size-before-drag"));
+        if resp.drag_started() {
+            ui.data_mut(|d| d.insert_temp(orig_id, v.icon_size));
+        }
+        let escaped = resp.drag_stopped() && ui.input(|i| i.key_pressed(egui::Key::Escape));
+        if resp.drag_stopped()
+            && let Some(before) = ui.data_mut(|d| d.remove_temp(orig_id))
+            && escaped
+        {
+            sz = before;
+        }
+        if sz != v.icon_size {
+            match v.inst {
+                Inst::Main => app.session.prefs.project_panel.view.icon_size = sz,
+                Inst::Tab(k) => app.ui.project_panel.tabs[k].icon_size = sz,
+            }
+        }
+        if v.inst == Inst::Main && !escaped && (resp.drag_stopped() || (resp.changed() && !resp.dragged())) {
+            actions.push(("project.view.set".into(), json!({"iconSize": sz})));
         }
     }
-    if v.inst == Inst::Main && !escaped && (resp.drag_stopped() || (resp.changed() && !resp.dragged())) {
-        actions.push(("project.view.set".into(), json!({"iconSize": sz})));
-    }
-    x = sr.max.x + 6.0;
     // Sort Icons (Icon view)
-    if v.mode == ViewMode::Icon {
-        let r = Rect::from_min_size(pos2(x, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
+    if let Some((row, sx)) = plan.sort {
+        let r = Rect::from_min_size(pos2(bar.min.x + sx, row_top(row)), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "sortIcons")), Sense::click()).on_hover_text(tl!("Sort Icons"));
         app.auto.add(&format!("{pre}.sortIcons"), r, "Sort Icons");
         if resp.hovered() {
@@ -624,7 +712,8 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
         icons::paint(ui.painter(), r.shrink(4.0), Icon::SortIcons, t.icon);
         egui::Popup::menu(&resp).show(|ui| sort_icons_menu(app, ui, pre, actions));
     }
-    let mut rx = bar.max.x - 6.0;
+    // the right action group keeps its place at the bar's right edge, on whichever row fits
+    let mut rx = bar.min.x + plan.actions.1 + ACTIONS_W - FOOT_PAD;
     for (icon, id, tip) in [
         (Icon::Trash, "project.delete", tl!("Clear (Delete)")),
         (Icon::NewItem, "new-item", tl!("New Item")),
@@ -632,7 +721,7 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
         (Icon::Search, "find", tl!("Find")),
         (Icon::Automate, "clip.automateToSequence", tl!("Automate to Sequence")),
     ] {
-        let r = Rect::from_min_size(pos2(rx - BTN_W, bar.min.y + 4.0), vec2(BTN_W, BTN_H));
+        let r = Rect::from_min_size(pos2(rx - BTN_W, row_top(plan.actions.0)), vec2(BTN_W, BTN_H));
         let resp = ui.interact(r, egui::Id::new((pre, "pb", id)), Sense::click()).on_hover_text(tip);
         app.auto.add(&format!("{pre}.button.{id}"), r, tip);
         if resp.hovered() {
@@ -658,7 +747,7 @@ fn footer(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, v: &View, action
                 _ => actions.push((id.into(), json!({}))),
             }
         }
-        rx -= BTN_X;
+        rx -= BTN_STEP;
     }
 }
 
@@ -1039,4 +1128,113 @@ pub fn commit_rename(app: &mut FilmcraftApp) {
 /// Is `kind` a sequence (double-click opens it in the Timeline)?
 pub fn is_sequence(kind: &ItemKind) -> bool {
     matches!(kind, ItemKind::Sequence(_))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every control the plan implies for a bar `width` points wide, as `(row, x0, x1)` spans:
+    /// the three view buttons, the slider, Sort Icons and the five action buttons.
+    fn spans(width: f32, icon_mode: bool) -> Vec<(usize, f32, f32)> {
+        let p = footer_plan(width, icon_mode);
+        let mut v: Vec<(usize, f32, f32)> = Vec::new();
+        for i in 0..3u16 {
+            let x = FOOT_PAD + f32::from(i) * BTN_STEP;
+            v.push((0, x, x + BTN_W));
+        }
+        if let Some((row, x, w)) = p.slider {
+            v.push((row, x, x + w));
+        }
+        if let Some((row, x)) = p.sort {
+            v.push((row, x, x + BTN_W));
+        }
+        for i in 0..5u16 {
+            let x = p.actions.1 + f32::from(i) * BTN_STEP;
+            v.push((p.actions.0, x, x + BTN_W));
+        }
+        v
+    }
+
+    /// No two controls share a row and overlap, no control is empty, and the slider respects
+    /// its width bounds — at every width, in both views.
+    #[test]
+    fn footer_buttons_never_overlap() {
+        for icon_mode in [false, true] {
+            for w in (40u16..=640).step_by(4) {
+                let width = f32::from(w);
+                let p = footer_plan(width, icon_mode);
+                let s = spans(width, icon_mode);
+                for (i, &(ri, ai, bi)) in s.iter().enumerate() {
+                    assert!(bi > ai, "empty control {i} at width {w} (icon {icon_mode})");
+                    if let Some((_, _, sw)) = p.slider {
+                        assert!((SLIDER_MIN..=SLIDER_MAX).contains(&sw), "slider width {sw} at {w}");
+                    }
+                    for (j, &(rj, aj, bj)) in s.iter().enumerate().skip(i + 1) {
+                        assert!(ri != rj || bi <= aj + 0.01 || bj <= ai + 0.01, "controls {i} and {j} overlap at width {w} (icon {icon_mode}): {s:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// A wide bar keeps the single row the footer always had, with the slider at its maximum.
+    #[test]
+    fn wide_footer_keeps_one_row() {
+        for icon_mode in [false, true] {
+            let p = footer_plan(520.0, icon_mode);
+            assert_eq!(p.rows, 1);
+            assert_eq!(p.slider, Some((0, VIEW_END + SLIDER_GAP, SLIDER_MAX)));
+            assert_eq!(p.actions, (0, 520.0 - ACTIONS_W));
+            if icon_mode {
+                assert_eq!(p.sort, Some((0, VIEW_END + SLIDER_GAP + SLIDER_MAX + SORT_GAP)));
+            } else {
+                assert_eq!(p.sort, None);
+            }
+        }
+    }
+
+    /// Below the width where the action group fits beside the view buttons it wraps to a
+    /// second row; the slider stays on the first.
+    #[test]
+    fn narrow_footer_wraps_the_action_group() {
+        let p = footer_plan(240.0, true);
+        assert_eq!(p.actions, (1, 240.0 - ACTIONS_W));
+        assert_eq!(p.slider.map(|(r, _, _)| r), Some(0));
+        assert_eq!(p.sort.map(|(r, _)| r), Some(0));
+        assert_eq!(p.rows, 2);
+        assert_eq!(footer_height(240.0, true), 2.0 * FOOTER_H);
+    }
+
+    /// When the slider no longer fits behind the view buttons (with Sort Icons behind it) it
+    /// wraps below; the action group keeps the first row while it fits there.
+    #[test]
+    fn slider_wraps_before_it_overlaps() {
+        let p = footer_plan(300.0, true);
+        assert_eq!(p.actions, (0, 300.0 - ACTIONS_W));
+        assert_eq!(p.slider, Some((1, FOOT_PAD, SLIDER_MAX)));
+        assert_eq!(p.sort, Some((1, FOOT_PAD + SLIDER_MAX + SORT_GAP)));
+        assert_eq!(p.rows, 2);
+    }
+
+    /// A bar too narrow for the slider even alone drops it (only the slider may disappear);
+    /// Sort Icons stays, on the view buttons' row when it fits, else on a row of its own.
+    #[test]
+    fn very_narrow_footer_hides_only_the_slider() {
+        let p = footer_plan(150.0, true);
+        assert_eq!(p.slider, None);
+        assert_eq!(p.sort, Some((0, VIEW_END + GROUP_GAP)));
+        assert_eq!(p.actions, (1, 150.0 - ACTIONS_W));
+        assert_eq!(p.rows, 2);
+
+        let p = footer_plan(130.0, true);
+        assert_eq!(p.slider, None);
+        assert_eq!(p.sort, Some((2, FOOT_PAD)));
+        assert_eq!(p.rows, 3);
+
+        let p = footer_plan(150.0, false);
+        assert_eq!(p.slider, None);
+        assert_eq!(p.sort, None);
+        assert_eq!(p.rows, 2);
+    }
 }

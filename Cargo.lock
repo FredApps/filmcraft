@@ -2085,7 +2085,6 @@ dependencies = [
  "filmcraft-media",
  "filmcraft-project",
  "filmcraft-time",
- "flate2",
  "proptest",
  "roxmltree",
  "serde",
