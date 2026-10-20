@@ -130,13 +130,42 @@ fn main() -> eframe::Result {
     if graphics.mode() == graphics::Mode::Default {
         register_gpu_frame_renderer();
     }
+    // A panic before the app exists moves on once per process; a second is not the mode's fault.
+    let mut moved_on_after_panic = false;
+    // A second panic saved the next mode for the next launch (it is not tried in this process).
+    let mut next_saved = false;
+    let mut app_ran = false;
     let started = loop {
         let mut options = native_options(launch.control_port.is_some());
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
         let app_created = Arc::new(AtomicBool::new(false));
-        let result = eframe::run_native("FilmCraft", options, app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created)));
+        let creator = app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created));
+        let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eframe::run_native("FilmCraft", options, creator)));
         let app_created = app_created.load(Ordering::Relaxed);
+        app_ran |= app_created;
+        let result = match run {
+            Ok(result) => result,
+            // After start-up the app's own guards had their chance: as before, the panic goes on.
+            Err(panic) if app_created => std::panic::resume_unwind(panic),
+            // wgpu turns its validation errors into panics: one before the app existed is a
+            // failed graphics start, e.g. a GPU that claimed the window's surface and could not
+            // configure it (NVIDIA 470 on Wayland, #2553). The crash log has the backtrace.
+            Err(panic) => {
+                let what = format!("the graphics device panicked: {}", panic_text(panic.as_ref()));
+                if !moved_on_after_panic && graphics.step_down() {
+                    log::warn!("graphics start failed: {what}");
+                    // Logged; not for the in-app error window of the start that follows.
+                    let _ = filmcraft_ui_egui::crash::take_last();
+                    moved_on_after_panic = true;
+                    continue;
+                }
+                // Not retried here, but the next launch starts in the next mode (software after
+                // the integrated GPU), instead of going back to the ones that failed.
+                next_saved = graphics.step_down();
+                Err(eframe::Error::AppCreation(what.into()))
+            }
+        };
         match &result {
             // wgpu reported the failure (no adapter, device creation failed) before the app
             // existed: try the next mode in this process.
@@ -155,12 +184,27 @@ fn main() -> eframe::Result {
     // The window could not be created (no usable GPU / graphics driver, no display): say so
     // instead of exiting silently, and keep the reason in the crash log.
     if let Err(e) = &started {
-        let msg = format!("FilmCraft could not start its window: {e}\n\nUpdating the graphics driver usually fixes this.");
+        let mut msg = format!("FilmCraft could not start its window: {e}\n\nUpdating the graphics driver usually fixes this.");
+        // Every fallback failed as well (no software adapter installed, say, #2553): the next
+        // start tries the default again instead of the last mode, which can't start here.
+        if next_saved {
+            msg.push_str(&format!(" The next start uses {}.", graphics.mode().label()));
+        } else if !app_ran && graphics.degraded() && graphics.reset_to_default().is_ok() {
+            msg.push_str(&format!(
+                " The next start tries the default graphics again instead of {}; `--graphics <mode>` picks one (see `filmcraft --help`).",
+                graphics.mode().label()
+            ));
+        }
         log::error!("{msg}");
         filmcraft_ui_egui::crash::record(&msg);
         let _ = rfd::MessageDialog::new().set_title("FilmCraft").set_description(&msg).set_level(rfd::MessageLevel::Error).show();
     }
     started
+}
+
+/// The message of a caught panic, if it has one.
+fn panic_text(panic: &(dyn std::any::Any + Send)) -> &str {
+    panic.downcast_ref::<String>().map(String::as_str).or_else(|| panic.downcast_ref::<&str>().copied()).unwrap_or("no message")
 }
 
 /// The main window's options; built for each start attempt (they hold a one-shot hook).
@@ -514,6 +558,17 @@ fn project_patterns() -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    /// A panic out of a graphics start is reported with its message, whatever its payload (#2553).
+    #[test]
+    fn a_caught_panic_keeps_its_message() {
+        let owned = std::panic::catch_unwind(|| std::panic::panic_any(String::from("Invalid surface"))).unwrap_err();
+        assert_eq!(super::panic_text(owned.as_ref()), "Invalid surface");
+        let literal = std::panic::catch_unwind(|| std::panic::panic_any("Invalid surface")).unwrap_err();
+        assert_eq!(super::panic_text(literal.as_ref()), "Invalid surface");
+        let other = std::panic::catch_unwind(|| std::panic::panic_any(7_u8)).unwrap_err();
+        assert_eq!(super::panic_text(other.as_ref()), "no message");
+    }
+
     /// Start-up registers the hardware decoders whether or not anything is logged (no logger is
     /// installed here, as in a normal run).
     #[test]
