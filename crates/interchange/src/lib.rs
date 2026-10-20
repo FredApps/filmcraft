@@ -33,6 +33,7 @@ pub mod fcp7;
 pub mod fcpxml;
 pub mod omf;
 pub mod otio;
+pub mod prproj;
 
 mod common;
 mod comp;
@@ -63,10 +64,12 @@ pub enum Format {
     Aaf,
     /// OMF Interchange 2.0 (Bento container).
     Omf,
+    /// Adobe Premiere Pro project (gzip XML). Import only.
+    Prproj,
 }
 
 impl Format {
-    pub const ALL: [Format; 6] = [Format::Edl, Format::Fcp7Xml, Format::Fcpxml, Format::Otio, Format::Aaf, Format::Omf];
+    pub const ALL: [Format; 7] = [Format::Edl, Format::Fcp7Xml, Format::Fcpxml, Format::Otio, Format::Aaf, Format::Omf, Format::Prproj];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -76,6 +79,7 @@ impl Format {
             Format::Otio => "OpenTimelineIO",
             Format::Aaf => "AAF",
             Format::Omf => "OMF",
+            Format::Prproj => "Premiere Project",
         }
     }
 
@@ -88,6 +92,7 @@ impl Format {
             Format::Otio => "otio",
             Format::Aaf => "aaf",
             Format::Omf => "omf",
+            Format::Prproj => "prproj",
         }
     }
 
@@ -101,6 +106,7 @@ impl Format {
             "otio" => Some(Format::Otio),
             "aaf" => Some(Format::Aaf),
             "omf" | "omfi" => Some(Format::Omf),
+            "prproj" => Some(Format::Prproj),
             _ => None,
         }
     }
@@ -110,6 +116,9 @@ impl Format {
 pub fn detect(bytes: &[u8], extension: Option<&str>) -> Option<Format> {
     if aaf::sniff(bytes) {
         return Some(Format::Aaf);
+    }
+    if prproj::sniff(bytes) && extension.is_none_or(|e| Format::from_extension(e) == Some(Format::Prproj)) {
+        return Some(Format::Prproj);
     }
     if omf::sniff(bytes) && extension.is_none_or(|e| matches!(Format::from_extension(e), None | Some(Format::Omf))) {
         return Some(Format::Omf);
@@ -266,6 +275,11 @@ pub fn import_with(bytes: &[u8], format: Format, opts: &ImportOptions) -> Result
         }
         return Ok((imported, report));
     }
+    if format == Format::Prproj {
+        let mut report = Report::default();
+        let imported = prproj::import(bytes, opts, &mut report)?;
+        return Ok((imported, report));
+    }
     let text = decode_text(bytes);
     let mut report = Report::default();
     let imported = match format {
@@ -274,6 +288,7 @@ pub fn import_with(bytes: &[u8], format: Format, opts: &ImportOptions) -> Result
         Format::Fcpxml => fcpxml::import(&text, opts, &mut report)?,
         Format::Otio => otio::import(&text, opts, &mut report)?,
         Format::Aaf | Format::Omf => return Err(Error::Other("AAF / OMF are binary documents".into())),
+        Format::Prproj => return Err(Error::Other("Premiere projects are gzip containers; handled above".into())),
     };
     Ok((imported, report))
 }
@@ -391,6 +406,7 @@ pub fn export(project: &Project, sequence: ItemId, format: Format, opts: &Export
         Format::Fcpxml => fcpxml::export(project, sequence, opts, &mut report)?,
         Format::Otio => otio::export(project, sequence, opts, &mut report)?,
         Format::Aaf | Format::Omf => return Err(Error::Other("AAF / OMF are binary documents".into())),
+        Format::Prproj => return Err(Error::Other("Premiere project (.prproj) export is not supported; use FCP7 XML, FCPXML, OTIO, AAF or EDL".into())),
     };
     Ok((text.into_bytes(), report))
 }

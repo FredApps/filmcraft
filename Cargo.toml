@@ -70,6 +70,7 @@ log = "0.4"
 rayon = "1"
 proptest = "1"
 roxmltree = "0.21"
+flate2 = "1"
 craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "82a24b006eefa036b43c09a67fb9a3fbd17ffe63" }
 
 # ui

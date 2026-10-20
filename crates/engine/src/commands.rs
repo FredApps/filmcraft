@@ -1667,10 +1667,22 @@ fn build() -> Vec<CommandSpec> {
                 return crate::captions::delete(s, &caps, true);
             }
             let sel = if p.get("clips").is_some() || p.get("clip").is_some() { with_links(s, &clips_p(s, p)) } else { s.state.selection.clone() };
+            let mut closed: Vec<filmcraft_time::TimeRange> = Vec::new();
             s.edit_sequence("Ripple Delete", |q, _, st| {
-                let spans = edit::ripple_delete_items(q, &sel)?;
+                closed = match edit::ripple_delete_items(q, &sel) {
+                    Ok(spans) => spans,
+                    // what stays on the deleted items' own tracks covers all of their time, so
+                    // there is nothing to ripple shut: take the clips out (a lift) rather than
+                    // failing the key — the edit algebra's "no gap can close" is an explanation,
+                    // not an outcome the Delete key should ever show (#1926).
+                    Err(edit::EditError::Other(_)) => {
+                        edit::delete_items(q, &sel);
+                        Vec::new()
+                    }
+                    Err(e) => return Err(e.into()),
+                };
                 if st.ripple_sequence_markers {
-                    for r in spans.iter().rev() {
+                    for r in closed.iter().rev() {
                         crate::sequence_tools::ripple_markers(&mut q.markers, r.end(), -r.duration);
                     }
                 }

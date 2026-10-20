@@ -11,9 +11,12 @@ pub type Entry = (&'static str, &'static str, &'static str);
 /// FilmCraft additions to the per-command defaults: panel-specific shortcuts.
 pub const FILMCRAFT_PANEL: &[Entry] = &[
     ("project.delete", "Backspace", "Project"),
-    // the forward-delete key (Delete on Windows and Linux keyboards) clears timeline clips too;
-    // application-wide it is Project ▸ Clear (#243)
-    ("edit.clear", "Delete", "Timeline"),
+    // the forward-delete key (Delete on Windows and Linux keyboards) removes timeline clips too;
+    // application-wide it is Project ▸ Clear (#243). On the Timeline both delete keys ripple —
+    // the deleted clips snap backward and later material follows — the way every current editor
+    // expects a fast delete to behave; a plain lift stays on the clip context menu (#1926).
+    ("edit.rippleDelete", "Delete", "Timeline"),
+    ("edit.rippleDelete", "Backspace", "Timeline"),
     ("file.newBin", "Cmd+B", "Project"),
     ("edit.undo", "Left", "History"),
     ("edit.redo", "Right", "History"),
