@@ -26,7 +26,7 @@ pub mod transitions;
 
 use std::collections::HashMap;
 
-use filmcraft_project::{ClipId, ItemId, Sequence, Track, TrackId, TrackItem, Transition, TransitionId};
+use filmcraft_project::{ClipId, ItemId, Sequence, Track, TrackId, TrackItem, Transition, TransitionAlign, TransitionId};
 use filmcraft_time::{Tick, TimeRange};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -507,7 +507,9 @@ pub fn close_gap(seq: &mut Sequence, track: TrackId, t: Tick) -> Result<()> {
 }
 
 /// Move items by (track, time) offsets with overwrite (default drag) or insert (Cmd-drag) semantics.
-/// `moves`: (item, destination track, new start).
+/// `moves`: (item, destination track, new start). The transitions ride along: one whose every clip
+/// moves to one track by one offset travels with them, one whose other side stays is kept on the
+/// stationary side (see [`move_transitions`]).
 pub fn move_items(seq: &mut Sequence, moves: &[(ClipId, TrackId, Tick)], insert_mode: bool, ctx: &mut EditCtx) -> Result<()> {
     let mut work = seq.clone();
     let mut placed = Vec::new();
@@ -516,27 +518,52 @@ pub fn move_items(seq: &mut Sequence, moves: &[(ClipId, TrackId, Tick)], insert_
         if work.track(src).is_some_and(|t| t.locked) {
             return Err(EditError::Locked);
         }
-        let mut it = it.clone();
         if work.track(*dest).ok_or(EditError::NoTrack(*dest))?.locked {
             return Err(EditError::Locked);
         }
-        it.start = (*start).max(Tick::ZERO);
+        let start = (*start).max(Tick::ZERO);
+        // a clip asked to land exactly where it already is stays put (an overwrite move): taking
+        // it out and putting it back would tear the transitions at its edges off the neighbours
+        // they also sit on. An insert still takes it — the gap it opens moves other material.
+        if !insert_mode && src == *dest && it.start == start {
+            continue;
+        }
+        let mut it = it.clone();
+        it.start = start;
         placed.push((*dest, it));
     }
-    let carried = carried_transitions(&work, &placed);
-    // a transition whose partner stays behind is dropped, as in Premiere
-    delete_items(&mut work, &moves.iter().map(|m| m.0).collect::<Vec<_>>());
+    let moved = move_transitions(&work, &placed);
+    delete_items(&mut work, &placed.iter().map(|(_, it)| it.id).collect::<Vec<_>>());
     if insert_mode {
         insert(&mut work, placed, ctx)?;
     } else {
         overwrite(&mut work, placed, ctx)?;
     }
-    for (dest, tr) in carried {
+    // the transitions that travel come back where their clips landed
+    for (dest, tr) in moved.carried {
         let t = track_mut(&mut work, dest)?;
         if [tr.from, tr.to].into_iter().flatten().all(|c| t.item(c).is_some()) {
             t.transitions.push(tr);
             t.sort();
         }
+    }
+    // one whose other side stayed goes back to that side, one-sided on the staying clip's edge at
+    // the cut. The edge is read back after the edit: an overwrite may have shortened the clip and
+    // an insert shifted it, and the transition follows what is left of the clip it stays on.
+    for (dest, mut tr) in moved.kept {
+        let Some(t) = work.track_mut(dest) else { continue };
+        let Some((at, len)) = (match (tr.from, tr.to) {
+            (None, Some(to)) => t.item(to).map(|i| (i.start, i.duration)),
+            (Some(from), None) => t.item(from).map(|i| (i.end(), i.duration)),
+            _ => None,
+        }) else {
+            continue; // the placement covered the staying clip too: there is nothing to stay on
+        };
+        tr.duration = tr.duration.min(len);
+        tr.start = if tr.to.is_some() { at } else { at - tr.duration };
+        tr.align = if tr.to.is_some() { TransitionAlign::StartAtCut } else { TransitionAlign::EndAtCut };
+        t.transitions.push(tr);
+        t.sort();
     }
     *seq = work;
     Ok(())
@@ -560,8 +587,9 @@ pub fn copy_items(seq: &mut Sequence, moves: &[(ClipId, TrackId, Tick)], insert_
         placed.push((*dest, it));
     }
     // worked out on the original ids, then moved over to the copies (only transitions whose every
-    // clip is copied travel; one whose partner stays with the originals is not duplicated)
-    let carried = carried_transitions(&work, &placed);
+    // clip is copied travel; one whose partner stays with the originals is not duplicated — a copy
+    // leaves the originals, and their transitions, where they are)
+    let carried = move_transitions(&work, &placed).carried;
     let mut ids = HashMap::new();
     let mut links = HashMap::new();
     for (_, it) in &mut placed {
@@ -597,30 +625,58 @@ pub fn copy_items(seq: &mut Sequence, moves: &[(ClipId, TrackId, Tick)], insert_
     Ok(out)
 }
 
-/// The transitions that travel with a move (#227, #374): only those whose every clip moves, onto
-/// one track and by one offset (a fade at a moved clip's edge, or the cut between two clips that
-/// move together), shifted to where those clips land. A transition whose partner stays behind is
-/// dropped, as in Premiere (the drag preview leaves it where it is until the release).
-fn carried_transitions(seq: &Sequence, placed: &[(TrackId, TrackItem)]) -> Vec<(TrackId, Transition)> {
+/// The transitions a move takes along and the ones it leaves behind, worked out before the move
+/// deletes anything ([`move_transitions`]).
+#[derive(Default)]
+struct MoveTransitions {
+    /// Every clip these sit on moves, to one track by one offset: they are shifted to where those
+    /// clips land and put back after the placement.
+    carried: Vec<(TrackId, Transition)>,
+    /// One clip moves and the other stays: these stay with the stationary clip, one-sided on its
+    /// edge at the cut (the side that leaves is dropped from them).
+    kept: Vec<(TrackId, Transition)>,
+}
+
+/// What a move does to the transitions it touches (#227, #374):
+/// - every clip a transition sits on moves, to one track by one offset — it is carried, shifted
+///   to where those clips land (a fade at a moved clip's edge, or the cut between two clips that
+///   move together);
+/// - one of its two clips moves and the other stays — it is kept: it stays with the stationary
+///   clip as a one-sided transition at the cut, as though it had been applied to that clip's
+///   edge, so dragging one side of a cut never silently deletes the transition;
+/// - every clip moves, but not to one track by one offset — its cut came apart and it is dropped
+///   (nothing it joined is left);
+/// - no clip moves — the move never touches it.
+fn move_transitions(seq: &Sequence, placed: &[(TrackId, TrackItem)]) -> MoveTransitions {
     let landing = |c: ClipId| {
         let (dest, it) = placed.iter().find(|(_, it)| it.id == c)?;
         let (_, old) = seq.find_item(c)?;
         Some((*dest, it.start - old.start))
     };
-    let mut carried = Vec::new();
-    for tr in seq.all_tracks().filter(|t| !t.locked).flat_map(|t| t.transitions.iter()) {
-        let endpoints: Vec<ClipId> = [tr.from, tr.to].into_iter().flatten().collect();
-        let lands: Vec<(TrackId, Tick)> = endpoints.iter().filter_map(|c| landing(*c)).collect();
-        // every clip it sits on must move, onto one track by one offset, or the transition is
-        // dropped with the delete below (a partner that stayed behind ends the move)
-        if lands.len() == endpoints.len()
-            && let Some(&(dest, delta)) = lands.first()
-            && lands.iter().skip(1).all(|l| *l == (dest, delta))
-        {
-            carried.push((dest, Transition { start: tr.start + delta, ..tr.clone() }));
+    let mut out = MoveTransitions::default();
+    for track in seq.all_tracks().filter(|t| !t.locked) {
+        for tr in &track.transitions {
+            let endpoints: Vec<ClipId> = [tr.from, tr.to].into_iter().flatten().collect();
+            let lands: Vec<(TrackId, Tick)> = endpoints.iter().filter_map(|c| landing(*c)).collect();
+            if lands.len() == endpoints.len() {
+                // every clip it sits on moves: together, to one track by one offset, it travels
+                // with them; to several places, its cut came apart and it is dropped
+                if let Some(&(dest, delta)) = lands.first()
+                    && lands.iter().skip(1).all(|l| *l == (dest, delta))
+                {
+                    out.carried.push((dest, Transition { start: tr.start + delta, ..tr.clone() }));
+                }
+            } else if !lands.is_empty() {
+                // one side moves and the other stays: the transition stays with the side that
+                // stays, one-sided on it (the drop re-anchors it at the staying clip's edge)
+                let mut kept = tr.clone();
+                kept.from = tr.from.filter(|c| landing(*c).is_none());
+                kept.to = tr.to.filter(|c| landing(*c).is_none());
+                out.kept.push((track.id, kept));
+            }
         }
     }
-    carried
+    out
 }
 
 fn media_len(ctx: &EditCtx, item: &TrackItem) -> Option<Tick> {

@@ -117,8 +117,9 @@ fn a_clip_on_a_locked_track_cannot_move_to_another_track() {
     q.check().unwrap();
 }
 
-/// A partner that would land where it already is does not move: re-placing it would drop the
-/// transitions at its edges and list it in `moved` for nothing. Moving only the picture to
+/// A partner that would land where it already is does not move: moving it would tear it out of
+/// the cut it shares with its neighbours (`edit::move_items` also leaves a clip that lands on
+/// its own spot alone) and list it in `moved` for nothing. Moving only the picture to
 /// another track at the same time leaves the sound as it was.
 #[test]
 fn a_partner_whose_position_does_not_change_is_left_alone() {

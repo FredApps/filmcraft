@@ -337,6 +337,8 @@ pub(crate) fn item_p(p: &Value, k: &str) -> Option<ItemId> {
 /// the same time offset on their own tracks, so picture and sound stay in sync; a partner on a
 /// locked track, or one whose position would not change, stays as it is. Nothing moves before the sequence start: when a clip would,
 /// every clip of the call lands later by the same amount, so the spacing asked for is kept.
+/// Transitions ride along: one whose every clip moves to one track by one offset travels with
+/// them, and one whose other side stays is kept on the stationary clip, one-sided at the cut.
 /// `overwritten` lists every clip the move covered without being asked to move it: its length
 /// before and after (ticks) and the clips what is left of it now lives on as (none = removed; a
 /// clip a moved clip lands inside is split in two). With `copy: true` (Option-drag) the clips stay
@@ -391,7 +393,8 @@ fn move_clips(s: &mut Session, p: &Value) -> Result<Value> {
     let mut moves: Vec<(ClipId, TrackId, Tick)> = Vec::with_capacity(plan.len());
     for (clip, track, start, was) in plan {
         // a partner that ends up where it is does not move (its listed clip only changed track):
-        // re-placing it would drop the transitions at its edges
+        // moving it would needlessly tear it out of the cut it shares with its neighbours
+        // (`edit::move_items` also leaves a clip that lands on its own spot alone)
         if was == Some(start + late) {
             continue;
         }

@@ -599,9 +599,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         // selected edit points (trim mode): red brackets for ripple, yellow for roll / regular trim
         super::trim_monitor::paint_edit_points(app, &p, seq, tr, r, &layout);
         // transitions (one being dragged where the drag puts it; the selected ones outlined). A
-        // clip drag also shows where the drop will carry its transitions (those whose clips all
-        // move to one track by one offset): a plain move draws them on their destination track
-        // right away, a copy adds a ghost beside the copies while the originals stay at home.
+        // clip drag also shows where the drop will leave its transitions: one whose clips all
+        // move to one track by one offset is drawn where they land right away, one whose other
+        // side stays is drawn one-sided at the cut on the staying clip (the drop re-anchors it
+        // there instead of deleting it), and a copy adds a ghost beside the copies while the
+        // originals stay at home.
         for trn in &tr.transitions {
             let carried = move_transition_preview(app, seq, trn);
             // the transition's home span (a transition dragged by an end still takes over)
@@ -1961,15 +1963,17 @@ fn preview_drag(app: &FilmcraftApp, seq: &Sequence, out: &mut HashMap<ClipId, (T
     }
 }
 
-/// The transition a clip drag will leave behind, by the same rule `edit::move_items` applies:
-/// the transition travels when every clip it sits on moves — to one track, by the same (clamped)
-/// offset — and is dropped when only some of its clips move (a partner that stays behind ends the
-/// move, as in Premiere), shifted by that offset. The preview draws carried ones where they land,
-/// so a dragged clip's transition follows it instead of lagging behind until the drop, and a cut
-/// transition does not ride along on a clip whose partner stays. Returns the transition's
-/// `(start, end, destination track)` when the drag carries it.
+/// The transition a clip drag will leave behind, by the same rule `edit::move_items` applies: the
+/// transition travels when every clip it sits on moves — to one track, by the same (clamped)
+/// offset — and when one side moves while the other stays, it stays with the stationary side,
+/// one-sided at the cut on that clip (the drop drops the side that left, as though the transition
+/// had been applied to the staying clip's edge). The preview draws both where they land, so a
+/// dragged clip's transition follows it instead of lagging behind until the drop, and a cut
+/// transition neither rides along on a clip whose partner stays nor vanishes with the drag. A
+/// copy leaves the originals — and their transitions — at home; only the transitions whose every
+/// clip is copied travel as ghosts. Returns the transition's `(start, end, destination track)`.
 fn move_transition_preview(app: &FilmcraftApp, seq: &Sequence, trn: &filmcraft_project::Transition) -> Option<(Tick, Tick, TrackId)> {
-    let Some(Drag::Move { clips, offset, track_delta, .. }) = &app.tl.drag else { return None };
+    let Some(Drag::Move { clips, offset, track_delta, copy, .. }) = &app.tl.drag else { return None };
     let endpoints: Vec<ClipId> = [trn.from, trn.to].into_iter().flatten().collect();
     // where each clip it sits on that moves lands (the same track shift as the clip preview), and
     // by how much: clamped like the drop clamps each clip's start
@@ -1981,16 +1985,30 @@ fn move_transition_preview(app: &FilmcraftApp, seq: &Sequence, trn: &filmcraft_p
             }
             let (tid, it) = seq.find_item(*c)?;
             let dest = shift_track(seq, tid, *track_delta)?;
-            Some((dest, (it.start + *offset).max(Tick::ZERO) - it.start))
+            let delta = (it.start + *offset).max(Tick::ZERO) - it.start;
+            // a clip that lands exactly where it is stays put (the drop leaves it, and its
+            // transitions, alone) — the same no-op the edit skips
+            (dest != tid || delta != Tick::ZERO).then_some((dest, delta))
         })
         .collect();
-    // every clip it sits on must move to one track by one offset; one staying behind keeps the
-    // transition where it is (and the drop does not carry it either)
-    if lands.len() != endpoints.len() {
+    if lands.len() == endpoints.len() {
+        // every clip it sits on moves to one track by one offset: it travels with them
+        let &(dest, delta) = lands.first()?;
+        return lands.iter().skip(1).all(|l| *l == (dest, delta)).then(|| (trn.start + delta, trn.end() + delta, dest));
+    }
+    // a copy leaves the originals and their transitions at home (a partially copied one is not
+    // duplicated); no endpoint moves: the transition is not part of this drag
+    if *copy || lands.is_empty() {
         return None;
     }
-    let &(dest, delta) = lands.first()?;
-    lands.iter().skip(1).all(|l| *l == (dest, delta)).then(|| (trn.start + delta, trn.end() + delta, dest))
+    // one side moves and the other stays: the drop keeps the transition with the staying side,
+    // one-sided at the cut on that clip — the same re-anchoring `edit::move_items` applies
+    let (Some(from), Some(to)) = (trn.from, trn.to) else { return None };
+    let staying = if clips.contains(&from) { to } else { from };
+    let (tid, it) = seq.find_item(staying)?;
+    let at = if staying == to { it.start } else { it.end() };
+    let dur = trn.duration.min(it.duration);
+    Some(if staying == to { (at, at + dur, tid) } else { (at - dur, at, tid) })
 }
 
 /// The clips a marquee rectangle touches, on the tracks it crosses.
