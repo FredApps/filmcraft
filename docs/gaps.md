@@ -298,7 +298,12 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   with circular fillets (`masks.add` `cornerRadius`, `masks.roundCorners`, every path keyframe;
   #813), from an on-monitor corner-roundness handle with a live preview (one undo step per drag;
   #844); Shift snaps pen mask segments and dragged-out Bézier handles to 45° steps (#853), and
-  Shift constrains vertex and whole-mask drags to 45° steps from the press point (#1408).
+  Shift constrains vertex and whole-mask drags to 45° steps from the press point (#1408);
+  Video De-Noise (`Video Effects ▸ Noise & Grain`, CPU, #2514) averages each pixel with the same
+  pixel in the neighbouring frames by how well they match and smooths the rest with an
+  edge-preserving spatial pass, so a pixel that moved or sits across a cut gets less denoising
+  instead of a ghost; it does not compensate motion yet (the Lucas–Kanade solver behind
+  Optical Flow could).
 - **Estimate:** 60–110 h.
 
 ## G19. Speech to text off in release builds
@@ -320,3 +325,4 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
 | 2026-10-10 | major | Created from ROADMAP.md's "Where we are lacking" (2026-10-05); re-ranked against Premiere 26.5.2 and the 188 open issues; added `.prproj`, 10-bit / 4:2:2 camera decode, launch crashes and missing PR CI, localization, delivery formats |
 | 2026-10-12 | minor | G10: MP1 (`A_MPEG/L1`) in Matroska imports (#1402) |
 | 2026-10-12 | minor | G10: OpenEXR PXR24 import |
+| 2026-10-19 | minor | G18: Video De-Noise (#2514), temporal and spatial, CPU; no motion compensation yet |

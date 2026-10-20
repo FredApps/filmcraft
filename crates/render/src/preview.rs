@@ -427,6 +427,7 @@ pub fn effect_cost_ms(id: &str) -> f64 {
         | "vr_blur"
         | "vr_glow"
         | "vr_denoise"
+        | "video_denoise"
         | "vr_sharpen" => 50.0,
         "vertical_flip" | "horizontal_flip" | "crop" | "timecode" | "black_white" | "extract" | "clip_name" | "strobe" | "mosaic" | "mirror"
         | "simple_text" | "track_matte" => 6.0,
