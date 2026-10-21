@@ -157,16 +157,8 @@ mod mac {
         let Some(mtm) = MainThreadMarker::new() else { return false };
         let app = NSApplication::sharedApplication(mtm);
 
-        // Accept the promise types as well, so a drag that offers nothing but promises (and
-        // therefore no `NSFilenamesPboardType`) is not rejected before it can be read.
-        let mut types: Vec<Retained<NSPasteboardType>> = NSFilePromiseReceiver::readableDraggedTypes().iter().collect();
-        types.push(NSString::from_str("NSFilenamesPboardType"));
-        types.push(NSString::from_str("public.file-url"));
-        let types = NSArray::from_retained_slice(&types);
-
         let mut delegate_class: Option<&AnyClass> = None;
         for window in app.windows().iter() {
-            window.registerForDraggedTypes(&types);
             if let Some(delegate) = window.delegate() {
                 let object: &AnyObject = delegate.as_ref();
                 delegate_class = Some(object.class());
@@ -194,6 +186,20 @@ mod mac {
                 let _ = ORIGINAL_ENTERED.set(previous_entered);
             }
         }
+        // Only now that the drops will be taken: accept the promise types as well, so a drag
+        // that offers nothing but promises (and therefore no `NSFilenamesPboardType`) is not
+        // rejected before it can be read. Registering these before the checks above would leave
+        // a declined install advertising types winit's own `performDragOperation:` finds no
+        // paths in, so a pure-promise drag would be accepted and then do nothing at all, where
+        // AppKit used to refuse it outright.
+        let mut types: Vec<Retained<NSPasteboardType>> = NSFilePromiseReceiver::readableDraggedTypes().iter().collect();
+        types.push(NSString::from_str("NSFilenamesPboardType"));
+        types.push(NSString::from_str("public.file-url"));
+        let types = NSArray::from_retained_slice(&types);
+        for window in app.windows().iter() {
+            window.registerForDraggedTypes(&types);
+        }
+
         HANDLERS.with_borrow_mut(|h| *h = Some(handlers));
         true
     }
