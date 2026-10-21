@@ -759,9 +759,13 @@ fn empty_state(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     // OS files dropped on an empty Timeline: import already happened; create a sequence from the first item
     // Only the first lands here: it becomes the sequence, and a sequence open changes what the
-    // rest of the frame is looking at, so any other drop waits for the next one.
+    // rest of the frame is looking at, so any other drop on the Timeline is held over to the next
+    // frame, which has a sequence to place it on. Without that it would keep its bin import and
+    // lose its landing point, the very thing `pending_timeline_drops` is a queue to prevent.
     if let Some(i) = app.pending_timeline_drops.iter().position(|(_, p)| rect.contains(*p)) {
         let (items, _) = app.pending_timeline_drops.remove(i);
+        let held: Vec<_> = app.pending_timeline_drops.iter().filter(|(_, p)| rect.contains(*p)).cloned().collect();
+        app.deferred_timeline_drops.extend(held);
         if let Some((first, rest)) = items.split_first() {
             if let Err(e) = app.session.execute("file.newSequence", json!({"fromItem": first.0})) {
                 app.ui.status = e.to_string();

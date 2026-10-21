@@ -208,3 +208,40 @@ fn two_drops_that_finish_between_frames_are_both_placed() {
     assert!(names.iter().any(|n| n.contains("promised-first")), "the earlier drop was imported: {names:?}");
     assert!(names.iter().any(|n| n.contains("promised-second")), "the later drop was imported: {names:?}");
 }
+
+/// The same two-drops-between-frames case on an *empty* Timeline, where the first drop has to
+/// become the sequence before the second has anything to land on. Opening a sequence changes what
+/// the rest of the frame is laying out, so the second is held over to the next frame rather than
+/// left as a bin import with its landing point forgotten.
+#[test]
+fn on_an_empty_timeline_the_second_drop_is_placed_on_the_sequence_the_first_makes() {
+    // An empty project: the demo one already has a sequence open, and this is about the Timeline
+    // that has none, where the first drop has to make one.
+    let s = Session::default();
+    let shared = PromisedDrops::default();
+    let hooked = shared.clone();
+    let mut h = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).build_eframe(move |_cc| {
+        let mut app = FilmcraftApp::new(s);
+        app.hooks.promised_drops = Some(hooked);
+        app
+    });
+    for _ in 0..4 {
+        step(&mut h);
+    }
+    assert!(h.state().session.active_sequence().is_none(), "no sequence is open yet");
+
+    let first = fixture("promised-empty-first.png");
+    let second = fixture("promised-empty-second.png");
+    let panel = control_rect(&h, "panel.Timeline");
+    let x = panel.min.x + h.state().ui.timeline.header_w + 60.0;
+
+    // Both land before the next frame is drawn, as two finished downloads do.
+    arrive(&shared, &first, Some(egui::pos2(x, panel.min.y + 80.0)));
+    arrive(&shared, &second, Some(egui::pos2(x + 240.0, panel.min.y + 80.0)));
+    for _ in 0..4 {
+        step(&mut h);
+    }
+
+    assert!(h.state().session.active_sequence().is_some(), "the first drop made the sequence");
+    assert_eq!(timeline_clips(&h), 2, "and the second was placed on it, not left behind in the bin");
+}

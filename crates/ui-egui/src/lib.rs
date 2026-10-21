@@ -425,6 +425,11 @@ pub struct FilmcraftApp {
     /// each has its own landing point: keeping only the last would import the earlier one to the
     /// bin and quietly forget where it was dropped.
     pending_timeline_drops: Vec<(Vec<filmcraft_engine::project::ItemId>, egui::Pos2)>,
+    /// Drops the Timeline could not place this frame but must not forget: opening a sequence
+    /// changes what the rest of the frame is laying out, so a drop that lands on an empty
+    /// Timeline alongside the one that becomes the sequence is held over to the next frame,
+    /// where there is a sequence to place it on.
+    deferred_timeline_drops: Vec<(Vec<filmcraft_engine::project::ItemId>, egui::Pos2)>,
     /// Files being dragged over the window from the OS (count, pointer): the Timeline previews where they would land.
     file_drag_hover: Option<(usize, egui::Pos2)>,
     timeline_view_last: Option<filmcraft_engine::project::SequenceView>,
@@ -657,6 +662,7 @@ impl FilmcraftApp {
             last_timeline_width: 1000.0,
             timeline_view_of: None,
             pending_timeline_drops: Vec::new(),
+            deferred_timeline_drops: Vec::new(),
             file_drag_hover: None,
             timeline_view_last: None,
             fps: 60.0,
@@ -1515,6 +1521,8 @@ impl FilmcraftApp {
     /// Import dropped files. With Timeline ▸ drop imports to the timeline, the new items are also
     /// queued to be placed at the pointer (see `timeline::interact`).
     fn handle_drops(&mut self, ctx: &egui::Context) {
+        // A drop the Timeline held over because it had no sequence to place it on, now that it has.
+        self.pending_timeline_drops.append(&mut self.deferred_timeline_drops);
         // While files hover, the OS sends no cursor events: poll the cursor each frame to draw the Timeline preview.
         let hovering = ctx.input(|i| i.raw.hovered_files.len());
         // A promise is fulfilled into a directory the host must know before the drop, and a drag
@@ -1969,7 +1977,8 @@ impl FilmcraftApp {
             state::Mode::Import => panels::import_mode::show(self, ui, body),
             state::Mode::Export => panels::export_mode::show(self, ui, body),
         }
-        // the Timeline has had its chance to place a file drop this frame; anything left stays a bin import
+        // the Timeline has had its chance to place a file drop this frame; anything left stays a
+        // bin import, except what it deliberately held over for the next frame
         self.pending_timeline_drops.clear();
         panels::dialogs::show(self, &ctx);
         if !self.ui.show_status_bar {
