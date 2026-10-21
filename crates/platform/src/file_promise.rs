@@ -349,9 +349,9 @@ mod mac {
     }
 
     /// Asks the dragging source to write every promised file into the host's destination
-    /// directory, and reports each one as it lands. The plain paths of the drag stand in when
-    /// every promise fails, so an unusable destination or a source that gives up does not leave
-    /// the drop with nothing.
+    /// directory, and reports each one as it lands. Nothing stands in for a promise that fails:
+    /// the drag's own paths are the poster frame this exists to stop importing, so an unusable
+    /// destination or a source that gives up is reported to the user rather than papered over.
     fn receive(receivers: &[Retained<NSFilePromiseReceiver>], drop: TakenDrop) {
         let TakenDrop { id, destination } = drop;
         if let Err(e) = std::fs::create_dir_all(&destination) {
