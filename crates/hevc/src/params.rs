@@ -779,7 +779,14 @@ impl Pps {
                     any |= r.read_ue()? != 0;
                 }
                 any |= r.read_flag()?; // cross_component_prediction
-                any |= r.read_flag()?; // chroma_qp_offset_list
+                let chroma_qp_offset_list = r.read_flag()?;
+                any |= chroma_qp_offset_list;
+                if !chroma_qp_offset_list {
+                    // (with the list enabled the PPS is unsupported already and the list sits
+                    // before these fields)
+                    any |= r.read_ue()? != 0; // log2_sao_offset_scale_luma
+                    any |= r.read_ue()? != 0; // log2_sao_offset_scale_chroma
+                }
                 range_extension = any;
             }
         }

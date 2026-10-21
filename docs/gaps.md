@@ -74,10 +74,12 @@ platforms** G4, G9, G17; **performance** G16; **ecosystem** G11; **measurement**
   cross-component prediction, extended precision, persistent Rice adaptation, chroma QP offset
   lists) are still rejected as unsupported.
 - **Evidence:** #626 (Panasonic Lumix 4K 10-bit 4:2:2 MOV). On macOS VideoToolbox decodes 10-bit
-  4:2:2 H.264 / HEVC on chips that support it; Windows Media Foundation and Linux decline them, and
-  there is no software fallback, so the clip fails. Premiere decodes them everywhere (and in
-  hardware on Apple silicon, Intel and NVIDIA Blackwell).
-- **Impact:** camera originals from most current cameras do not open on Windows or Linux.
+  4:2:2 H.264 / HEVC on chips that support it; Windows Media Foundation and Linux decline them.
+  HEVC now falls back to the software decoder; H.264 High 10 / High 4:2:2 has no software
+  fallback, so such clips fail there. Premiere decodes them everywhere (and in hardware on Apple
+  silicon, Intel and NVIDIA Blackwell).
+- **Impact:** H.264 10-bit / 4:2:2 camera originals (Sony XAVC S-I, Canon XF-AVC, some Panasonic
+  modes) do not open on Windows or Linux, nor on Macs whose hardware declines them.
 - **Estimate:** H.264 High 10 + High 4:2:2 (chroma geometry, deblocking, transforms) 15–25 h.
   Doc: [codec-parity.md](codec-parity.md).
 

@@ -31,7 +31,7 @@ and fixture generators.
 | Frame-level multithreading (CTB-row granularity dependencies) | done |
 | Draft mode (non-reference pictures skip deblocking / SAO; reduced-resolution playback only) | done |
 | Tiles / WPP | parsed and decoded sequentially within a picture (parallelism is across pictures) |
-| 4:2:2 (Main 4:2:2 10 / RExt profile): chroma geometry, Table 8-3 intra mode mapping, stacked chroma transform blocks with their second cbf flags, chroma QP = Min(qPi, 51), chroma motion vectors, deblocking / SAO geometry; 8–12-bit | done, bit-exact on libx265 fixtures and a Fujifilm X-S20 clip |
+| 4:2:2 (Main 4:2:2 10 / RExt profile): chroma geometry, Table 8-3 intra mode mapping, stacked chroma transform blocks with their second cbf flags, chroma QP = Min(qPi, 51), chroma motion vectors, deblocking / SAO geometry; 8–12-bit | implemented; bit-exact on the 8- and 10-bit libx265 fixtures and a Fujifilm X-S20 clip; 12-bit not yet validated |
 | 4:4:4 / monochrome, range-extension coding tools (RDPCM, cross-component prediction, extended precision, persistent Rice adaptation, bypass alignment, chroma QP offset lists) | not yet (`Error::Unsupported`) |
 | SCC, multilayer (SHVC / MV-HEVC), 3D extensions | not supported (layers > 0 are ignored) |
 
@@ -195,8 +195,9 @@ context-coded bins are branch-free. Single-threaded 4K now splits into CABAC res
 
 - 4:4:4 and monochrome streams, and the range extension coding tools (implicit / explicit RDPCM,
   cross-component prediction, extended precision, persistent Rice adaptation, bypass alignment,
-  chroma QP offset lists) are rejected with `Error::Unsupported`. 4:2:2 streams that use none of
-  those tools (what cameras and libx265 write) decode.
+  chroma QP offset lists, SAO offset scaling) are rejected with `Error::Unsupported`. 4:2:2
+  streams that use none of those tools (what cameras and libx265 write) decode.
+- 12-bit 4:2:2 is implemented but no fixture or ffmpeg comparison covers `yuv422p12le` yet.
 - Tiles and WPP substreams are decoded sequentially (entry points are parsed but the decoder finds
   substream starts itself); parallelism is at the picture level.
 - Error concealment is minimal: missing references are replaced by grey pictures, undecodable
