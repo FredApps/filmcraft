@@ -179,3 +179,32 @@ fn an_automation_owned_app_ignores_a_native_promised_drop() {
     assert!(promised.arrived.lock().unwrap().is_empty(), "the files are drained rather than left to pile up");
     assert!(promised.lost.lock().unwrap().is_empty());
 }
+
+/// Two drops can finish downloading in the time between one frame and the next, each with its own
+/// landing point. Both are placed: holding only the newest would import the earlier drop to the
+/// bin and quietly forget where it was dropped.
+#[test]
+fn two_drops_that_finish_between_frames_are_both_placed() {
+    let (mut h, promised) = harness();
+    let first = fixture("promised-first.png");
+    let second = fixture("promised-second.png");
+    let panel = control_rect(&h, "panel.Timeline");
+    let x = panel.min.x + h.state().ui.timeline.header_w + 60.0;
+    assert_eq!(timeline_clips(&h), 0);
+
+    // The pointer is nowhere near either, as it would be after two long downloads.
+    let elsewhere = control_rect(&h, "panel.Project").center();
+    h.input_mut().events.push(egui::Event::PointerMoved(elsewhere));
+    step(&mut h);
+
+    // Both land before the next frame is drawn.
+    arrive(&promised, &first, Some(egui::pos2(x, panel.min.y + 80.0)));
+    arrive(&promised, &second, Some(egui::pos2(x + 240.0, panel.min.y + 80.0)));
+    step(&mut h);
+    step(&mut h);
+
+    assert_eq!(timeline_clips(&h), 2, "both drops are placed, not just the last one to arrive");
+    let names = item_names(&h);
+    assert!(names.iter().any(|n| n.contains("promised-first")), "the earlier drop was imported: {names:?}");
+    assert!(names.iter().any(|n| n.contains("promised-second")), "the later drop was imported: {names:?}");
+}
