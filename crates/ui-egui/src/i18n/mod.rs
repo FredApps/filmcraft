@@ -181,7 +181,7 @@ impl Language {
             Self::Id => Some(INDONESIAN.get_or_init(|| Catalog::parse(include_str!("id.tsv")))),
             Self::It => Some(ITALIAN.get_or_init(|| Catalog::parse(include_str!("it.tsv")))),
             Self::Ko => Some(KOREAN.get_or_init(|| Catalog::parse(include_str!("ko.tsv")))),
-            Some(LAO.get_or_init(|| Catalog::parse(include_str!("lo.tsv")))),
+            Self::Lo => Some(LAO.get_or_init(|| Catalog::parse(include_str!("lo.tsv")))),
         }
     }
 
