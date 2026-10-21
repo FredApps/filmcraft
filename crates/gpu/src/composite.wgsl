@@ -190,37 +190,48 @@ fn sample(p: vec2<f32>) -> vec4<f32> {
     if kind == 1u {
         return load4(tex0, p);
     }
-    // Y'CbCr: the four texels are converted to linear light before they are interpolated, as
-    // the CPU resamples its linear image; mixing code values darkens fine bright detail (#1558)
-    let tp = taps(p);
-    let i = tp.i;
-    let f = tp.f;
-    let top = mix(yuv_texel(i), yuv_texel(i + vec2(1, 0)), f.x);
-    let bottom = mix(yuv_texel(i + vec2(0, 1)), yuv_texel(i + vec2(1, 1)), f.x);
-    return mix(top, bottom, f.y);
+    if u.p3.w > 0.5 {
+        // Y'CbCr scaled up: the four texels are converted to linear light before they are
+        // interpolated, as the CPU resamples its linear image; mixing code values darkens fine
+        // bright detail (#1558)
+        let tp = taps(p);
+        let i = tp.i;
+        let f = tp.f;
+        let top = mix(yuv_texel(i), yuv_texel(i + vec2(1, 0)), f.x);
+        let bottom = mix(yuv_texel(i + vec2(0, 1)), yuv_texel(i + vec2(1, 1)), f.x);
+        return mix(top, bottom, f.y);
+    }
+    // 1:1 and scaled down: the code values interpolated at p and converted once (per tap, so a
+    // minified draw costs what it did before #1558)
+    let cs = u.p2.z;
+    let cp = p * u.src.zw / u.src.xy;
+    var a = 1.0;
+    if u.p3.y > 0.0 {
+        a = clamp(load4(tex3, p).r * u.p3.y, 0.0, 1.0);
+    }
+    return yuv_linear(load4(tex0, p).r * cs, load4(tex1, cp).r * cs, load4(tex2, cp).r * cs, a);
 }
 
-// One Y'CbCr texel (luma position, clamped to the picture) as linear premultiplied colour.
+// One Y'CbCr texel of a scaled-up layer (luma position, clamped to the picture) as linear
+// premultiplied colour. Its chroma is the chroma texel that covers it (`x >> 1` when subsampled), as
+// the CPU decodes the frame before it resamples: interpolating the chroma plane as well smears hard
+// colour edges (#1558).
 fn yuv_texel(texel: vec2<i32>) -> vec4<f32> {
     let t = clamp(texel, vec2(0), vec2<i32>(textureDimensions(tex0)) - 1);
-    let p = vec2<f32>(t) + 0.5;
     let cs = u.p2.z;
-    let yc = textureLoad(tex0, t, 0).r * cs;
-    let cp = p * u.src.zw / u.src.xy;
-    // (Cb, Cr) codes. Scaled up, the chroma texel that covers this luma texel (`x >> 1` when
-    // subsampled), as the CPU decodes the frame before it resamples: interpolating the chroma
-    // plane as well smears hard colour edges (#1558). Otherwise interpolated.
-    var c: vec2<f32>;
-    if u.p3.w > 0.5 {
-        let cd = vec2<i32>(textureDimensions(tex1));
-        let sh = vec2<u32>(select(vec2(0u), vec2(1u), cd < vec2<i32>(textureDimensions(tex0))));
-        let ct = min(t >> sh, cd - 1);
-        c = vec2(textureLoad(tex1, ct, 0).r, textureLoad(tex2, ct, 0).r);
-    } else {
-        c = vec2(load4(tex1, cp).r, load4(tex2, cp).r);
+    let cd = vec2<i32>(textureDimensions(tex1));
+    let sh = vec2<u32>(select(vec2(0u), vec2(1u), cd < vec2<i32>(textureDimensions(tex0))));
+    let ct = min(t >> sh, cd - 1);
+    var a = 1.0;
+    if u.p3.y > 0.0 {
+        a = clamp(textureLoad(tex3, t, 0).r * u.p3.y, 0.0, 1.0);
     }
-    let cb = c.x * cs;
-    let cr = c.y * cs;
+    return yuv_linear(textureLoad(tex0, t, 0).r * cs, textureLoad(tex1, ct, 0).r * cs, textureLoad(tex2, ct, 0).r * cs, a);
+}
+
+// Y'CbCr codes and straight alpha (from the alpha plane, full resolution like luma) as linear
+// premultiplied colour.
+fn yuv_linear(yc: f32, cb: f32, cr: f32, a: f32) -> vec4<f32> {
     let y = (yc - u.p1.x) / u.p1.y;
     let b = (cb - u.p1.z) / u.p1.w;
     let r = (cr - u.p1.z) / u.p1.w;
@@ -228,11 +239,6 @@ fn yuv_texel(texel: vec2<i32>) -> vec4<f32> {
     let R = y + 2.0 * (1.0 - kr) * r;
     let B = y + 2.0 * (1.0 - kb) * b;
     let G = (y - kr * R - kb * B) / kg;
-    // straight alpha from the alpha plane (full resolution, like luma), premultiplied here
-    var a = 1.0;
-    if u.p3.y > 0.0 {
-        a = clamp(textureLoad(tex3, t, 0).r * u.p3.y, 0.0, 1.0);
-    }
     var lin = to_linear(vec3(R, G, B));
     if u.q0.x > 0.5 { lin = managed(vec3(R, G, B)); }
     return vec4(lin * a, a);

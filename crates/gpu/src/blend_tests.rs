@@ -415,3 +415,50 @@ fn upscaled_yuv_chroma_edges_match_cpu() {
     // (both decode the same texels and interpolate in linear light: tighter than the criterion)
     assert!(p99 <= 2 && mean < 0.5, "p99 {p99}, mean {mean}");
 }
+
+/// #1558: only a magnified Y'CbCr layer is interpolated in linear light; 1:1 and scaled-down draws
+/// keep interpolating code values and converting once, as before. Columns of 1 px alternating
+/// between Y' 236 and 60, drawn half a texel off (1:1) or at 50 % with every tap between two
+/// columns, must come out as a flat Y' 148 drawn the same way; the linear-light mix is far brighter.
+#[test]
+fn yuv_not_magnified_keeps_code_value_sampling() {
+    let Some((dev, q)) = device() else {
+        eprintln!("no GPU adapter; skipping");
+        return;
+    };
+    let (fw, fh) = (128u32, 64u32);
+    let (cw, ch) = (fw.div_ceil(2), fh.div_ceil(2));
+    let frame = |y: Vec<u8>| {
+        Arc::new(VideoFrame {
+            width: fw,
+            height: fh,
+            data: PixelData::Yuv8 {
+                planes: [Arc::new(y), Arc::new(vec![128; (cw * ch) as usize]), Arc::new(vec![128; (cw * ch) as usize])],
+                chroma: Chroma::C420,
+                alpha: None,
+            },
+            color: filmcraft_color::ColorInfo::REC709,
+            par: (1, 1),
+            pts: Default::default(),
+        })
+    };
+    let stripes = frame((0..fw * fh).map(|i| if (i % fw).is_multiple_of(2) { 236 } else { 60 }).collect());
+    let flat = frame(vec![148; (fw * fh) as usize]);
+    // (scale, x offset): the source position of each tap falls on a texel boundary in x
+    for (s, e) in [(1.0, 0.5), (0.5, 0.25)] {
+        let m = Affine { a: s, b: 0.0, c: 0.0, d: s, e, f: 0.0 };
+        let (w, h) = ((fw as f64 * s) as usize, (fh as f64 * s) as usize);
+        let draw = |f: &Arc<VideoFrame>| {
+            let plan = FramePlan::Layers { width: w, height: h, layers: vec![PlanLayer::new(f.clone(), m, 1.0, Blend::Normal)] };
+            let mut c = GpuCompositor::new(&dev, &q);
+            c.composite(&plan);
+            let (_, _, px) = c.read_output().expect("readback");
+            (px, interior(&plan))
+        };
+        let (a, keep) = draw(&stripes);
+        let (b, _) = draw(&flat);
+        let (p99, mean, max) = stats8(&a, &b, &keep);
+        eprintln!("Y'CbCr at {s}x: p99 {p99} mean {mean:.3} max {max}");
+        assert!(max <= 1, "scale {s}: p99 {p99}, mean {mean}, max {max}");
+    }
+}
