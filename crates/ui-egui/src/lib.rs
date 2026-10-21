@@ -430,6 +430,11 @@ pub struct FilmcraftApp {
     /// Timeline alongside the one that becomes the sequence is held over to the next frame,
     /// where there is a sequence to place it on.
     deferred_timeline_drops: Vec<(Vec<filmcraft_engine::project::ItemId>, egui::Pos2)>,
+    /// The promise destination last given to the host, with the settings it was resolved from.
+    /// Resolving it walks the filesystem (`trusted_scratch` canonicalizes), and the host has to
+    /// be pointed somewhere every frame because a promising drag reports no hover to react to,
+    /// so it is recomputed only when one of those settings changes.
+    promised_destination: Option<(Option<String>, Option<String>, Vec<String>, String)>,
     /// Files being dragged over the window from the OS (count, pointer): the Timeline previews where they would land.
     file_drag_hover: Option<(usize, egui::Pos2)>,
     timeline_view_last: Option<filmcraft_engine::project::SequenceView>,
@@ -663,6 +668,7 @@ impl FilmcraftApp {
             timeline_view_of: None,
             pending_timeline_drops: Vec::new(),
             deferred_timeline_drops: Vec::new(),
+            promised_destination: None,
             file_drag_hover: None,
             timeline_view_last: None,
             fps: 60.0,
@@ -1529,8 +1535,17 @@ impl FilmcraftApp {
         // that promises its files reports nothing as hovering (it has no path to report), so the
         // host is kept pointed at this project's (Scratch Disks ▸ Captured) rather than told once
         // a drag shows up.
-        if let Some(promised) = self.hooks.promised_drops.as_ref() {
-            promised.point_at(filmcraft_engine::voiceover::captured_media_dir(&self.session, "Dropped Media"));
+        if self.hooks.promised_drops.is_some() {
+            let (captured, path, folders) =
+                (&self.session.project.settings.scratch.captured, &self.session.path, &self.session.prefs.auto_save.scratch_folders);
+            let current = self.promised_destination.as_ref().is_some_and(|(c, p, f, _)| c == captured && p == path && f == folders);
+            if !current {
+                let dir = filmcraft_engine::voiceover::captured_media_dir(&self.session, "Dropped Media");
+                self.promised_destination = Some((captured.clone(), path.clone(), folders.clone(), dir));
+            }
+            if let (Some(promised), Some((.., dir))) = (self.hooks.promised_drops.as_ref(), self.promised_destination.as_ref()) {
+                promised.point_at(dir.clone());
+            }
         }
         self.file_drag_hover = if hovering > 0 && self.session.prefs.timeline.drop_import_to_timeline {
             ctx.request_repaint();
