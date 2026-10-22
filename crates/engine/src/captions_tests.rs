@@ -216,3 +216,51 @@ fn caption_style_preset_commands_reject_hostile_parameters_without_mutation() {
     assert!(s.caption_style_presets.all().is_empty());
     assert_eq!(s.active_sequence().unwrap().caption_tracks[0].style, original_style);
 }
+
+#[test]
+fn caption_style_preset_save_does_not_replace_a_file_that_failed_to_load() {
+    let dir = std::env::temp_dir().join(format!("fc-caption-style-presets-invalid-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("caption-style-presets.json");
+    let original = b"not a valid preset file";
+    std::fs::write(&path, original).unwrap();
+
+    let mut library = crate::captions::CaptionStyleLibrary::default();
+    library.set_dir(&dir);
+    assert!(library.save("Replacement", Default::default()).is_err());
+    assert!(library.all().is_empty());
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn caption_style_preset_save_and_load_share_unicode_name_normalization() {
+    let dir = std::env::temp_dir().join(format!("fc-caption-style-presets-unicode-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let mut library = crate::captions::CaptionStyleLibrary::default();
+    library.set_dir(&dir);
+    library.save("Café", Default::default()).unwrap();
+    library.save("CAFÉ", Default::default()).unwrap();
+    assert_eq!(library.all().len(), 1);
+
+    let mut loaded = crate::captions::CaptionStyleLibrary::default();
+    loaded.set_dir(&dir);
+    assert_eq!(loaded.all().len(), 1);
+    assert!(loaded.find("CAFÉ").is_some());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn caption_style_preset_save_requires_a_persistence_directory() {
+    let mut library = crate::captions::CaptionStyleLibrary::default();
+    assert!(library.save("Temporary", Default::default()).is_err());
+    assert!(library.all().is_empty());
+
+    let mut session = demo();
+    session.execute("captions.newTrack", json!({"name": "No persistence"})).unwrap();
+    assert!(session.execute("captions.stylePreset.save", json!({"track": "C1", "name": "Temporary"})).is_err());
+    assert!(session.caption_style_presets.all().is_empty());
+}

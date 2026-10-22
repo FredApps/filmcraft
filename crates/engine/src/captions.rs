@@ -50,18 +50,22 @@ struct CaptionStylePresetFile {
 pub struct CaptionStyleLibrary {
     user: Vec<CaptionStylePreset>,
     dir: Option<PathBuf>,
+    load_error: Option<String>,
 }
 
 impl CaptionStyleLibrary {
     /// Load saved styles from the app data directory. Invalid files are left untouched and reported.
     pub fn set_dir(&mut self, data_dir: &Path) {
         self.dir = Some(data_dir.to_path_buf());
+        self.user.clear();
+        self.load_error = None;
         let path = data_dir.join(STYLE_PRESET_FILE);
         let file = match std::fs::File::open(&path) {
             Ok(file) => file,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
             Err(e) => {
                 log::warn!("{}: {e}", path.display());
+                self.load_error = Some(e.to_string());
                 return;
             }
         };
@@ -69,6 +73,7 @@ impl CaptionStyleLibrary {
         let read = file.take(MAX_STYLE_PRESET_FILE_BYTES.saturating_add(1)).read_to_end(&mut bytes);
         if let Err(e) = read {
             log::warn!("{}: {e}", path.display());
+            self.load_error = Some(e.to_string());
             return;
         }
         match if bytes.len() as u64 > MAX_STYLE_PRESET_FILE_BYTES {
@@ -77,18 +82,24 @@ impl CaptionStyleLibrary {
             parse_style_presets(&bytes)
         } {
             Ok(presets) => self.user = presets,
-            Err(e) => log::warn!("{}: {e}", path.display()),
+            Err(e) => {
+                log::warn!("{}: {e}", path.display());
+                self.load_error = Some(e);
+            }
         }
     }
 
+    /// Return all user-saved caption track style presets.
     pub fn all(&self) -> &[CaptionStylePreset] {
         &self.user
     }
 
+    /// Find a saved preset by its exact display name.
     pub fn find(&self, name: &str) -> Option<CaptionStyle> {
         self.user.iter().find(|p| p.name == name).map(|p| p.style.clone())
     }
 
+    /// Save or replace a preset, persisting it before changing the in-memory list.
     pub fn save(&mut self, name: &str, style: CaptionStyle) -> std::result::Result<(), String> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > MAX_STYLE_PRESET_NAME_CHARS || name.chars().any(char::is_control) {
@@ -96,7 +107,8 @@ impl CaptionStyleLibrary {
         }
         let style = normalize_style(style).ok_or_else(|| "caption style has an invalid font or non-finite value".to_string())?;
         let mut next = self.user.clone();
-        if let Some(preset) = next.iter_mut().find(|p| p.name.eq_ignore_ascii_case(name)) {
+        let key = style_preset_name_key(name);
+        if let Some(preset) = next.iter_mut().find(|p| style_preset_name_key(&p.name) == key) {
             preset.name = name.to_string();
             preset.style = style;
         } else {
@@ -110,6 +122,7 @@ impl CaptionStyleLibrary {
         Ok(())
     }
 
+    /// Delete a preset by its exact display name, persisting the change before removing it in memory.
     pub fn delete(&mut self, name: &str) -> std::result::Result<bool, String> {
         let Some(index) = self.user.iter().position(|p| p.name == name) else { return Ok(false) };
         let mut next = self.user.clone();
@@ -120,11 +133,19 @@ impl CaptionStyleLibrary {
     }
 
     fn persist(&self, presets: &[CaptionStylePreset]) -> std::result::Result<(), String> {
-        let Some(dir) = &self.dir else { return Ok(()) };
+        if let Some(error) = &self.load_error {
+            return Err(format!("cannot save caption style presets because the existing file failed to load: {error}"));
+        }
+        let Some(dir) = &self.dir else { return Err("caption style preset persistence is not configured".into()) };
         std::fs::create_dir_all(dir).map_err(|e| format!("could not create caption style preset directory: {e}"))?;
         let bytes = style_preset_file_bytes(presets)?;
         filmcraft_format::atomic_write(&dir.join(STYLE_PRESET_FILE), &bytes).map_err(|e| e.to_string())
     }
+}
+
+/// Normalize preset names with the same Unicode case-folding rule for saves and file validation.
+fn style_preset_name_key(name: &str) -> String {
+    name.trim().to_lowercase()
 }
 
 fn normalize_style(mut style: CaptionStyle) -> Option<CaptionStyle> {
@@ -169,7 +190,7 @@ fn parse_style_presets(bytes: &[u8]) -> std::result::Result<Vec<CaptionStylePres
         if name.is_empty() || name.chars().count() > MAX_STYLE_PRESET_NAME_CHARS || name.chars().any(char::is_control) {
             return Err("caption style preset file contains an invalid name".into());
         }
-        if !names.insert(name.to_lowercase()) {
+        if !names.insert(style_preset_name_key(&name)) {
             return Err("caption style preset file contains duplicate names".into());
         }
         preset.name = name.clone();
