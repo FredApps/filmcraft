@@ -649,8 +649,7 @@ impl Sps {
         if self.range_extension {
             return unsupported("SPS range extension tools");
         }
-        // (the low 4 bits are sps_extension_4bits: extension data a decoder ignores)
-        if self.extension_flags & 0x70 != 0 {
+        if self.extension_flags & 0x7f != 0 {
             return unsupported("SPS multilayer / 3D / SCC extensions");
         }
         Ok(())
@@ -838,8 +837,7 @@ impl Pps {
         if self.range_extension {
             return unsupported("PPS range extension tools");
         }
-        // (the low 4 bits are pps_extension_4bits: extension data a decoder ignores)
-        if self.extension_flags & 0x70 != 0 {
+        if self.extension_flags & 0x7f != 0 {
             return unsupported("PPS multilayer / 3D / SCC extensions");
         }
         Ok(())

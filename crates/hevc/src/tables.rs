@@ -93,6 +93,40 @@ pub static DST_MATRIX: [[i8; 4]; 4] = [[29, 55, 74, 84], [74, 74, 0, -74], [84, 
 mod tests {
     use super::*;
 
+    /// Table 8-3 (Rec. ITU-T H.265 v8 (08/2021), 8.4.3) is the 4:2:2 form of each luma direction:
+    /// chroma has half the horizontal resolution, so the direction of mode m (Table 8-5's
+    /// intraPredAngle, horizontal modes 2..=17 and vertical 18..=34) with its horizontal component
+    /// halved, mapped to the angular mode nearest in angle. Planar and DC stay. This rule
+    /// reproduces every one of the 35 entries, so a mistyped entry fails here without an oracle.
+    #[test]
+    fn the_422_chroma_mode_table_is_the_luma_direction_with_half_the_width() {
+        let dir = |m: usize| -> (f64, f64) {
+            let a = f64::from(INTRA_PRED_ANGLE[m]);
+            if m < 18 { (-32.0, a) } else { (a, -32.0) }
+        };
+        let angle = |(x, y): (f64, f64)| y.atan2(x);
+        let gap = |a: f64, b: f64| {
+            let d = (a - b).rem_euclid(std::f64::consts::TAU);
+            d.min(std::f64::consts::TAU - d)
+        };
+        for m in 0..35usize {
+            let want = if m < 2 {
+                m
+            } else {
+                let (x, y) = dir(m);
+                let t = angle((x / 2.0, y));
+                let mut best = 2;
+                for k in 2..35 {
+                    if gap(angle(dir(k)), t) < gap(angle(dir(best)), t) - 1e-12 {
+                        best = k;
+                    }
+                }
+                best
+            };
+            assert_eq!(INTRA_CHROMA_MODE_422[m] as usize, want, "luma mode {m}");
+        }
+    }
+
     #[test]
     fn diagonal_scan_4x4() {
         let s = &SCAN_4[0];

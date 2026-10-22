@@ -157,6 +157,10 @@ average 50-100), so these are lower bounds:
 | 1080p Main, x265 medium CRF 24, 60 frames | ~75 fps | ~225 fps |
 | 2160p Main 10, x265 fast CRF 26, 20 frames | ~20 fps | ~95 fps |
 
+4:2:2 10-bit at 2160p (a Fujifilm X-S20 clip, 87 Mbit/s LongGOP) decodes at about 17 fps with 16
+threads on a Ryzen 7 7730U laptop (`hevcdec`, all pictures output): below real time for 24–30 fps
+material, so the Program monitor drops frames on such footage unless proxies are used.
+
 No intrinsics: the hot loops are written to auto-vectorise. M4.8
 profiling (`cargo xtask bench`, macOS `sample`) found the inverse transform at over half of the
 decoder's CPU time: it evaluated the full matrix product with strided table reads. It now sums
