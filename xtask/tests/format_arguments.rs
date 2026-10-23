@@ -3,12 +3,14 @@ use std::ffi::OsString;
 use std::process::Command;
 
 #[cfg(windows)]
+/// Construct an unpaired UTF-16 surrogate that cannot be converted to a Rust string.
 fn hostile_argument() -> OsString {
     use std::os::windows::ffi::OsStringExt;
     OsString::from_wide(&[0xd800])
 }
 
 #[cfg(unix)]
+/// Construct a non-UTF-8 argument without relying on the host locale.
 fn hostile_argument() -> OsString {
     use std::os::unix::ffi::OsStringExt;
     OsString::from_vec(vec![0xff])

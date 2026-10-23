@@ -6,6 +6,7 @@ const MAX_PACKAGES: usize = 4096;
 const MAX_ID_BYTES: usize = 16384;
 const MAX_NAME_BYTES: usize = 1024;
 
+/// Read a nonempty metadata array within the workspace package bound.
 fn array<'a>(md: &'a Value, field: &str) -> Result<&'a [Value], String> {
     let values = md.get(field).and_then(Value::as_array).ok_or_else(|| format!("format metadata requires an array: {field}"))?;
     if values.is_empty() || values.len() > MAX_PACKAGES {
@@ -14,6 +15,7 @@ fn array<'a>(md: &'a Value, field: &str) -> Result<&'a [Value], String> {
     Ok(values)
 }
 
+/// Borrow a nonblank metadata string without accepting an input-sized allocation.
 fn text<'a>(value: &'a Value, field: &str, limit: usize) -> Result<&'a str, String> {
     let text = value.get(field).and_then(Value::as_str).ok_or_else(|| format!("format metadata requires a string: {field}"))?;
     if text.trim().is_empty() || text.len() > limit {
@@ -22,6 +24,7 @@ fn text<'a>(value: &'a Value, field: &str, limit: usize) -> Result<&'a str, Stri
     Ok(text)
 }
 
+/// Resolve workspace members to unique, sorted package names, excluding dependencies.
 fn workspace_package_names(md: &Value) -> Result<Vec<&str>, String> {
     let packages = array(md, "packages")?;
     let members = array(md, "workspace_members")?;
@@ -61,6 +64,8 @@ fn workspace_package_names(md: &Value) -> Result<Vec<&str>, String> {
     Ok(names)
 }
 
+/// Validate all metadata before launching argument-preserving formatter commands.
+/// Windows supplies metadata to split work by package; other hosts keep one command.
 fn run_checks(md: Option<&Value>, mut run: impl FnMut(&mut Command) -> Result<(), String>) -> Result<(), String> {
     let cargo = env!("CARGO");
     let Some(md) = md else { return run(Command::new(cargo).args(["fmt", "--check"])) };
@@ -76,6 +81,7 @@ fn run_checks(md: Option<&Value>, mut run: impl FnMut(&mut Command) -> Result<()
     Ok(())
 }
 
+/// Run the platform's formatting gate and return launch, metadata or formatter errors.
 pub(super) fn check() -> Result<(), String> {
     #[cfg(windows)]
     {
@@ -93,6 +99,7 @@ mod tests {
     use serde_json::json;
     use std::ffi::OsStr;
 
+    /// Include an unrelated dependency and a root with spaces to exercise argument boundaries.
     fn metadata() -> Value {
         json!({
             "workspace_root": std::env::temp_dir().join("Workspace With Spaces").join("filmcraft"),
