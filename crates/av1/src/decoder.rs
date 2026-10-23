@@ -1033,6 +1033,7 @@ mod worker_recovery_tests {
             refs: Default::default(),
             ref_info: Default::default(),
             tiles: Vec::new(),
+            tile_covered: Vec::new(),
             slot: Slot::new(),
             picture: Some(Slot::new()),
             pts: 0,
