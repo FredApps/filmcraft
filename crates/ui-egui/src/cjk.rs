@@ -28,6 +28,18 @@ pub(crate) fn craft_fonts() -> impl Iterator<Item = &'static filmcraft_text::fon
 const KOREAN_SAMPLE: &str = "한국어입력테스트";
 const KOREAN_PREFERRED: &[&str] = &["Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "NanumGothic"];
 
+// Every Lao-script codepoint used in the Lao catalog, so a partial fallback cannot silently
+// render one of its combining marks or letters as a missing-glyph box.
+const LAO_SAMPLE: &str = "\u{0e81}\u{0e82}\u{0e84}\u{0e87}\u{0e88}\u{0e8a}\u{0e8d}\u{0e94}\u{0e95}\u{0e96}\u{0e97}\u{0e99}\u{0e9a}\u{0e9b}\u{0e9c}\u{0e9d}\u{0e9e}\u{0e9f}\u{0ea1}\u{0ea2}\u{0ea3}\u{0ea5}\u{0ea7}\u{0eaa}\u{0eab}\u{0ead}\u{0eae}\u{0eb0}\u{0eb1}\u{0eb2}\u{0eb3}\u{0eb4}\u{0eb5}\u{0eb6}\u{0eb7}\u{0eb8}\u{0eb9}\u{0ebb}\u{0ebc}\u{0ebd}\u{0ec0}\u{0ec1}\u{0ec2}\u{0ec3}\u{0ec4}\u{0ec6}\u{0ec8}\u{0ec9}\u{0ecc}\u{0ecd}\u{0edc}\u{0edd}";
+const LAO_PREFERRED: &[&str] = &[
+    "Noto Sans Lao",
+    "Noto Sans Lao UI",
+    "Lao UI",
+    "Phetsarath OT",
+    "Saysettha OT",
+    "Lao Sangam MN",
+];
+
 fn system_font() -> Option<Arc<FontData>> {
     static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
     FONT.get_or_init(|| find_system_font(SAMPLE, PREFERRED)).clone()
@@ -36,6 +48,11 @@ fn system_font() -> Option<Arc<FontData>> {
 fn korean_font() -> Option<Arc<FontData>> {
     static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
     FONT.get_or_init(|| find_system_font(KOREAN_SAMPLE, KOREAN_PREFERRED)).clone()
+}
+
+fn lao_font() -> Option<Arc<FontData>> {
+    static FONT: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
+    FONT.get_or_init(|| find_system_font(LAO_SAMPLE, LAO_PREFERRED)).clone()
 }
 
 /// A font collection's face index matters: Windows CJK UI fonts commonly live in TTC files.
@@ -59,6 +76,12 @@ pub(crate) fn korean_available() -> bool {
     korean_font().is_some()
 }
 
+/// Whether an installed system font covers every Lao character used by the interface catalog.
+/// There is no bundled Lao face, so the Lao interface is unavailable without this fallback.
+pub(crate) fn lao_available() -> bool {
+    lao_font().is_some()
+}
+
 /// Whether [`install`] has a Chinese face to add: craft-fonts Hans/Hant faces, or an installed
 /// system face (scanned once per process). The Simplified Chinese interface needs one.
 pub(crate) fn available() -> bool {
@@ -76,12 +99,34 @@ pub(crate) fn install(fonts: &mut FontDefinitions) {
             stack.push("system-korean".into());
         }
     }
+    if let Some(font) = lao_font() {
+        fonts.font_data.insert("system-lao".into(), font);
+        for stack in fonts.families.values_mut() {
+            stack.push("system-lao".into());
+        }
+    }
 }
 
 /// Optional installed CJK fallbacks, separate from the Japanese fallback under test.
 #[cfg(test)]
 pub(crate) fn is_system_face(name: &str) -> bool {
-    matches!(name, "system-chinese" | "system-korean")
+    matches!(name, "system-chinese" | "system-korean" | "system-lao")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lao_sample_covers_every_lao_character_in_the_catalog() {
+        for line in include_str!("i18n/lo.tsv").lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
+            let translation = line.split('\t').nth(2).unwrap_or_default();
+            for ch in translation.chars().filter(|ch| ('\u{0e80}'..='\u{0eff}').contains(ch)) {
+                assert!(LAO_SAMPLE.contains(ch), "Lao catalog character U+{:04X} is absent from the font coverage sample", ch as u32);
+            }
+        }
+        assert!(LAO_PREFERRED.contains(&"Noto Sans Lao"));
+    }
 }
 
 fn install_chinese(fonts: &mut FontDefinitions) {
