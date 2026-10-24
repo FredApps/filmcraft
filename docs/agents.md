@@ -344,3 +344,32 @@ include `author` and the effective `color`.
 `colors.addCustom {color:"#RRGGBB"}` saves a reusable project-local marker/clip swatch (maximum 64). Duplicate colors are no-ops. Palette additions are independently undoable from marker edits.
 
 `edit.label` also accepts a hex `label` and `saveColor:true` to save and apply a custom clip color atomically. Markers and clips share the unchanged sixteen clip presets; Red, Orange, Cyan and Pink are aliases for Rose, Mango, Teal and Magenta.
+
+Adding a marker stays immediate and does not open an editor. The dialogs described here are
+marker editing controls, opened explicitly for an existing marker.
+If a command changes or removes that marker while its editor is open, the editor and its
+native color session close with a status message; reopen it to edit the current values.
+Changes to other markers do not discard the draft.
+
+Range markers split their flag vertically, placing the left half at the start and the right
+half at the end in the Timeline, Source, and Program rulers. Both ends retain the marker's
+identity for editing; `timeline.markerEnd.<id>`, `source.markerEnd.<id>`, and
+`program.markerEnd.<id>` expose the end flags to automation. Point markers keep their whole flag.
+
+On macOS, custom marker/clip colors and project-palette edits open the system Color panel.
+Its live selection updates only the draft; FilmCraft's Add/Save/Apply and Cancel actions keep
+ownership of project changes and Undo. Closing the Color panel retains the draft without applying
+it. Colors are converted to opaque sRGB `#RRGGBB`; typed hex values update the open panel.
+Preset swatches and named project colors remain in FilmCraft. Other hosts, headless automation,
+and native-picker failures reuse egui's established opaque color picker with FilmCraft's hex field.
+The `*.native` automation control reopens the system panel; `*.hex` remains available on either path. Switching projects or leaving
+the draft closes its native panel, and an older draft cannot redirect or close a newer picker.
+While the native Color panel has keyboard focus, its Edit menu uses AppKit's normal text actions
+for Copy/Paste, Select All, and Undo/Redo. FilmCraft's Edit menu returns when its main window
+regains focus. Temporary panel hiding during app deactivation does not discard the color draft.
+
+This host picker is scoped to marker colors, clip labels, and project palette editing. Existing
+text, graphics, effect, transition, and settings color controls retain their established behavior.
+The label editor stores opaque sRGB bytes; it does not reinterpret floating-point effect colors,
+HDR values, or alpha. The fallback shares egui's picker implementation with those controls,
+without replacing their command or color-format semantics.

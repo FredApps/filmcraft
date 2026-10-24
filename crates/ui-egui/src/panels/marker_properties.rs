@@ -19,6 +19,7 @@ pub struct Draft {
     pub initial_time: String,
     pub initial_duration: String,
     pub marker: u64,
+    pub original: Marker,
     pub name: String,
     pub comment: String,
     pub author: String,
@@ -52,12 +53,12 @@ impl Owner {
         match self {
             Self::Sequence(_) => {
                 let q = app.session.project.sequence(id)?;
-                Some((format!("Sequence: {}", item.name), q.settings.frame_rate, q.settings.drop_frame, q.markers.clone()))
+                Some((tlf!("Sequence: {name}", name = &item.name), q.settings.frame_rate, q.settings.drop_frame, q.markers.clone()))
             }
             Self::Source(_) => {
                 let v = filmcraft_engine::clip_ops::source_view(&app.session, id)?;
                 Some((
-                    format!("Source: {}{}", item.name, if v.media != id { " (shared source markers)" } else { "" }),
+                    if v.media != id { tlf!("Source: {name} (shared source markers)", name = &item.name) } else { tlf!("Source: {name}", name = &item.name) },
                     v.rate,
                     app.session.project.sequence(v.media).is_some_and(|q| q.settings.drop_frame),
                     v.markers,
@@ -86,6 +87,7 @@ pub fn open_owned(app: &mut FilmcraftApp, marker: &Marker, owner: Owner) {
         range: marker.duration > filmcraft_time::Tick::ZERO,
         original_duration: marker.duration,
         marker: marker.id.0,
+        original: marker.clone(),
         name: marker.name.clone(),
         comment: marker.comment.clone(),
         author: marker.author.clone(),
@@ -102,6 +104,13 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if !Arc::ptr_eq(&draft.project, &app.session.project_instance) {
         return;
     }
+    // Commands can edit or remove this marker while its dialog (or native picker) is open.
+    // Check the marker itself, not unrelated project history, before allowing stale writes.
+    let current = draft.owner.details(app).and_then(|(_, _, _, markers)| markers.into_iter().find(|marker| marker.id.0 == draft.marker));
+    if current.as_ref() != Some(&draft.original) {
+        app.ui.status = tl!("Marker changed or was removed. Reopen it to continue.").into();
+        return;
+    }
     if draft.color_editor.is_some() {
         color_dialog(app, ctx, &mut draft);
         app.ui.marker_properties = Some(draft);
@@ -112,41 +121,43 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut delete = false;
     let modal = egui::Modal::new(egui::Id::new("marker-properties")).show(ctx, |ui| {
         ui.set_width(440.0);
-        ui.heading("Edit Marker");
+        ui.heading(tl!("Edit Marker"));
         if let Some((title, _, _, _)) = draft.owner.details(app) {
             ui.label(title);
         }
         ui.horizontal(|ui| {
-            ui.label("Time");
+            ui.label(tl!("Time"));
             let response = ui.add(egui::TextEdit::singleline(&mut draft.time).desired_width(100.0));
-            app.auto.add_response("markerProperties.time", &response, "Time");
-            let response = ui.checkbox(&mut draft.range, "Range");
-            app.auto.add_response("markerProperties.range", &response, "Range marker");
+            app.auto.add_response("markerProperties.time", &response, tl!("Time"));
+            let response = ui.checkbox(&mut draft.range, tl!("Range"));
+            app.auto.add_response("markerProperties.range", &response, tl!("Range marker"));
             if draft.range && draft.original_duration == filmcraft_time::Tick::ZERO && draft.duration == draft.initial_duration {
                 draft.duration = "00:00:00:01".into();
             }
-            ui.label("Duration");
+            ui.label(tl!("Duration"));
             let response = ui.add_enabled(draft.range, egui::TextEdit::singleline(&mut draft.duration).desired_width(100.0));
-            app.auto.add_response("markerProperties.duration", &response, "Duration");
+            app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
         });
         ui.add_space(6.0);
         ui.columns(2, |columns| {
-            for ((id, label, value), column) in [("name", "Name", &mut draft.name), ("author", "Author", &mut draft.author)].into_iter().zip(columns) {
+            for ((id, label, value), column) in [("name", tl!("Name"), &mut draft.name), ("author", tl!("Author"), &mut draft.author)].into_iter().zip(columns)
+            {
                 column.label(label);
                 let response = column.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY));
                 app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
             }
         });
-        ui.label("Notes");
+        ui.label(tl!("Notes"));
         let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(3));
-        app.auto.add_response("markerProperties.comment", &response, "Notes");
+        app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
         ui.add_space(8.0);
-        ui.label("Color");
+        ui.label(tl!("Color"));
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 5.0;
             for preset in Label::ALL {
-                let response = swatch(ui, app.session.prefs.labels.rgb(preset), !draft.custom && draft.preset == preset).on_hover_text(preset.name());
-                app.auto.add_response(&format!("markerProperties.preset.{}", preset.name()), &response, preset.name());
+                let response =
+                    swatch(ui, app.session.prefs.labels.rgb(preset), !draft.custom && draft.preset == preset).on_hover_text(crate::i18n::t(preset.name()));
+                app.auto.add_response(&format!("markerProperties.preset.{}", preset.name()), &response, crate::i18n::t(preset.name()));
                 if response.clicked() {
                     draft.preset = preset;
                     draft.custom = false;
@@ -154,7 +165,6 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                 }
             }
         });
-        ui.add_space(6.0);
         let mut colors = super::custom_colors::available(app);
         if draft.custom
             && let Some(color) = HexColor::parse(&draft.hex)
@@ -175,8 +185,8 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
                         draft.custom = true;
                     }
                 }
-                let response = add_color_swatch(ui).on_hover_text("Add custom color");
-                app.auto.add_response("markerProperties.addColor", &response, "Add custom color");
+                let response = add_color_swatch(ui).on_hover_text(tl!("Add custom color"));
+                app.auto.add_response("markerProperties.addColor", &response, tl!("Add custom color"));
                 if response.clicked() {
                     draft.error.clear();
                     draft.color_editor = Some(ColorDraft::new(HexColor::parse(&draft.hex).map_or(app.session.prefs.labels.rgb(draft.preset), |c| c.0)));
@@ -188,14 +198,14 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         }
         ui.separator();
         ui.horizontal(|ui| {
-            let response = ui.button("Done");
-            app.auto.add_response("markerProperties.apply", &response, "Done");
+            let response = ui.button(tl!("Done"));
+            app.auto.add_response("markerProperties.apply", &response, tl!("Done"));
             apply = response.clicked();
-            let response = ui.button("Cancel");
-            app.auto.add_response("markerProperties.cancel", &response, "Cancel");
+            let response = ui.button(tl!("Cancel"));
+            app.auto.add_response("markerProperties.cancel", &response, tl!("Cancel"));
             cancel = response.clicked();
-            let response = ui.button("Delete Marker");
-            app.auto.add_response("markerProperties.delete", &response, "Delete Marker");
+            let response = ui.button(tl!("Delete Marker"));
+            app.auto.add_response("markerProperties.delete", &response, tl!("Delete Marker"));
             delete = response.clicked();
         });
     });
@@ -220,12 +230,12 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 
 fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, String> {
     let Some((_, rate, drop, _)) = draft.owner.details(app) else {
-        return Err("Marker owner is unavailable".into());
+        return Err(tl!("Marker owner is unavailable").into());
     };
     let parse = |value: &str| -> Result<i64, String> {
         let f = filmcraft_time::parse_timecode(value, rate, drop, 0).map_err(|e| e.to_string())?;
         if f < 0 || f > rate.frame_at(filmcraft_time::Tick::MAX) {
-            return Err("Time is outside the supported range".into());
+            return Err(tl!("Time is outside the supported range").into());
         }
         Ok(f)
     };
@@ -244,7 +254,7 @@ fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, S
     } else if draft.range && (draft.duration != draft.initial_duration || draft.original_duration == filmcraft_time::Tick::ZERO) {
         let duration = parse(&draft.duration)?;
         if duration == 0 {
-            return Err("A range marker needs a positive duration".into());
+            return Err(tl!("A range marker needs a positive duration").into());
         }
         p["durationFrames"] = json!(duration);
     }
@@ -257,18 +267,18 @@ fn color_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, draft: &mut Draft) 
     let mut cancel = false;
     let modal = egui::Modal::new(egui::Id::new("marker-custom-color")).show(ctx, |ui| {
         ui.set_width(360.0);
-        ui.heading("Add Custom Color");
-        color_picker::show(ui, &mut app.auto, "markerColor", editor);
+        ui.heading(tl!("Add Custom Color"));
+        color_picker::show(ui, &mut app.auto, &mut app.hooks, "markerColor", editor);
         if !draft.error.is_empty() {
             ui.colored_label(ui.visuals().error_fg_color, &draft.error);
         }
         ui.separator();
         ui.horizontal(|ui| {
-            let response = ui.add_enabled(editor.value().is_some(), egui::Button::new("Add color"));
-            app.auto.add_response("markerColor.add", &response, "Add color");
+            let response = ui.add_enabled(editor.value().is_some(), egui::Button::new(tl!("Add color")));
+            app.auto.add_response("markerColor.add", &response, tl!("Add color"));
             add = response.clicked();
-            let response = ui.button("Cancel");
-            app.auto.add_response("markerColor.cancel", &response, "Cancel");
+            let response = ui.button(tl!("Cancel"));
+            app.auto.add_response("markerColor.cancel", &response, tl!("Cancel"));
             cancel = response.clicked();
         });
     });
@@ -289,24 +299,30 @@ fn color_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, draft: &mut Draft) 
 }
 
 fn add_color_swatch(ui: &mut egui::Ui) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(vec2(22.0, 26.0), Sense::click());
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), "Add custom color"));
-    let chip = rect.shrink2(vec2(3.0, 5.0));
+    let (chip, response) = allocate_swatch(ui);
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Add custom color")));
     let visuals = ui.style().interact(&response);
     ui.painter().rect_filled(chip, 3.0, visuals.bg_fill);
-    ui.painter().rect_stroke(chip, 3.0, visuals.bg_stroke, egui::StrokeKind::Outside);
-    ui.painter().text(chip.center(), egui::Align2::CENTER_CENTER, "+", egui::FontId::proportional(14.0), visuals.text_color());
+    ui.painter().rect_stroke(chip, 3.0, Stroke::new(1.0, ui.visuals().text_color().gamma_multiply(0.5)), egui::StrokeKind::Outside);
+    let center = chip.center();
+    let stroke = Stroke::new(1.25, visuals.text_color());
+    ui.painter().line_segment([center - vec2(4.0, 0.0), center + vec2(4.0, 0.0)], stroke);
+    ui.painter().line_segment([center - vec2(0.0, 4.0), center + vec2(0.0, 4.0)], stroke);
     response
 }
 
 pub(super) fn swatch(ui: &mut egui::Ui, rgb: [u8; 3], selected: bool) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(vec2(22.0, 26.0), Sense::click());
+    let (chip, response) = allocate_swatch(ui);
     let [r, g, b] = rgb;
-    let chip = rect.shrink2(vec2(3.0, 5.0));
     ui.painter().rect_filled(chip, 3.0, Color32::from_rgb(r, g, b));
     ui.painter().rect_stroke(chip, 3.0, Stroke::new(1.0, ui.visuals().text_color().gamma_multiply(0.5)), egui::StrokeKind::Outside);
     if selected {
         ui.painter().rect_stroke(chip.expand(3.0), 5.0, Stroke::new(2.0, ui.visuals().text_color()), egui::StrokeKind::Outside);
     }
     response
+}
+
+fn allocate_swatch(ui: &mut egui::Ui) -> (egui::Rect, egui::Response) {
+    let (rect, response) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+    (rect.shrink(3.0), response)
 }

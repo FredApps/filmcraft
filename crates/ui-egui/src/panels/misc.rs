@@ -109,8 +109,8 @@ pub(crate) fn marker_owned_menu(
                 }
             }
         });
-        let response = ui.button("Custom Color…");
-        app.auto.add_response(&format!("{prefix}.customColor"), &response, "Custom Color");
+        let response = ui.button(tl!("Custom Color…"));
+        app.auto.add_response(&format!("{prefix}.customColor"), &response, tl!("Custom Color"));
         if response.clicked() {
             super::marker_properties::open_owned(app, marker, owner);
             if let Some(draft) = &mut app.ui.marker_properties {
@@ -122,14 +122,14 @@ pub(crate) fn marker_owned_menu(
         }
     });
     app.auto.add_response(&format!("{prefix}.label"), &menu.response, label);
-    let response = ui.button("Edit Marker…");
-    app.auto.add_response(&format!("{prefix}.properties"), &response, "Edit Marker");
+    let response = ui.button(tl!("Edit Marker…"));
+    app.auto.add_response(&format!("{prefix}.properties"), &response, tl!("Edit Marker"));
     if response.clicked() {
         super::marker_properties::open_owned(app, marker, owner);
         ui.close();
     }
-    let response = ui.button("Delete Marker");
-    app.auto.add_response(&format!("{prefix}.delete"), &response, "Delete Marker");
+    let response = ui.button(tl!("Delete Marker"));
+    app.auto.add_response(&format!("{prefix}.delete"), &response, tl!("Delete Marker"));
     if response.clicked() {
         let mut p = owner.params();
         p["marker"] = serde_json::json!(marker.id.0);

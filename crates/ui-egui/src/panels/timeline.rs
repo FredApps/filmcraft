@@ -22,7 +22,7 @@ use crate::icons::{self, Icon};
 use crate::state::{ThumbnailMode, TimelineView, Tool};
 use crate::theme::Tokens;
 
-use super::timeline_hit::{EdgeKind, Grab, edge_geometry, grab_at, marker_at, marker_range_rect, marker_rect, marker_under_pointer};
+use super::timeline_hit::{EdgeKind, Grab, edge_geometry, grab_at, marker_at, marker_end_rect, marker_range_rect, marker_rect, marker_under_pointer};
 pub use super::timeline_hit::{Hit, ROLL_PX, hit, selection_trim_kind};
 
 const TOP_H: f32 = 58.0; // timecode + toolbar (left) / ruler (right)
@@ -1547,21 +1547,30 @@ fn draw_top(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, seq: &Sequenc
             });
         }
     }
-    // markers: 8 × 12 pt pentagons in the marker colour, on the top row
+    // Point flags stay whole; ranges split the same glyph across their endpoints.
     for m in &seq.markers {
         let x = layout.x_of(m.start);
         let c = m.custom_color.map_or_else(|| app.session.prefs.labels.rgb(m.color), |c| c.0);
         let c = Color32::from_rgb(c[0], c[1], c[2]);
-        let shape =
-            vec![pos2(x - 4.0, marker_y), pos2(x + 4.0, marker_y), pos2(x + 4.0, marker_y + 8.0), pos2(x, marker_y + 12.0), pos2(x - 4.0, marker_y + 8.0)];
+        let glyph = |x| Rect::from_min_size(pos2(x - 4.0, marker_y), vec2(8.0, 12.0));
         if let Some(band) = marker_range_rect(layout, m).filter(|r| r.width() > 0.0) {
             clip.rect_filled(band, 0.0, c.gamma_multiply(0.6));
             app.auto.add(&format!("timeline.markerRange.{}", m.id.0), band, &m.name);
         }
-        clip.add(egui::Shape::convex_polygon(shape, c, Stroke::NONE));
+        let end = marker_end_rect(layout, m);
+        if let Some(end) = end {
+            crate::widgets::marker_glyph(&clip, glyph(x), 4.0, crate::widgets::MarkerPart::Left, c);
+            crate::widgets::marker_glyph(&clip, glyph(end.center().x), 4.0, crate::widgets::MarkerPart::Right, c);
+            let visible = end.intersect(ruler);
+            if visible.is_positive() {
+                app.auto.add(&format!("timeline.markerEnd.{}", m.id.0), visible, &m.name);
+            }
+        } else {
+            crate::widgets::marker_glyph(&clip, glyph(x), 4.0, crate::widgets::MarkerPart::Whole, c);
+        }
         let mr = marker_rect(layout, m.start);
         app.auto.add(&format!("timeline.marker.{}", m.id.0), mr, &m.name);
-        if ui.rect_contains_pointer(mr) && !m.name.is_empty() {
+        if (ui.rect_contains_pointer(mr) || end.is_some_and(|r| ui.rect_contains_pointer(r))) && !m.name.is_empty() {
             egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), egui::Id::new(("mk", m.id.0)), egui::PopupAnchor::Pointer).show(|ui| {
                 ui.label(&m.name);
             });

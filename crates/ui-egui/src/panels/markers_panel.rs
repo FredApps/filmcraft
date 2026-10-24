@@ -27,20 +27,20 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let ui = &mut child;
     ui.horizontal_wrapped(|ui| {
         for (source, label) in [(false, "Sequence"), (true, "Source")] {
-            let response = ui.selectable_label(state.source == source, label);
-            app.auto.add_response(&format!("markers.scope.{label}"), &response, label);
+            let response = ui.selectable_label(state.source == source, crate::i18n::t(label));
+            app.auto.add_response(&format!("markers.scope.{label}"), &response, crate::i18n::t(label));
             if response.clicked() {
                 state.source = source;
             }
         }
-        let response = ui.button("Manage Colors…");
-        app.auto.add_response("markers.manageColors", &response, "Manage Colors");
+        let response = ui.button(tl!("Manage Colors…"));
+        app.auto.add_response("markers.manageColors", &response, tl!("Manage Colors"));
         if response.clicked() {
             super::palette_manager::open(app);
         }
     });
-    let response = ui.add(egui::TextEdit::singleline(&mut state.search).hint_text("Search name, notes, author").desired_width(f32::INFINITY));
-    app.auto.add_response("markers.search", &response, "Search markers");
+    let response = ui.add(egui::TextEdit::singleline(&mut state.search).hint_text(tl!("Search name, notes, author")).desired_width(f32::INFINITY));
+    app.auto.add_response("markers.search", &response, tl!("Search markers"));
     let owner = Owner::current(app, state.source);
     if owner != state.owner || state.project.as_ref().is_none_or(|p| !std::sync::Arc::ptr_eq(p, &app.session.project_instance)) {
         state.selected.clear();
@@ -49,7 +49,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         state.project = Some(app.session.project_instance.clone());
     }
     let Some((owner, (title, rate, drop, markers))) = owner.and_then(|owner| owner.details(app).map(|d| (owner, d))) else {
-        ui.label(if state.source { "No source clip open" } else { "No sequence open" });
+        ui.label(if state.source { tl!("No source clip open") } else { tl!("No sequence open") });
         app.ui.markers_panel = state;
         return;
     };
@@ -65,8 +65,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     ui.horizontal_wrapped(|ui| {
         for color in Label::ALL {
             let on = !hidden.contains(&color);
-            let response = filter(ui, app.session.prefs.labels.rgb(color), on).on_hover_text(color.name());
-            app.auto.add_response(&format!("markers.filter.{}", color.name()), &response, color.name());
+            let response = filter(ui, app.session.prefs.labels.rgb(color), on).on_hover_text(crate::i18n::t(color.name()));
+            app.auto.add_response(&format!("markers.filter.{}", color.name()), &response, crate::i18n::t(color.name()));
             if response.clicked()
                 && let Err(e) = app.session.execute("markers.filterColors", json!({"color":color.name(),"visible":!on}))
             {
@@ -98,21 +98,21 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let visible_ids: std::collections::BTreeSet<_> = shown.iter().map(|m| m.id.0).collect();
     state.selected.retain(|id| visible_ids.contains(id));
     ui.horizontal_wrapped(|ui| {
-        let r = ui.button("Select all");
-        app.auto.add_response("markers.selectAll", &r, "Select all visible markers");
+        let r = ui.button(tl!("Select all"));
+        app.auto.add_response("markers.selectAll", &r, tl!("Select all visible markers"));
         if r.clicked() {
             state.selected = shown.iter().map(|m| m.id.0).collect();
         }
-        let r = ui.add_enabled(!state.selected.is_empty(), egui::Button::new("Delete"));
-        app.auto.add_response("markers.deleteSelected", &r, "Delete selected markers");
+        let r = ui.add_enabled(!state.selected.is_empty(), egui::Button::new(tl!("Delete")));
+        app.auto.add_response("markers.deleteSelected", &r, tl!("Delete selected markers"));
         if r.clicked() {
             bulk(app, owner, &state.selected, "markers.delete", None);
         }
         ui.add_enabled_ui(!state.selected.is_empty(), |ui| {
-            let menu = ui.menu_button("Color", |ui| {
+            let menu = ui.menu_button(tl!("Color"), |ui| {
                 for preset in Label::ALL {
-                    let r = ui.button(preset.name());
-                    app.auto.add_response(&format!("markers.bulkColor.{}", preset.name()), &r, preset.name());
+                    let r = ui.button(crate::i18n::t(preset.name()));
+                    app.auto.add_response(&format!("markers.bulkColor.{}", preset.name()), &r, crate::i18n::t(preset.name()));
                     if r.clicked() {
                         bulk(app, owner, &state.selected, "markers.edit", Some(preset.name()));
                         ui.close();
@@ -128,13 +128,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     }
                 }
             });
-            app.auto.add_response("markers.bulkColor", &menu.response, "Color selected markers");
+            app.auto.add_response("markers.bulkColor", &menu.response, tl!("Color selected markers"));
         });
-        ui.label(format!("{} selected", state.selected.len()));
+        ui.label(tlf!("{count} selected", count = state.selected.len()));
     });
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         if shown.is_empty() {
-            ui.label(if markers.is_empty() { "No markers" } else { "No matching markers" });
+            ui.label(if markers.is_empty() { tl!("No markers") } else { tl!("No matching markers") });
         }
         for (index, m) in shown.iter().enumerate() {
             let selected = state.selected.contains(&m.id.0);
@@ -145,14 +145,15 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             }
             let [r, g, b] = m.custom_color.map_or_else(|| app.session.prefs.labels.rgb(m.color), |c| c.0);
             ui.painter().rect_filled(Rect::from_min_size(rect.min + vec2(4.0, 6.0), vec2(4.0, 30.0)), 2.0, Color32::from_rgb(r, g, b));
-            let name = if m.name.is_empty() { "Marker" } else { &m.name };
+            let name = if m.name.is_empty() { tl!("Marker") } else { &m.name };
             let time = |tick| filmcraft_time::format_time(tick, rate, drop, filmcraft_time::TimeDisplay::Timecode, 48000);
             let mut line = time(m.start);
             if m.duration > filmcraft_time::Tick::ZERO {
                 line.push_str(&format!("  ({})", time(m.duration)));
             }
             if m.kind == filmcraft_project::MarkerKind::Chapter {
-                line.push_str("  Chapter");
+                line.push_str("  ");
+                line.push_str(tl!("Chapter"));
             }
             if !m.author.is_empty() {
                 line.push_str(&format!("  · {}", m.author));

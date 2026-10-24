@@ -74,14 +74,14 @@ pub fn menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, params: Value, prefix: &s
             }
         }
     });
-    let response = ui.button("Manage Colors…");
-    app.auto.add_response(&format!("{prefix}.manageColors"), &response, "Manage Colors");
+    let response = ui.button(tl!("Manage Colors…"));
+    app.auto.add_response(&format!("{prefix}.manageColors"), &response, tl!("Manage Colors"));
     if response.clicked() {
         super::palette_manager::open(app);
         ui.close();
     }
-    let response = ui.button("Add custom color…");
-    app.auto.add_response(&format!("{prefix}.addColor"), &response, "Add custom color");
+    let response = ui.button(tl!("Add custom color…"));
+    app.auto.add_response(&format!("{prefix}.addColor"), &response, tl!("Add custom color"));
     if response.clicked() {
         app.ui.custom_label_color =
             Some(Draft { project: app.session.project_instance.clone(), color: ColorDraft::new([128, 128, 128]), params, error: String::new() });
@@ -98,18 +98,18 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut cancel = false;
     let modal = egui::Modal::new(egui::Id::new("custom-clip-color")).show(ctx, |ui| {
         ui.set_width(360.0);
-        ui.heading("Add Custom Color");
-        color_picker::show(ui, &mut app.auto, "labelColor", &mut draft.color);
+        ui.heading(tl!("Add Custom Color"));
+        color_picker::show(ui, &mut app.auto, &mut app.hooks, "labelColor", &mut draft.color);
         if !draft.error.is_empty() {
             ui.colored_label(ui.visuals().error_fg_color, &draft.error);
         }
         ui.separator();
         ui.horizontal(|ui| {
-            let response = ui.add_enabled(draft.color.value().is_some(), egui::Button::new("Add and apply"));
-            app.auto.add_response("labelColor.apply", &response, "Add and apply");
+            let response = ui.add_enabled(draft.color.value().is_some(), egui::Button::new(tl!("Add and apply")));
+            app.auto.add_response("labelColor.apply", &response, tl!("Add and apply"));
             apply = response.clicked();
-            let response = ui.button("Cancel");
-            app.auto.add_response("labelColor.cancel", &response, "Cancel");
+            let response = ui.button(tl!("Cancel"));
+            app.auto.add_response("labelColor.cancel", &response, tl!("Cancel"));
             cancel = response.clicked();
         });
     });

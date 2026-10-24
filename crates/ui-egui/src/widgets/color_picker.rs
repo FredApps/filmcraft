@@ -1,173 +1,188 @@
-//! Reusable opaque sRGB color editor. Callers own dialogs, palettes and project commands.
-//! HSV operates on sRGB channel values, not linear-light channels: radial saturation
-//! therefore matches the familiar selection wheel without an oversized white center.
-use crate::automation::Registry;
+//! Reusable opaque sRGB color editor with an optional native host picker.
+//! Callers own dialogs, palettes and project commands.
+//! The fallback reuses egui's established picker. Opaque label bytes stay in sRGB;
+//! floating-point effect colors and their alpha handling are outside this editor.
+use crate::{HostHooks, automation::Registry};
 use egui::{Color32, Sense, Stroke, vec2};
 use filmcraft_project::HexColor;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
+
+/// A native picker edits only a draft. Callers still own Apply/Cancel and project commands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeColorState {
+    pub color: Option<[u8; 3]>,
+    pub open: bool,
+}
+
+/// Main-thread host session. Dropping the last reference closes its own panel.
+pub trait NativeColorSession: std::fmt::Debug {
+    fn poll(&self) -> Result<NativeColorState, String>;
+    fn set_color(&self, color: [u8; 3]) -> Result<(), String>;
+}
+
+pub type NativeColorPicker = Box<dyn FnMut([u8; 3]) -> Result<Rc<dyn NativeColorSession>, String>>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ColorDraft {
     pub hex: String,
-    pub hue: f32,
-    pub saturation: f32,
-    pub brightness: f32,
+    #[serde(default = "default_rgb")]
+    rgb: [u8; 3],
+    #[serde(skip)]
+    native: Option<Rc<dyn NativeColorSession>>,
+    #[serde(skip)]
+    native_requested: bool,
+    #[serde(skip)]
+    native_last: Option<[u8; 3]>,
+    #[serde(skip)]
+    native_error: Option<String>,
 }
 
 impl ColorDraft {
     pub fn new(rgb: [u8; 3]) -> Self {
-        let mut draft = Self { hex: HexColor(rgb).hex().trim_start_matches('#').to_string(), hue: 0.0, saturation: 0.0, brightness: 1.0 };
-        draft.set_rgb(rgb);
-        draft
+        Self { hex: HexColor(rgb).hex().trim_start_matches('#').to_string(), rgb, native: None, native_requested: false, native_last: None, native_error: None }
     }
 
-    fn set_rgb(&mut self, rgb: [u8; 3]) {
-        let [r, g, b] = rgb.map(|v| f32::from(v) / 255.0);
-        let max = r.max(g).max(b);
-        let min = r.min(g).min(b);
-        let delta = max - min;
-        if delta > 0.0 {
-            let sector = if max == r {
-                (g - b) / delta
-            } else if max == g {
-                (b - r) / delta + 2.0
-            } else {
-                (r - g) / delta + 4.0
-            };
-            self.hue = (sector / 6.0).rem_euclid(1.0);
-        }
-        if max > 0.0 {
-            self.saturation = delta / max;
-        }
-        self.brightness = max;
+    /// End native editing when a retained palette draft returns to its list.
+    pub fn close_native(&mut self) {
+        self.native = None;
     }
 
-    fn update_hex(&mut self) {
-        let color = hsv_color(self.hue, self.saturation, self.brightness);
-        self.hex = HexColor([color.r(), color.g(), color.b()]).hex().trim_start_matches('#').to_string();
+    fn open_native(&mut self, hooks: &mut HostHooks) {
+        let Some(open) = &mut hooks.pick_color else { return };
+        self.close_native();
+        self.native_requested = true;
+        let rgb = self.preview_rgb();
+        match open(rgb) {
+            Ok(session) => {
+                self.native = Some(session);
+                self.native_last = Some(rgb);
+                self.native_error = None;
+            }
+            Err(error) => self.native_error = Some(error),
+        }
+    }
+
+    fn poll_native(&mut self) {
+        let Some(session) = &self.native else { return };
+        match session.poll() {
+            Ok(state) => {
+                if let Some(rgb) = state.color
+                    && self.native_last != Some(rgb)
+                {
+                    self.hex = HexColor(rgb).hex().trim_start_matches('#').to_string();
+                    self.rgb = rgb;
+                    self.native_last = Some(rgb);
+                }
+                // A native panel can hide when the app deactivates. Keep its draft/session;
+                // Apply/Cancel owns its lifetime and Choose Color can bring it back.
+                if state.color.is_none() && !state.open {
+                    self.close_native();
+                }
+            }
+            Err(error) => {
+                self.native_error = Some(error);
+                self.close_native();
+            }
+        }
     }
 
     pub fn value(&self) -> Option<HexColor> {
         HexColor::parse(&self.hex)
     }
+
+    /// An incomplete hex edit keeps the most recent valid selection visible.
+    fn preview_rgb(&self) -> [u8; 3] {
+        self.value().map_or(self.rgb, |color| color.0)
+    }
 }
 
-fn unit(value: f32) -> f32 {
-    if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.0 }
+fn default_rgb() -> [u8; 3] {
+    [128, 128, 128]
 }
 
-fn hsv_color(hue: f32, saturation: f32, brightness: f32) -> Color32 {
-    let h = unit(hue).rem_euclid(1.0) * 6.0;
-    let v = unit(brightness);
-    let chroma = v * unit(saturation);
-    let x = chroma * (1.0 - (h.rem_euclid(2.0) - 1.0).abs());
-    let rgb = match h as u8 {
-        0 => [chroma, x, 0.0],
-        1 => [x, chroma, 0.0],
-        2 => [0.0, chroma, x],
-        3 => [0.0, x, chroma],
-        4 => [x, 0.0, chroma],
-        _ => [chroma, 0.0, x],
-    };
-    let [r, g, b] = rgb.map(|channel| ((channel + v - chroma).clamp(0.0, 1.0) * 255.0).round() as u8);
-    Color32::from_rgb(r, g, b)
-}
-
-pub fn show(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: &mut ColorDraft) {
-    draft.hue = unit(draft.hue);
-    draft.saturation = unit(draft.saturation);
-    draft.brightness = unit(draft.brightness);
-    ui.horizontal(|ui| {
-        wheel(ui, auto, prefix, draft);
-        ui.vertical(|ui| {
-            let color =
-                draft.value().map(|c| Color32::from_rgb(c.0[0], c.0[1], c.0[2])).unwrap_or_else(|| hsv_color(draft.hue, draft.saturation, draft.brightness));
-            let (rect, _) = ui.allocate_exact_size(vec2(68.0, 48.0), Sense::hover());
-            ui.painter().rect_filled(rect, 4.0, color);
-            ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, ui.visuals().text_color()), egui::StrokeKind::Inside);
-            ui.label("Hex");
-            let response = ui.add(egui::TextEdit::singleline(&mut draft.hex).font(egui::TextStyle::Monospace).desired_width(58.0).char_limit(7));
-            auto.add_response(&format!("{prefix}.hex"), &response, "Hex color");
-            if response.changed() {
-                if let Some(hex) = draft.hex.strip_prefix('#') {
-                    draft.hex = hex.to_string();
-                }
-                if let Some(color) = draft.value() {
-                    draft.set_rgb(color.0);
-                }
+pub fn show(ui: &mut egui::Ui, auto: &mut Registry, hooks: &mut HostHooks, prefix: &str, draft: &mut ColorDraft) {
+    if hooks.pick_color.is_some() && !draft.native_requested {
+        draft.open_native(hooks);
+    }
+    draft.poll_native();
+    if hooks.pick_color.is_some() && draft.native_error.is_none() {
+        ui.horizontal(|ui| {
+            preview_and_hex(ui, auto, prefix, draft);
+            let response = ui.button(tl!("Choose Color…"));
+            auto.add_response(&format!("{prefix}.native"), &response, tl!("Choose color with system picker"));
+            if response.clicked() {
+                draft.open_native(hooks);
             }
         });
-    });
-    for (id, label, scale, suffix) in [("hue", "Hue", 360.0, "°"), ("saturation", "Saturation", 100.0, "%"), ("brightness", "Brightness", 100.0, "%")] {
-        let field = match id {
-            "hue" => &mut draft.hue,
-            "saturation" => &mut draft.saturation,
-            _ => &mut draft.brightness,
-        };
-        let mut value = *field * scale;
-        // Format the display without rounding the stored value or an entered hex color.
-        let response = ui.add(egui::Slider::new(&mut value, 0.0..=scale).text(label).suffix(suffix).custom_formatter(|v, _| format!("{v:.0}")));
-        auto.add_response(&format!("{prefix}.{id}"), &response, label);
-        if response.changed() {
-            *field = value / scale;
-            draft.update_hex();
+        // Keep observing focus even while AppKit hides its panel. Reactivating that
+        // native window need not produce a focus event for eframe's main window.
+        if draft.native.is_some() {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(33));
         }
+        if draft.value().is_none() {
+            ui.colored_label(ui.visuals().error_fg_color, tl!("Enter six hex digits, for example FF80C0."));
+        }
+        return;
     }
+    if let Some(error) = &draft.native_error {
+        ui.colored_label(ui.visuals().error_fg_color, crate::i18n::fmt(tl!("System color picker unavailable: {error}"), &[("error", error)]));
+    }
+    // Match FilmCraft's other opaque sRGB controls without converting label bytes
+    // through the linear floating-point representation used by effect parameters.
+    let [r, g, b] = draft.preview_rgb();
+    let mut color = Color32::from_rgb(r, g, b);
+    let picker = ui.push_id(prefix, |ui| egui::color_picker::color_picker_color32(ui, &mut color, egui::color_picker::Alpha::Opaque));
+    auto.add_response(&format!("{prefix}.picker"), &picker.response, tl!("Color picker"));
+    if picker.inner {
+        draft.rgb = [color.r(), color.g(), color.b()];
+        draft.hex = HexColor(draft.rgb).hex().trim_start_matches('#').to_string();
+    }
+    hex_field(ui, auto, prefix, draft);
     if draft.value().is_none() {
-        ui.colored_label(ui.visuals().error_fg_color, "Enter six hex digits, for example FF80C0.");
+        ui.colored_label(ui.visuals().error_fg_color, tl!("Enter six hex digits, for example FF80C0."));
     }
 }
 
-fn wheel(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: &mut ColorDraft) {
-    let (rect, response) = ui.allocate_exact_size(vec2(200.0, 200.0), Sense::click_and_drag());
-    auto.add_response(&format!("{prefix}.wheel"), &response, "Color wheel");
-    let center = rect.center();
-    let radius = 94.0;
-    let mut mesh = egui::Mesh::default();
-    for ring in 0..=16_u32 {
-        let saturation = ring as f32 / 16.0;
-        for step in 0..=96_u32 {
-            let h = step as f32 / 96.0;
-            let angle = h * std::f32::consts::TAU;
-            mesh.colored_vertex(center + vec2(angle.cos(), angle.sin()) * radius * saturation, hsv_color(h, saturation, 1.0));
-            if ring > 0 && step > 0 {
-                let current = ring * 97 + step;
-                mesh.add_triangle(current - 98, current - 97, current);
-                mesh.add_triangle(current - 98, current, current - 1);
+fn preview_and_hex(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: &mut ColorDraft) {
+    let [r, g, b] = draft.preview_rgb();
+    let color = Color32::from_rgb(r, g, b);
+    let (rect, _) = ui.allocate_exact_size(vec2(68.0, 48.0), Sense::hover());
+    ui.painter().rect_filled(rect, 4.0, color);
+    ui.painter().rect_stroke(rect, 4.0, Stroke::new(1.0, ui.visuals().text_color()), egui::StrokeKind::Inside);
+    hex_field(ui, auto, prefix, draft);
+}
+
+fn hex_field(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: &mut ColorDraft) {
+    ui.label(tl!("Hex"));
+    let response = ui.add(egui::TextEdit::singleline(&mut draft.hex).font(egui::TextStyle::Monospace).desired_width(58.0).char_limit(7));
+    auto.add_response(&format!("{prefix}.hex"), &response, tl!("Hex color"));
+    if response.changed() {
+        if let Some(hex) = draft.hex.strip_prefix('#') {
+            draft.hex = hex.to_string();
+        }
+        if let Some(color) = draft.value() {
+            draft.rgb = color.0;
+            if let Some(session) = &draft.native {
+                if let Err(error) = session.set_color(color.0) {
+                    draft.native_error = Some(error);
+                    draft.close_native();
+                } else {
+                    draft.native_last = Some(color.0);
+                }
             }
         }
     }
-    ui.painter().add(egui::Shape::mesh(mesh));
-    if (response.clicked() || response.dragged())
-        && let Some(pointer) = response.interact_pointer_pos()
-    {
-        let delta = pointer - center;
-        if delta.length() > 0.0 {
-            draft.hue = (delta.y.atan2(delta.x) / std::f32::consts::TAU).rem_euclid(1.0);
-        }
-        draft.saturation = (delta.length() / radius).clamp(0.0, 1.0);
-        draft.update_hex();
-    }
-    let angle = draft.hue * std::f32::consts::TAU;
-    let selected = center + vec2(angle.cos(), angle.sin()) * radius * draft.saturation;
-    ui.painter().circle_stroke(selected, 5.0, Stroke::new(3.0, Color32::BLACK));
-    ui.painter().circle_stroke(selected, 5.0, Stroke::new(1.0, Color32::WHITE));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn wheel_uses_srgb_saturation_and_round_trips_channels() {
-        assert_eq!(hsv_color(0.0, 0.5, 1.0), Color32::from_rgb(255, 128, 128));
-        for r in (0..=255).step_by(17) {
-            for g in (0..=255).step_by(17) {
-                for b in (0..=255).step_by(17) {
-                    let mut draft = ColorDraft::new([r, g, b]);
-                    draft.update_hex();
-                    assert_eq!(draft.value(), Some(HexColor([r, g, b])));
-                }
-            }
-        }
+    fn legacy_drafts_keep_exact_srgb_bytes_without_hsv_conversion() {
+        let draft: ColorDraft = serde_json::from_value(serde_json::json!({"hex":"12ABCD","hue":0.2,"saturation":1.0,"brightness":0.8})).unwrap();
+        assert_eq!(draft.value(), Some(HexColor([18, 171, 205])));
+        assert!(draft.native.is_none());
     }
 }

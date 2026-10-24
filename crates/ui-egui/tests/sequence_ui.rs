@@ -30,7 +30,7 @@ fn custom_marker_properties_preserve_presets_and_commit_once() {
     d.click("timeline.markerMenu.label");
     assert_eq!(d.ids("timeline.markerMenu.color.").len(), filmcraft_project::Label::ALL.len());
     d.click("timeline.markerMenu.customColor");
-    assert!(!d.ids("markerColor.wheel").is_empty());
+    assert!(!d.ids("markerColor.picker").is_empty());
     d.click("markerColor.hex");
     d.ok("ui.key", json!({"key":"Cmd+A"}));
     d.ok("ui.type", json!({"text":"#FF80C0"}));
@@ -39,7 +39,7 @@ fn custom_marker_properties_preserve_presets_and_commit_once() {
     d.snapshot("marker-color-picker", "markerColor.");
     d.click("markerColor.add");
     assert_eq!(d.app().session.project.custom_colors, vec![filmcraft_project::HexColor([255, 128, 192])]);
-    assert!(d.ids("markerColor.wheel").is_empty(), "the wheel is not embedded in the marker window");
+    assert!(d.ids("markerColor.picker").is_empty(), "the picker is not embedded in the marker window");
     assert_eq!(d.ids("markerProperties.preset.").len(), filmcraft_project::Label::ALL.len());
     let with_palette = d.app().session.project.to_json();
     d.click("markerProperties.author");
@@ -82,14 +82,15 @@ fn custom_marker_cancel_and_desaturation_do_not_edit_the_project() {
     d.right_marker(id, false);
     d.click("timeline.markerMenu.properties");
     d.click("markerProperties.addColor");
-    // A wheel drag changes hue/saturation, but the project remains unchanged until Apply.
-    let elements = d.ok("ui.elements", json!({"prefix":"markerColor.wheel"}));
+    // Click the established picker's saturation/value square near its white corner.
+    // Preview changes only the draft until confirmation.
+    let elements = d.ok("ui.elements", json!({"prefix":"markerColor.picker"}));
     let rect = elements[0]["rect"].as_array().unwrap();
     let x = rect[0].as_f64().unwrap();
     let y = rect[1].as_f64().unwrap();
-    d.ok("ui.click", json!({"x":x+100.0,"y":y+100.0}));
+    d.ok("ui.click", json!({"x":x+2.0,"y":y+60.0}));
     d.frames(2);
-    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "FFFFFF");
+    assert_ne!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "FF0000");
     assert_eq!(d.app().session.project.to_json(), before);
     d.click("markerColor.cancel");
     d.click("markerProperties.cancel");
@@ -125,6 +126,37 @@ fn custom_clip_picker_reuses_the_project_palette_and_is_undoable() {
     d.click("markerProperties.custom.#12ABCD");
     d.click("markerProperties.apply");
     assert_eq!(d.app().session.active_sequence().unwrap().markers.iter().find(|m| m.id.0 == marker).unwrap().custom_color, expected);
+}
+
+#[test]
+fn marker_editor_does_not_overwrite_newer_marker_edits() {
+    let mut d = Driver::demo();
+    let probe = NativeProbe::install(&mut d);
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.add", json!({"frame":30,"name":"Original"}))["marker"].as_u64().unwrap();
+    let other = d.exec("markers.add", json!({"frame":90}))["marker"].as_u64().unwrap();
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.set_text("markerProperties.name", "Unsaved draft");
+    d.exec("markers.edit", json!({"marker":other,"name":"Unrelated edit"}));
+    d.frames(2);
+    assert!(d.app().ui.marker_properties.is_some(), "unrelated marker edits must not discard the draft");
+    d.click("markerProperties.addColor");
+    assert_eq!(probe.opens.get(), 1);
+    d.exec("markers.edit", json!({"marker":marker,"name":"Newer edit","comment":"Keep this"}));
+    let updated = d.app().session.project.to_json();
+    let history = d.app().session.history.undo.len();
+    d.frames(3);
+    assert!(d.app().ui.marker_properties.is_none(), "a changed marker must invalidate its old draft");
+    assert_eq!(probe.drops.get(), 1, "invalidating the draft also releases its native color session");
+    assert_eq!(d.app().session.project.to_json(), updated);
+    assert_eq!(d.app().session.history.undo.len(), history);
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().name, "Newer edit");
+    d.exec("markers.delete", json!({"marker":marker}));
+    d.frames(2);
+    assert!(d.app().ui.marker_properties.is_none(), "deleted markers must invalidate their drafts too");
 }
 
 #[test]
@@ -259,6 +291,256 @@ fn marker_panel_search_selection_filters_and_palette_manager() {
     d.double_click(&format!("markers.row.{source}"));
     d.frames(3);
     assert!(d.app().ui.marker_properties.is_some());
+}
+
+#[derive(Debug)]
+struct NativeProbeSession {
+    state: std::rc::Rc<std::cell::Cell<filmcraft_ui_egui::widgets::color_picker::NativeColorState>>,
+    drops: std::rc::Rc<std::cell::Cell<usize>>,
+}
+impl filmcraft_ui_egui::widgets::color_picker::NativeColorSession for NativeProbeSession {
+    fn poll(&self) -> Result<filmcraft_ui_egui::widgets::color_picker::NativeColorState, String> {
+        Ok(self.state.get())
+    }
+    fn set_color(&self, color: [u8; 3]) -> Result<(), String> {
+        self.state.set(filmcraft_ui_egui::widgets::color_picker::NativeColorState { color: Some(color), open: true });
+        Ok(())
+    }
+}
+impl Drop for NativeProbeSession {
+    fn drop(&mut self) {
+        self.drops.set(self.drops.get() + 1);
+    }
+}
+struct NativeProbe {
+    state: std::rc::Rc<std::cell::Cell<filmcraft_ui_egui::widgets::color_picker::NativeColorState>>,
+    drops: std::rc::Rc<std::cell::Cell<usize>>,
+    opens: std::rc::Rc<std::cell::Cell<usize>>,
+}
+impl NativeProbe {
+    fn install(d: &mut Driver) -> Self {
+        use filmcraft_ui_egui::widgets::color_picker::{NativeColorSession, NativeColorState};
+        use std::{cell::Cell, rc::Rc};
+        let probe =
+            Self { state: Rc::new(Cell::new(NativeColorState { color: None, open: false })), drops: Rc::new(Cell::new(0)), opens: Rc::new(Cell::new(0)) };
+        let (state, drops, opens) = (probe.state.clone(), probe.drops.clone(), probe.opens.clone());
+        d.harness.state_mut().hooks.pick_color = Some(Box::new(move |color| {
+            opens.set(opens.get() + 1);
+            state.set(NativeColorState { color: Some(color), open: true });
+            Ok(Rc::new(NativeProbeSession { state: state.clone(), drops: drops.clone() }) as Rc<dyn NativeColorSession>)
+        }));
+        probe
+    }
+    fn choose(&self, color: [u8; 3]) {
+        self.state.set(filmcraft_ui_egui::widgets::color_picker::NativeColorState { color: Some(color), open: true });
+    }
+}
+
+#[test]
+fn adding_a_marker_keeps_creation_immediate_without_opening_editors() {
+    let mut d = Driver::demo();
+    let probe = NativeProbe::install(&mut d);
+    d.exec("markers.clearAll", json!({}));
+    d.ok("ui.set", json!({"focused":"Timeline"}));
+    d.ok("ui.key", json!({"key":"M"}));
+    d.frames(3);
+    assert_eq!(d.app().session.active_sequence().unwrap().markers.len(), 1);
+    assert!(d.app().ui.marker_properties.is_none());
+    assert!(d.app().ui.custom_label_color.is_none());
+    assert_eq!(probe.opens.get(), 0, "creation must not open the native picker");
+    let marker = d.app().session.active_sequence().unwrap().markers[0].id.0;
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    assert!(d.app().ui.marker_properties.is_some());
+    assert_eq!(probe.opens.get(), 0, "editing presets does not open custom color selection");
+    d.click("markerProperties.addColor");
+    assert_eq!(probe.opens.get(), 1);
+}
+
+#[test]
+fn shared_picker_preserves_exact_hex_and_incomplete_input_until_confirmation() {
+    let mut d = Driver::demo();
+    let marker = d.exec("markers.add", json!({"frame":30,"color":"#010203"}))["marker"].as_u64().unwrap();
+    let before = d.app().session.project.to_json();
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    d.frames(12);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "010203");
+    d.set_text("markerColor.hex", "01");
+    d.frames(12);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "01");
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.set_text("markerColor.hex", "12ABCD");
+    d.frames(12);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().value(), Some(filmcraft_project::HexColor([18, 171, 205])));
+    d.click("markerColor.cancel");
+    d.click("markerProperties.cancel");
+    assert_eq!(d.app().session.project.to_json(), before);
+}
+
+#[test]
+fn marker_and_palette_controls_translate_without_changing_automation_ids() {
+    let mut d = Driver::demo();
+    let marker = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    d.harness.state_mut().ui.language = filmcraft_ui_egui::i18n::Language::Es;
+    d.frames(3);
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    let labels = d.ok("ui.elements", json!({"prefix":"markerProperties.author"}));
+    assert_eq!(labels[0]["label"], "Autor");
+    d.click("markerProperties.addColor");
+    let labels = d.ok("ui.elements", json!({"prefix":"markerColor.picker"}));
+    assert_eq!(labels[0]["label"], "Selector de color");
+    d.click("markerColor.cancel");
+    d.click("markerProperties.cancel");
+    d.ok("ui.panel.show", json!({"panel":"Markers"}));
+    d.frames(3);
+    d.click("markers.manageColors");
+    d.click("palette.add");
+    let labels = d.ok("ui.elements", json!({"prefix":"palette.save"}));
+    assert_eq!(labels[0]["label"], "Guardar color");
+    d.click("palette.cancelEdit");
+    d.click("palette.close");
+    d.harness.state_mut().ui.language = filmcraft_ui_egui::i18n::Language::En;
+    d.frames(1);
+}
+
+#[test]
+fn native_marker_color_preview_cancel_and_undo_preserve_project_ownership() {
+    let mut d = Driver::demo();
+    let probe = NativeProbe::install(&mut d);
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.add", json!({"frame":30,"color":"Blue"}))["marker"].as_u64().unwrap();
+    let before = d.app().session.project.to_json();
+    let history = d.app().session.history.undo.len();
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    assert_eq!(probe.opens.get(), 1);
+    assert!(d.ids("markerColor.picker").is_empty());
+    assert!(!d.ids("markerColor.native").is_empty());
+    probe.choose([18, 171, 205]);
+    d.frames(3);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "12ABCD");
+    assert_eq!(d.app().session.project.to_json(), before, "native color changes are draft-only");
+    d.set_text("markerColor.hex", "123456");
+    assert_eq!(probe.state.get().color, Some([18, 52, 86]), "typed hex updates the open system picker");
+    d.set_text("markerColor.hex", "12");
+    d.frames(3);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "12", "polling must not erase incomplete hex input");
+    d.click("markerColor.native");
+    assert_eq!(probe.opens.get(), 2);
+    assert_eq!(probe.drops.get(), 1);
+    assert_eq!(probe.state.get().color, Some([18, 52, 86]), "reopening with incomplete hex must retain the last valid color");
+    d.frames(3);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "12");
+    d.click("markerColor.cancel");
+    assert_eq!(probe.drops.get(), 2);
+    d.click("markerProperties.cancel");
+    assert_eq!(d.app().session.project.to_json(), before);
+    assert_eq!(d.app().session.history.undo.len(), history);
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    probe.choose([18, 171, 205]);
+    d.frames(3);
+    d.click("markerColor.add");
+    assert_eq!(probe.drops.get(), 3);
+    d.click("markerProperties.apply");
+    assert_eq!(d.app().session.active_sequence().unwrap().markers[0].custom_color, Some(filmcraft_project::HexColor([18, 171, 205])));
+    assert_eq!(d.app().session.history.undo.len(), history + 2, "one palette add and one marker apply");
+    d.exec("edit.undo", json!({}));
+    d.exec("edit.undo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    d.exec("file.openDemoProject", json!({}));
+    d.frames(3);
+    assert_eq!(probe.drops.get(), 4, "switching projects releases the native picker");
+    assert!(d.app().ui.marker_properties.is_none());
+}
+
+#[test]
+fn native_clip_and_palette_colors_keep_confirmation_and_close_the_panel() {
+    let mut d = Driver::demo();
+    let probe = NativeProbe::install(&mut d);
+    let clip = d.app().session.active_sequence().unwrap().video_tracks[0].items[0].id;
+    d.exec("timeline.select", json!({"clips":[clip.0]}));
+    let before = d.app().session.project.to_json();
+    d.ok("ui.click", json!({"id":format!("timeline.clip.{}",clip.0),"button":"right"}));
+    d.frames(3);
+    d.click("timeline.clipMenu.edit.label");
+    d.click("timeline.clipMenu.label.addColor");
+    probe.choose([18, 171, 205]);
+    d.frames(3);
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.click("labelColor.apply");
+    assert_eq!(probe.drops.get(), 1);
+    assert_eq!(d.app().session.active_sequence().unwrap().find_item(clip).unwrap().1.custom_label_color, Some(filmcraft_project::HexColor([18, 171, 205])));
+    d.exec("edit.undo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.ok("ui.panel.show", json!({"panel":"Markers"}));
+    d.frames(3);
+    d.click("markers.manageColors");
+    d.click("palette.add");
+    probe.choose([17, 34, 51]);
+    d.frames(3);
+    d.click("palette.cancelEdit");
+    assert_eq!(probe.drops.get(), 2);
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.click("palette.add");
+    probe.choose([17, 34, 51]);
+    d.frames(3);
+    d.set_text("palette.name", "Review");
+    d.click("palette.save");
+    assert_eq!(probe.drops.get(), 3);
+    assert_eq!(d.app().session.project.custom_color_names[&filmcraft_project::HexColor([17, 34, 51])], "Review");
+    d.exec("edit.undo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), before);
+}
+
+#[test]
+fn native_panel_hiding_keeps_its_draft_until_confirmation_or_cancel() {
+    use filmcraft_ui_egui::widgets::color_picker::NativeColorState;
+    let mut d = Driver::demo();
+    let probe = NativeProbe::install(&mut d);
+    let marker = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    let before = d.app().session.project.to_json();
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    probe.state.set(NativeColorState { color: Some([18, 171, 205]), open: false });
+    d.frames(4);
+    assert_eq!(probe.opens.get(), 1, "hiding must not automatically reopen the panel");
+    assert_eq!(probe.drops.get(), 0, "a hidden panel can return when the app activates");
+    probe.choose([17, 34, 51]);
+    d.frames(3);
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().color_editor.as_ref().unwrap().hex, "112233");
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.click("markerColor.cancel");
+    assert_eq!(probe.drops.get(), 1);
+    d.click("markerProperties.cancel");
+    assert_eq!(d.app().session.project.to_json(), before);
+}
+
+#[test]
+fn failed_native_picker_keeps_the_shared_color_editor_available() {
+    let mut d = Driver::demo();
+    d.harness.state_mut().hooks.pick_color = Some(Box::new(|_| Err("Test picker unavailable".into())));
+    let marker = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    d.right_marker(marker, false);
+    d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.addColor");
+    assert!(!d.ids("markerColor.picker").is_empty());
+    d.set_text("markerColor.hex", "123456");
+    d.click("markerColor.add");
+    d.click("markerProperties.apply");
+    assert_eq!(
+        d.app().session.active_sequence().unwrap().markers.iter().find(|m| m.id.0 == marker).unwrap().custom_color,
+        Some(filmcraft_project::HexColor([18, 52, 86]))
+    );
 }
 
 impl Driver {
@@ -990,6 +1272,46 @@ fn timeline_marker_label_edits_only_the_clicked_marker_and_is_undoable() {
     assert_eq!(serde_json::to_value(d.app().session.active_sequence().unwrap()).unwrap(), serde_json::to_value(&before).unwrap());
     d.exec("edit.redo", json!({}));
     assert_eq!(serde_json::to_value(d.app().session.active_sequence().unwrap()).unwrap(), serde_json::to_value(&expected).unwrap());
+}
+
+#[test]
+fn range_marker_end_flags_keep_their_owner_in_timeline_and_monitors() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let point = d.exec("markers.add", json!({"frame":10,"name":"Point"}))["marker"].as_u64().unwrap();
+    let range = d.exec("markers.addRange", json!({"frame":30,"durationFrames":48,"name":"Split range","color":"#AB56CD"}))["marker"].as_u64().unwrap();
+    assert!(d.ids(&format!("timeline.markerEnd.{point}")).is_empty());
+    assert!(d.ids(&format!("program.markerEnd.{point}")).is_empty());
+    d.snapshot("range-marker-timeline", "timeline.marker");
+    d.snapshot("range-marker-program", "program.scrubBar");
+    for (panel, menu) in [("timeline", "timeline.markerMenu.properties"), ("program", "monitor.markerMenu.properties")] {
+        d.ok("ui.click", json!({"id":format!("{panel}.markerEnd.{range}"),"button":"right"}));
+        d.frames(3);
+        d.click(menu);
+        assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, range);
+        d.click("markerProperties.cancel");
+    }
+    // A zoomed ruler still shows the right half when the range's start is offscreen.
+    let seq = d.app().session.active_sequence().unwrap();
+    let marker = seq.markers.iter().find(|m| m.id.0 == range).unwrap();
+    let middle = (marker.start.0 as f64 + marker.duration.0 as f64 / 2.0) / seq.duration().0 as f64;
+    d.harness.state_mut().ui.program.time_zoom = Some([middle, 1.0]);
+    d.frames(3);
+    assert!(d.ids(&format!("program.marker.{range}")).is_empty());
+    assert!(!d.ids(&format!("program.markerEnd.{range}")).is_empty());
+    d.snapshot("range-marker-program-clipped", "program.scrubBar");
+    d.exec("source.open", json!({"item":5}));
+    let source = d.exec("markers.add", json!({"target":"source","time":filmcraft_time::TICKS_PER_SECOND,"durationFrames":48,"name":"Source range"}))["marker"]
+        .as_u64()
+        .unwrap();
+    d.frames(3);
+    d.snapshot("range-marker-source", "source.scrubBar");
+    d.ok("ui.click", json!({"id":format!("source.markerEnd.{source}"),"button":"right"}));
+    d.frames(3);
+    d.click("monitor.markerMenu.properties");
+    let draft = d.app().ui.marker_properties.as_ref().unwrap();
+    assert_eq!(draft.marker, source);
+    assert_eq!(draft.owner, filmcraft_ui_egui::panels::marker_properties::Owner::Source(5));
 }
 
 #[test]

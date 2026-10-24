@@ -442,10 +442,9 @@ mod tests {
         assert!(missing.is_empty(), "untranslated menu labels: {missing:#?}");
     }
 
-    /// The core menus every other catalog must cover: the entries of the menus-only Ukrainian
-    /// catalog, which `ukrainian_entries_cover_the_original_menu_catalog` keeps to menu labels (and
-    /// the native macOS Settings menu). Brazilian Portuguese played this role while it was
-    /// menus-only.
+    /// The shared translation baseline: the Ukrainian catalog's original menus and the marker /
+    /// palette controls added across all catalogs. Additional entries must name a valid source
+    /// string, as checked by `ukrainian_entries_cover_menus_and_shared_controls`.
     fn core_menu_labels() -> Vec<String> {
         let (entries, _) = catalog::parse_entries(include_str!("uk.tsv"));
         entries.into_iter().map(|(_, en, _)| en).collect()
@@ -1030,13 +1029,14 @@ mod tests {
     }
 
     #[test]
-    fn ukrainian_entries_cover_the_original_menu_catalog() {
+    fn ukrainian_entries_cover_menus_and_shared_controls() {
         let app = crate::FilmcraftApp::new(filmcraft_engine::Session::default());
         let items = crate::menus::menu_items(&app);
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
-        let (entries, _) = catalog::parse_entries(include_str!("uk.tsv"));
-        for (_, en, _) in entries {
-            assert!(known(&en) || en == "Settings", "not a menu label: {en}");
+        let (entries, errors) = catalog::parse_entries(include_str!("uk.tsv"));
+        assert!(errors.is_empty(), "{errors:?}");
+        for (ctx, en, _) in entries {
+            assert!(ctx.is_empty() && (known(&en) || en == "Settings" || Language::Es.has(&en)), "unknown Ukrainian source: {ctx:?} {en:?}");
         }
         for en in crate::menus::MENUS.into_iter().chain(["Audio", "Settings"]) {
             assert_ne!(Language::Uk.tr(en), en, "untranslated Ukrainian menu: {en}");
@@ -1044,15 +1044,19 @@ mod tests {
     }
 
     /// German covers at least the core menus (`core_menu_labels`, the top-level menus and the native
-    /// macOS app menu); every entry must still be a menu label.
+    /// macOS app menu); additional interface entries must have a Spanish source counterpart.
     #[test]
-    fn german_entries_cover_the_original_menu_catalog() {
+    fn german_entries_cover_menus_and_shared_controls() {
         let app = crate::FilmcraftApp::new(filmcraft_engine::Session::default());
         let items = crate::menus::menu_items(&app);
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
-        let (entries, _) = catalog::parse_entries(include_str!("de.tsv"));
-        for (_, en, _) in entries {
-            assert!(known(&en) || crate::menus::NATIVE_APP_MENU.contains(&en.as_str()), "not a menu label: {en}");
+        let (entries, errors) = catalog::parse_entries(include_str!("de.tsv"));
+        assert!(errors.is_empty(), "{errors:?}");
+        for (ctx, en, _) in entries {
+            assert!(
+                ctx.is_empty() && (known(&en) || crate::menus::NATIVE_APP_MENU.contains(&en.as_str()) || Language::Es.has(&en)),
+                "unknown German source: {ctx:?} {en:?}"
+            );
         }
         for en in core_menu_labels() {
             assert!(Language::De.has(&en), "missing German menu label: {en}");
@@ -1095,13 +1099,14 @@ mod tests {
     }
 
     #[test]
-    fn russian_entries_cover_the_original_menu_catalog() {
+    fn russian_entries_cover_menus_and_shared_controls() {
         let app = crate::FilmcraftApp::new(filmcraft_engine::Session::default());
         let items = crate::menus::menu_items(&app);
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
-        let (entries, _) = catalog::parse_entries(include_str!("ru.tsv"));
-        for (_, en, _) in entries {
-            assert!(known(&en) || en == "Settings", "not a menu label: {en}");
+        let (entries, errors) = catalog::parse_entries(include_str!("ru.tsv"));
+        assert!(errors.is_empty(), "{errors:?}");
+        for (ctx, en, _) in entries {
+            assert!(ctx.is_empty() && (known(&en) || en == "Settings" || Language::Es.has(&en)), "unknown Russian source: {ctx:?} {en:?}");
         }
         for en in core_menu_labels() {
             assert!(Language::Ru.has(&en), "missing Russian menu label: {en}");
@@ -1113,7 +1118,7 @@ mod tests {
 
     /// Indonesian covers the whole interface (the Spanish catalog's entries and the native macOS
     /// Settings menu), but, like Japanese and French, the tests require only the core menus (the
-    /// menus-only Ukrainian catalog, the top-level menus and the native macOS Settings menu), so
+    /// shared Ukrainian baseline, the top-level menus and the native macOS Settings menu), so
     /// strings added later show in English until they are translated. Every entry must still have a
     /// Spanish counterpart: a renamed or removed source would otherwise leave a dead entry.
     #[test]

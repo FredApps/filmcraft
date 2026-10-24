@@ -3568,3 +3568,55 @@
 	Export the labels to a preset file…	Exporter les étiquettes dans un fichier de paramètre prédéfini…
 	Show the presets folder	Afficher le dossier des paramètres prédéfinis
 	Delete this preset	Supprimer ce paramètre prédéfini
+
+# Marker editing and shared custom colors
+	A range marker needs a positive duration	Un marqueur de plage doit avoir une durée positive
+	Add Custom Color	Ajouter une couleur personnalisée
+	Add and apply	Ajouter et appliquer
+	Add color	Ajouter la couleur
+	Add custom color	Ajouter une couleur personnalisée
+	Add custom color…	Ajouter une couleur personnalisée…
+	Author	Auteur
+	Chapter	Chapitre
+	Choose Color…	Choisir une couleur…
+	Choose color with system picker	Choisir une couleur avec le sélecteur système
+	Color picker	Sélecteur de couleur
+	Color selected markers	Changer la couleur des marqueurs sélectionnés
+	Custom Color…	Couleur personnalisée…
+	Delete Marker	Supprimer le marqueur
+	Delete selected markers	Supprimer les marqueurs sélectionnés
+	Edit Custom Color	Modifier la couleur personnalisée
+	Edit Marker	Modifier le marqueur
+	Edit Marker…	Modifier le marqueur…
+	Edit color	Modifier la couleur
+	Editing or removing a swatch leaves assigned colors unchanged.	Modifier ou supprimer un échantillon ne change pas les couleurs déjà attribuées.
+	Enter six hex digits, for example FF80C0.	Saisissez six chiffres hexadécimaux, par exemple FF80C0.
+	Hex	Hex
+	Hex color	Couleur hexadécimale
+	Manage Colors	Gérer les couleurs
+	Manage Colors…	Gérer les couleurs…
+	Marker owner is unavailable	L’élément auquel appartient le marqueur est indisponible
+	No markers	Aucun marqueur
+	No matching markers	Aucun marqueur correspondant
+	No saved colors	Aucune couleur enregistrée
+	No sequence open	Aucune séquence ouverte
+	No source clip open	Aucun clip source ouvert
+	Notes	Notes
+	Project Colors	Couleurs du projet
+	Range marker	Marqueur de plage
+	Remove saved color	Supprimer la couleur enregistrée
+	Save color	Enregistrer la couleur
+	Search markers	Rechercher des marqueurs
+	Search name, notes, author	Rechercher nom, notes ou auteur
+	Select all	Tout sélectionner
+	Select all visible markers	Sélectionner tous les marqueurs visibles
+	Sequence: {name}	Séquence : {name}
+	Source: {name}	Source : {name}
+	Source: {name} (shared source markers)	Source : {name} (marqueurs source partagés)
+	System color picker unavailable: {error}	Sélecteur de couleur système indisponible : {error}
+	Time is outside the supported range	Le temps est en dehors de la plage prise en charge
+	{count} selected	{count} sélectionnés
+	Remove Custom Color	Supprimer la couleur personnalisée
+	Edit Markers	Modifier les marqueurs
+	Delete Markers	Supprimer les marqueurs
+	Marker changed or was removed. Reopen it to continue.	Le marqueur a été modifié ou supprimé. Rouvrez-le pour continuer.
