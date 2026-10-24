@@ -138,7 +138,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let next = index.and_then(|i| i.checked_add(1)).and_then(|i| markers.get(i));
     let mut action = None;
     let modal = egui::Modal::new(egui::Id::new("marker-properties")).show(ctx, |ui| {
-        let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 880.0);
+        let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 680.0);
         let max_height = (ctx.content_rect().height() - 110.0).max(100.0);
         ui.set_width(width);
         ui.heading(format!("{} @ {}", tl!("Edit Marker"), draft.time));
@@ -148,16 +148,16 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 16.0;
                 ui.vertical(|ui| {
-                    ui.set_width(width - 112.0);
-                    field_area(app, ui, &mut draft, width - 112.0, max_height);
+                    ui.set_width(width - 96.0);
+                    field_area(app, ui, &mut draft, width - 96.0, max_height);
                 });
                 ui.vertical(|ui| {
-                    ui.set_width(96.0);
+                    ui.set_width(80.0);
                     action = actions(app, ui, previous, next, true);
                 });
             });
         } else {
-            field_area(app, ui, &mut draft, width, (max_height - if width < 400.0 { 190.0 } else { 115.0 }).max(80.0));
+            field_area(app, ui, &mut draft, width, (max_height - if width < 400.0 { 150.0 } else { 85.0 }).max(80.0));
             ui.separator();
             action = actions(app, ui, previous, next, false);
         }
@@ -200,22 +200,33 @@ fn field_area(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, widt
     });
 }
 
+fn action_button(ui: &mut egui::Ui, label: &str, width: f32, enabled: bool, primary: bool) -> egui::Response {
+    ui.add_enabled(enabled, |ui: &mut egui::Ui| {
+        let text = if primary { egui::RichText::new(label).color(ui.visuals().selection.stroke.color) } else { egui::RichText::new(label) };
+        let mut button = egui::Button::new(text).corner_radius(14.0);
+        if primary {
+            button = button.fill(ui.visuals().selection.bg_fill);
+        }
+        ui.add_sized(vec2(width, 28.0), button)
+    })
+}
+
 fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>, next: Option<&Marker>, vertical: bool) -> Option<Action> {
     let mut action = None;
-    let width = if vertical { 96.0 } else { 128.0 };
     let mut buttons = |ui: &mut egui::Ui| {
+        let width = if vertical { 80.0 } else { 96.0 };
         for (id, label, value) in [("apply", tl!("Done"), Action::Done), ("cancel", tl!("Cancel"), Action::Cancel)] {
-            let response = ui.add_sized(vec2(width, 28.0), egui::Button::new(label));
+            let response = action_button(ui, label, width, true, id == "apply");
             app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
             if response.clicked() {
                 action = Some(value);
             }
             if vertical {
-                ui.add_space(if id == "apply" { 8.0 } else { 20.0 });
+                ui.add_space(if id == "apply" { 4.0 } else { 16.0 });
             }
         }
         for (id, label, marker) in [("previous", tl!("Previous"), previous), ("next", tl!("Next"), next)] {
-            let response = ui.add_enabled(marker.is_some(), egui::Button::new(label).min_size(vec2(width, 28.0)));
+            let response = action_button(ui, label, width, marker.is_some(), false);
             app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
             if response.clicked()
                 && let Some(marker) = marker
@@ -223,14 +234,11 @@ fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>,
                 action = Some(Action::Navigate(marker.clone()));
             }
             if vertical {
-                ui.add_space(8.0);
+                ui.add_space(4.0);
             }
         }
-        if vertical {
-            ui.add_space(8.0);
-        }
-        let response = ui.add_sized(vec2(width, 28.0), egui::Button::new(tl!("Delete Marker")));
-        app.auto.add_response("markerProperties.delete", &response, tl!("Delete Marker"));
+        let response = action_button(ui, tl!("Delete"), width, true, false);
+        app.auto.add_response("markerProperties.delete", &response, tl!("Delete"));
         if response.clicked() {
             action = Some(Action::Delete);
         }
@@ -240,8 +248,6 @@ fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>,
     } else {
         ui.horizontal_wrapped(&mut buttons);
     }
-    ui.add_space(8.0);
-    ui.small(tl!("Previous and Next save this marker."));
     action
 }
 
@@ -283,11 +289,6 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
     field_row(ui, tl!("Notes"), |ui| {
         let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8));
         app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
-    });
-    ui.add_space(6.0);
-    field_row(ui, tl!("Author"), |ui| {
-        let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
-        app.auto.add_response("markerProperties.author", &response, tl!("Author"));
     });
     ui.add_space(14.0);
     ui.group(|ui| {
@@ -373,6 +374,12 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
             }
         });
         app.auto.add_response("markerProperties.kind", &group.response, tl!("Type"));
+        ui.add_space(8.0);
+        ui.separator();
+        field_row(ui, tl!("Author"), |ui| {
+            let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
+            app.auto.add_response("markerProperties.author", &response, tl!("Author"));
+        });
     });
 }
 

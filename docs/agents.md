@@ -349,9 +349,9 @@ include `author` and the effective `color`.
 `markers.edit` also accepts `kind:"comment|chapter|segmentation|webLink|flashCue"`.
 The editor's visible Type radio group (`markerProperties.kind`, with choices
 `markerProperties.kind.<kind>`) applies type changes with the other fields in one Undo
-step. The wide form aligns labels beside broad Name, Notes and Author fields, with
-Time and Duration together, a grouped palette and vertical Type choices, and a side
-action column. Narrow windows move the actions below the scrolling form.
+step. The compact form follows Name, Time/Duration, Notes, then grouped Color and
+vertical Type choices. Author metadata follows the type-specific options. A narrow
+action column uses centered buttons; small windows move actions below the scrolling form.
 It retains the same sequence/source owner.
 
 Previous/Next (`markerProperties.previous`, `markerProperties.next`) save valid changes

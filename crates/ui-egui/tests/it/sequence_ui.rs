@@ -168,7 +168,7 @@ fn marker_editor_wide_form_and_small_window_keep_actions_accessible() {
     let notes = rect(&elements, "markerProperties.comment");
     let done = rect(&elements, "markerProperties.apply");
     assert!(name[2] > 400.0);
-    assert_eq!(author[2], name[2]);
+    assert!(author[2] > 400.0);
     assert!(author[1] > name[1] + name[3]);
     assert!(notes[3] > 70.0);
     assert!(done[0] > notes[0] + notes[2]);
