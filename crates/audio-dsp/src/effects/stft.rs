@@ -25,7 +25,7 @@ impl StftChannel {
     #[inline]
     pub(crate) fn tick(&mut self, x: f32, hop: usize, frame: &mut impl FnMut(&[f32], &mut [f32])) -> f32 {
         let n = self.input.len();
-        self.input[n - hop + self.pos] = x;
+        self.input[n - hop + self.pos] = finite_sample(x);
         let y = self.output[self.pos];
         self.pos += 1;
         if self.pos == hop {
@@ -50,8 +50,8 @@ impl StftChannel {
     ) -> (f32, f32) {
         debug_assert_eq!(a.pos, b.pos);
         let n = a.input.len();
-        a.input[n - hop + a.pos] = x.0;
-        b.input[n - hop + a.pos] = x.1;
+        a.input[n - hop + a.pos] = finite_sample(x.0);
+        b.input[n - hop + a.pos] = finite_sample(x.1);
         let y = (a.output[a.pos], b.output[a.pos]);
         a.pos += 1;
         b.pos = a.pos;
@@ -68,6 +68,13 @@ impl StftChannel {
         }
         y
     }
+}
+
+/// Invalid input is silence in its own channel. Sanitize before the shared complex FFT:
+/// a non-finite real or imaginary component would otherwise poison both channel spectra.
+#[inline]
+fn finite_sample(x: f32) -> f32 {
+    if x.is_finite() { x } else { 0.0 }
 }
 
 /// Stream `len` samples of every channel through its `StftChannel`, sample-major. At a frame
@@ -225,6 +232,38 @@ impl Spectral {
 mod tests {
     use super::*;
     use crate::testutil::Rng;
+
+    #[test]
+    fn non_finite_stft_input_does_not_contaminate_neighboring_channels() {
+        let (n, len) = (1024, 8192);
+        let mut rng = Rng::new(23);
+        let source: Vec<Vec<f32>> = (0..3).map(|_| (0..len).map(|_| rng.uniform()).collect()).collect();
+        // Cover both sides of a pair and the odd single-channel path, including a hop boundary.
+        for bad_channel in 0..3 {
+            for position in [0, n / 4 - 1, n + 17] {
+                for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+                    let render = |replacement: f32| {
+                        let mut audio = source.clone();
+                        audio[bad_channel][position] = replacement;
+                        let mut state = vec![StftChannel::new(n); 3];
+                        let mut spectral = Spectral::new(n, true);
+                        let mut channels: Vec<&mut [f32]> = audio.iter_mut().map(Vec::as_mut_slice).collect();
+                        stream(&mut state, &mut spectral, &mut channels, len, n / 4, 1.0 / (n as f32 * 2.0), &mut |_, _, _, _| {});
+                        audio
+                    };
+                    let actual = render(invalid);
+                    let control = render(0.0);
+                    for channel in 0..3 {
+                        for (sample, reference) in actual[channel].iter().zip(&control[channel]) {
+                            assert!(sample.is_finite(), "channel {channel}, invalid channel {bad_channel}");
+                            // Both paths run the same arithmetic after replacing the invalid input.
+                            assert_eq!(sample.to_bits(), reference.to_bits(), "channel {channel}, invalid channel {bad_channel}");
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn paired_channels_match_separate_ones_to_rounding() {
