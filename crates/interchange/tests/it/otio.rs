@@ -292,6 +292,54 @@ fn palette_collection(first: serde_json::Value, second: serde_json::Value) -> se
 }
 
 #[test]
+fn review_orphan_palette_names_do_not_hide_retained_names() {
+    use filmcraft_project::HexColor;
+    use serde_json::json;
+    let mut names = serde_json::Map::new();
+    for i in 0..70 {
+        names.insert(HexColor([0, 0, i]).hex(), json!("Orphan"));
+    }
+    names.insert("#FFFFFE".into(), json!("Later name"));
+    names.insert("#FFFFFF".into(), json!("Retained name"));
+    let doc = palette_collection(
+        json!({"custom_colors":["#FFFFFE"],"custom_color_names":{"#FFFFFE":"Original name"}}),
+        json!({"custom_colors":["#FFFFFF"],"custom_color_names":names}),
+    );
+    let (imp, _) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+    assert_eq!(imp.project.custom_color_names.len(), 2);
+    assert_eq!(imp.project.custom_color_names[&HexColor([255, 255, 254])], "Original name");
+    assert_eq!(imp.project.custom_color_names[&HexColor([255, 255, 255])], "Retained name");
+}
+
+#[test]
+fn review_generator_preset_labels_survive_otio_round_trip() {
+    let mut p = Project::new("Generator labels");
+    let s = sequence(&mut p, "Main", FrameRate::FPS_25, false);
+    for (index, (kind, label, custom)) in [
+        (Generator::BlackVideo, Label::Teal, None),
+        (Generator::BarsAndTone, Label::Magenta, filmcraft_project::HexColor::parse("#123456")),
+        (Generator::ColorMatte { color: [0.2, 0.4, 0.6, 1.0] }, Label::Mango, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let id = generator(&mut p, &format!("Generator {index}"), kind);
+        let item = p.item_mut(id).unwrap();
+        item.label = label;
+        item.custom_label_color = custom;
+        clip(&mut p, s, TrackKind::Video, 0, id, index as i64 * 25, 25, 0);
+    }
+    let (bytes, _) = filmcraft_interchange::export(&p, s, Format::Otio, &ExportOptions::default()).unwrap();
+    let (imp, _) = import(&bytes, Format::Otio, None).unwrap();
+    for original in p.items.values().filter(|i| i.as_media().is_some()) {
+        let restored = imp.project.items.values().find(|i| i.name == original.name).unwrap();
+        assert_eq!(restored.label, original.label, "{}", original.name);
+        assert_eq!(restored.custom_label_color, original.custom_label_color);
+        assert_eq!(restored.as_media().unwrap().media, original.as_media().unwrap().media);
+    }
+}
+
+#[test]
 fn review_collection_palettes_union_distinct_colors_and_preserve_first_names() {
     use filmcraft_project::HexColor;
     use serde_json::json;

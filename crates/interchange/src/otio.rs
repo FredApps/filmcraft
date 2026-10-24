@@ -234,7 +234,7 @@ impl Exp<'_, '_> {
                 "generator_kind": match g { Generator::ColorMatte { .. } => "SolidColor", Generator::BlackVideo => "black", Generator::BarsAndTone => "SMPTEBars", _ => "FilmCraftGenerator" },
                 "parameters": match g { Generator::ColorMatte { color } => json!({"color": color}), _ => json!({}) },
                 "available_range": avail,
-                "metadata": {"filmcraft": {"item": item.0, "generator": g, "info": m.info, "custom_label_color": self.p.item(item).and_then(|i| i.custom_label_color)}},
+                "metadata": {"filmcraft": {"item": item.0, "generator": g, "info": m.info, "label": self.p.item(item).map(|i| i.label), "custom_label_color": self.p.item(item).and_then(|i| i.custom_label_color)}},
             }),
             MediaRef::File { path } => {
                 let url = match &self.opts.relative_to {
@@ -430,7 +430,8 @@ impl Imp<'_, '_> {
             }
         }
         if let Some(names) = meta.and_then(|m| m.get("custom_color_names")).and_then(Value::as_object) {
-            for (key, value) in names.iter().take(64) {
+            // Palette membership bounds retained names to 64; orphan input entries consume no slots.
+            for (key, value) in names {
                 if let (Some(color), Some(name)) = (filmcraft_project::HexColor::parse(key), value.as_str())
                     && self.b.p.custom_colors.contains(&color)
                     && name.len() <= 128
