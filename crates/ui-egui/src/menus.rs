@@ -218,10 +218,10 @@ pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params:
         if id == "app.language.korean" && !crate::i18n::korean_font_available() {
             return Err("no Korean font is installed on this system (for example Malgun Gothic or Noto Sans CJK KR); the interface stays in English".into());
         }
-        if id == "app.language.lao" {
-            if let Some(message) = crate::i18n::lao_font_missing_message(crate::i18n::lao_font_available()) {
-                return Err(message.into());
-            }
+        if id == "app.language.lao"
+            && let Some(message) = crate::i18n::lao_font_missing_message(crate::i18n::lao_font_available())
+        {
+            return Err(message.into());
         }
         let language = match id {
             "app.language.japanese" => crate::i18n::Language::Ja,

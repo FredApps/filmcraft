@@ -123,6 +123,8 @@ pub fn work_area_at(seq: &Sequence, layout: &Layout, pos: Pos2) -> Option<Option
     } else {
         None
     })
+}
+
 /// The top of a transition's box on a track row: below the clip's name strip, and from the top of
 /// the track when it is compact (a short track would leave a sliver too thin to read or grab).
 pub fn transition_top(row: Rect) -> f32 {

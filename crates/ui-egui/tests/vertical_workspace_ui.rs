@@ -141,10 +141,7 @@ fn vertical_workspace_preset_registration_and_switching() {
 
     // Verify Vertical is now checked in the menu
     let menu_after = d.workspaces_menu();
-    assert!(
-        menu_after.iter().any(|(l, c)| l == "Vertical" && *c),
-        "Vertical must be checked in the menu: {menu_after:?}"
-    );
+    assert!(menu_after.iter().any(|(l, c)| l == "Vertical" && *c), "Vertical must be checked in the menu: {menu_after:?}");
 
     // 3. Verify core panels are present and docked in the layout
     assert!(d.shows(PanelKind::Program), "Program monitor must be present");
@@ -235,11 +232,7 @@ fn vertical_workspace_with_portrait_sequence() {
 
 #[test]
 fn responsive_vertical_layout_at_standard_resolutions() {
-    let resolutions = [
-        ("1080p", egui::vec2(1920.0, 1080.0)),
-        ("900p", egui::vec2(1600.0, 900.0)),
-        ("768p", egui::vec2(1366.0, 768.0)),
-    ];
+    let resolutions = [("1080p", egui::vec2(1920.0, 1080.0)), ("900p", egui::vec2(1600.0, 900.0)), ("768p", egui::vec2(1366.0, 768.0))];
 
     for (name, size) in resolutions {
         let data = data_dir(&format!("responsive_{name}"));
@@ -251,12 +244,7 @@ fn responsive_vertical_layout_at_standard_resolutions() {
         // The right Program Monitor must span the full available editor height
         // (excluding header bar and status bar, so > 80% of window height)
         let elements = d.ok("ui.elements", json!({"prefix": "program"}));
-        let pic = elements
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|e| e["id"] == json!("program.picture"))
-            .expect("program.picture should exist");
+        let pic = elements.as_array().unwrap().iter().find(|e| e["id"] == json!("program.picture")).expect("program.picture should exist");
 
         let h = pic["rect"][3].as_f64().unwrap_or(0.0);
         assert!(h > 150.0, "Program picture should have significant height in {name}: {h}");

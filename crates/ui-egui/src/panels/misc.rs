@@ -212,7 +212,6 @@ pub(crate) fn marker_owned_menu(
 
 pub fn markers(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     super::markers_panel::show(app, ui, rect);
-
 }
 
 pub fn info(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {

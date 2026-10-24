@@ -584,8 +584,7 @@ impl FilmcraftApp {
         let workspaces =
             session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| dock::WorkspacePrefs::load(&d.join(dock::WORKSPACES_FILE))).unwrap_or_default();
         let saved_language = i18n::Language::parse(&session.prefs.general.interface_language).unwrap_or_default();
-        let lao_missing = saved_language == i18n::Language::Lo
-            && i18n::lao_font_missing_message(i18n::lao_font_available()).is_some();
+        let lao_missing = saved_language == i18n::Language::Lo && i18n::lao_font_missing_message(i18n::lao_font_available()).is_some();
         let language = if lao_missing { i18n::Language::En } else { saved_language };
         Self {
             session,

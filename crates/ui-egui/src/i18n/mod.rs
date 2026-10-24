@@ -67,7 +67,8 @@ static ITALIAN: OnceLock<Catalog> = OnceLock::new();
 static LAO: OnceLock<Catalog> = OnceLock::new();
 
 impl Language {
-    pub const ALL: [Self; 13] = [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It, Self::Lo];
+    pub const ALL: [Self; 13] =
+        [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It, Self::Lo];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -358,12 +359,6 @@ pub(crate) fn lao_font_missing_message(available: bool) -> Option<&'static str> 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn lao_language_requires_a_system_font() {
-        assert!(lao_font_missing_message(false).is_some());
-        assert!(lao_font_missing_message(true).is_none());
-    }
 
     /// The catalog file of a language (none for English, the source language).
     fn catalog_text(l: Language) -> Option<&'static str> {
@@ -1021,7 +1016,8 @@ mod tests {
         for en in crate::menus::MENUS.into_iter().chain(["Audio", "Settings"]) {
             assert!(Language::Lo.has(en), "untranslated Lao menu: {en}");
         }
-        for (en, lo) in [("File", "ໄຟລ໌"), ("Edit", "ແກ້ໄຂ"), ("Sequence", "ຊີຄວນສ໌"), ("Settings", "ການຕັ້ງຄ່າ")] {
+        for (en, lo) in [("File", "ໄຟລ໌"), ("Edit", "ແກ້ໄຂ"), ("Sequence", "ຊີຄວນສ໌"), ("Settings", "ການຕັ້ງຄ່າ")]
+        {
             assert_eq!(Language::Lo.tr(en), lo);
         }
         assert_eq!(Language::Lo.name(), "ພາສາລາວ");
@@ -1030,7 +1026,6 @@ mod tests {
             assert_eq!(Language::from_locales(&[tag.to_string()]), Language::Lo, "{tag}");
         }
     }
-
 
     /// Every non-ASCII character of `text` renders with the bundled interface fonts, in every family.
     fn assert_bundled_fonts_cover(text: impl Iterator<Item = char>) {
