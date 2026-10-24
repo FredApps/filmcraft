@@ -107,6 +107,12 @@ Right-click a timeline or Markers-panel marker and choose **Edit Marker…**. Th
 edits time/duration, name, notes, author, type, and color. Existing presets are
 shown as swatches; project custom swatches are below them. Done makes one undoable marker
 edit; Cancel discards the marker draft.
+The compact form orders Name, Author, Time/Duration, scrolling Notes, then Color and
+marker types. Previous/Next save valid changes before opening the neighbouring marker;
+unchanged navigation adds no Undo step. Unchecked Duration saves a point marker even
+when its disabled field retains a draft value. Timecodes require complete numeric fields
+with colons; Done stays disabled until timing is valid. Text fields support normal
+clipboard shortcuts and local text Undo/Redo.
 
 The **+** square below the presets opens a separate color editor. macOS uses the native
 Colors panel; other hosts and native-picker failures reuse the established egui picker.
@@ -116,7 +122,8 @@ undoable operation) and selects it in the marker draft. Canceling the marker edi
 does not remove a deliberately saved palette color. The project stores at most 64 custom
 swatches shared by markers and clips; duplicate additions are no-ops. Used custom colors also appear for reuse.
 Marker/color dialogs belong to the opened project instance, close when that project is replaced,
-and are not restored from saved UI preferences. Edits and undo within the same project keep them open.
+and are not restored from saved UI preferences. Unrelated edits keep marker drafts open;
+editing or removing that marker elsewhere closes its stale draft rather than overwriting newer data.
 
 Markers and clips now share the existing 16 clip preset colors; clip RGB values and preset
 names are unchanged. Markers no longer collapse those names onto seven display colors.
@@ -132,8 +139,8 @@ offsets. Existing effect/graphics pickers retain their alpha/float/color-space s
 
 The same author and hex values are available to Source marker commands. Existing markers
 have an empty author; FilmCraft never infers authorship from the operating-system account.
-Projects (schema 16) retain marker properties and the project palette. Marker CSV reports
-and FilmCraft OTIO metadata retain individual marker authors and colors. OTIO also
+Projects (schema 17) retain marker properties, Web Link URLs and the project palette. Marker CSV reports
+and FilmCraft OTIO metadata retain individual marker authors, URLs and colors. OTIO also
 retains custom clip label colors and the palette in FilmCraft metadata. Other interchange exports warn when they cannot preserve those marker properties.
 Importing an OTIO document merges its saved swatches after the current project's swatches, omitting duplicates and respecting the 64-swatch limit.
 This does not add AVB marker import or Avid track-bound markers.

@@ -178,7 +178,35 @@ pub fn targets_source(app: &FilmcraftApp, params: &Value) -> bool {
 }
 
 /// Execute a UI or engine command by id.
-pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
+pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: Value) -> Result<Value, String> {
+    if ctx.text_edit_focused() && text_edit_command(id) {
+        match id {
+            "edit.copy" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestCopy),
+            "edit.cut" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestCut),
+            "edit.paste" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste),
+            _ => {
+                let (key, shift) = match id {
+                    "edit.selectAll" => (egui::Key::A, false),
+                    "edit.undo" => (egui::Key::Z, false),
+                    "edit.redo" => (egui::Key::Z, true),
+                    _ => (egui::Key::Delete, false),
+                };
+                let modifiers = if id == "edit.clear" { egui::Modifiers::NONE } else { egui::Modifiers { shift, ..egui::Modifiers::COMMAND } };
+                app.synthetic.push(egui::Event::ModifiersChanged(modifiers));
+                for pressed in [true, false] {
+                    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers });
+                }
+                app.synthetic.push(egui::Event::ModifiersChanged(egui::Modifiers::NONE));
+            }
+        }
+        ctx.request_repaint();
+        return Ok(Value::Null);
+    }
+    invoke_command(app, ctx, id, params)
+}
+
+/// Explicit commands from automation keep their engine semantics regardless of text focus.
+pub fn invoke_command(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
     if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
     }
@@ -693,6 +721,22 @@ pub const MENUS: [&str; 9] = ["File", "Edit", "Clip", "Sequence", "Markers", "Gr
 /// the catalogs like menu labels (`apps/filmcraft/src/native_menu.rs`).
 pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide FilmCraft", "Hide Others", "Quit FilmCraft"];
 
+pub(crate) fn text_edit_command(id: &str) -> bool {
+    matches!(id, "edit.copy" | "edit.cut" | "edit.paste" | "edit.selectAll" | "edit.undo" | "edit.redo" | "edit.clear")
+}
+
+pub(crate) fn menu_items_with_focus(app: &FilmcraftApp, ctx: &egui::Context) -> Vec<MenuItem> {
+    let mut items = menu_items(app);
+    if ctx.text_edit_focused() {
+        for item in &mut items {
+            if text_edit_command(&item.id) {
+                item.enabled = true;
+            }
+        }
+    }
+    items
+}
+
 pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
     let mut v = menu_items_for(&app.session);
     for it in &mut v {
@@ -905,7 +949,7 @@ pub fn external_commands() -> Vec<filmcraft_engine::shortcuts::CommandInfo> {
 /// Draw the in-window menu bar.
 pub fn menu_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
     ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("interface-language"), app.ui.language));
-    let items = menu_items(app);
+    let items = menu_items_with_focus(app, ui.ctx());
     // Draw Edit ▸ Label with the user's live palette, not the baked-in label colours.
     let labels = app.session.prefs.labels.clone();
     let ctx = ui.ctx().clone();

@@ -77,7 +77,7 @@ pub fn open(app: &mut FilmcraftApp, marker: &Marker) {
 }
 pub fn open_owned(app: &mut FilmcraftApp, marker: &Marker, owner: Owner) {
     let Some((_, rate, drop, _)) = owner.details(app) else { return };
-    let format = |ticks| filmcraft_time::format_time(ticks, rate, drop, filmcraft_time::TimeDisplay::Timecode, 48000);
+    let format = |ticks| filmcraft_time::format_time(ticks, rate, drop, filmcraft_time::TimeDisplay::Timecode, 48000).replace(';', ":");
     let time = format(marker.start);
     let duration = format(marker.duration);
     app.ui.marker_properties = Some(Draft {
@@ -117,7 +117,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if !Arc::ptr_eq(&draft.project, &app.session.project_instance) {
         return;
     }
-    let Some((title, _, _, mut markers)) = draft.owner.details(app) else {
+    let Some((title, rate, drop, mut markers)) = draft.owner.details(app) else {
         app.ui.status = tl!("Marker owner is unavailable").into();
         return;
     };
@@ -138,7 +138,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let next = index.and_then(|i| i.checked_add(1)).and_then(|i| markers.get(i));
     let mut action = None;
     let modal = egui::Modal::new(egui::Id::new("marker-properties")).show(ctx, |ui| {
-        let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 680.0);
+        let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 560.0);
         let max_height = (ctx.content_rect().height() - 110.0).max(100.0);
         ui.set_width(width);
         ui.heading(format!("{} @ {}", tl!("Edit Marker"), draft.time));
@@ -148,18 +148,19 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 16.0;
                 ui.vertical(|ui| {
-                    ui.set_width(width - 96.0);
-                    field_area(app, ui, &mut draft, width - 96.0, max_height);
+                    ui.set_width(width - 112.0);
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    field_area(app, ui, &mut draft, width - 112.0, max_height, rate);
                 });
                 ui.vertical(|ui| {
-                    ui.set_width(80.0);
-                    action = actions(app, ui, previous, next, true);
+                    ui.set_width(96.0);
+                    action = actions(app, ui, previous, next, true, valid_times(&draft, rate, drop));
                 });
             });
         } else {
-            field_area(app, ui, &mut draft, width, (max_height - if width < 400.0 { 150.0 } else { 85.0 }).max(80.0));
+            field_area(app, ui, &mut draft, width, (max_height - if width < 400.0 { 150.0 } else { 85.0 }).max(80.0), rate);
             ui.separator();
-            action = actions(app, ui, previous, next, false);
+            action = actions(app, ui, previous, next, false, valid_times(&draft, rate, drop));
         }
         if !draft.error.is_empty() {
             ui.colored_label(ui.visuals().error_fg_color, &draft.error);
@@ -191,11 +192,11 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     app.ui.marker_properties = Some(draft);
 }
 
-fn field_area(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, width: f32, height: f32) {
+fn field_area(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, width: f32, height: f32, rate: filmcraft_time::FrameRate) {
     ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::top_down(egui::Align::Min), |ui| {
         egui::ScrollArea::vertical().id_salt("marker-fields").max_height(height).show(ui, |ui| {
             ui.set_width(width - 12.0);
-            fields(app, ui, draft);
+            fields(app, ui, draft, rate);
         });
     });
 }
@@ -211,12 +212,13 @@ fn action_button(ui: &mut egui::Ui, label: &str, width: f32, enabled: bool, prim
     })
 }
 
-fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>, next: Option<&Marker>, vertical: bool) -> Option<Action> {
+fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>, next: Option<&Marker>, vertical: bool, can_save: bool) -> Option<Action> {
     let mut action = None;
     let mut buttons = |ui: &mut egui::Ui| {
         let width = if vertical { 80.0 } else { 96.0 };
         for (id, label, value) in [("apply", tl!("Done"), Action::Done), ("cancel", tl!("Cancel"), Action::Cancel)] {
-            let response = action_button(ui, label, width, true, id == "apply");
+            let response =
+                action_button(ui, label, width, id != "apply" || can_save, id == "apply").on_disabled_hover_text(tl!("Enter a valid HH:MM:SS:FF timecode"));
             app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
             if response.clicked() {
                 action = Some(value);
@@ -244,23 +246,77 @@ fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>,
         }
     };
     if vertical {
-        ui.vertical(&mut buttons);
+        ui.with_layout(egui::Layout::top_down(egui::Align::Center), &mut buttons);
     } else {
         ui.horizontal_wrapped(&mut buttons);
     }
     action
 }
 
+/// Keep typing, paste and text Undo on the same bounded numeric/colon buffer.
+struct TimecodeBuffer<'a>(&'a mut String, usize);
+impl egui::TextBuffer for TimecodeBuffer<'_> {
+    fn type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<TimecodeBuffer<'static>>()
+    }
+    fn is_mutable(&self) -> bool {
+        true
+    }
+    fn as_str(&self) -> &str {
+        self.0
+    }
+    fn insert_text(&mut self, text: &str, at: egui::epaint::text::CharIndex) -> usize {
+        let room = self.1.saturating_sub(self.0.chars().count());
+        let filtered: String = text.chars().filter(|c| c.is_ascii_digit() || *c == ':').take(room).collect();
+        egui::TextBuffer::insert_text(self.0, &filtered, at)
+    }
+    fn delete_char_range(&mut self, range: std::ops::Range<egui::epaint::text::CharIndex>) {
+        egui::TextBuffer::delete_char_range(self.0, range);
+    }
+}
+
+fn timecode_field(ui: &mut egui::Ui, value: &mut String, rate: filmcraft_time::FrameRate) -> egui::Response {
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let sample = if rate.timecode_base() >= 100 { "00:00:00:000" } else { "00:00:00:00" };
+    let width = ui.painter().layout_no_wrap(sample.into(), font.clone(), ui.visuals().text_color()).size().x + 8.0;
+    ui.add(egui::TextEdit::singleline(&mut TimecodeBuffer(value, sample.len())).font(font).desired_width(width))
+}
+
+fn parse_marker_timecode(value: &str, rate: filmcraft_time::FrameRate, drop: bool) -> Result<i64, String> {
+    let error = || tl!("Enter a valid HH:MM:SS:FF timecode").to_string();
+    let length = if rate.timecode_base() >= 100 { 12 } else { 11 };
+    if value.len() != length || !value.bytes().enumerate().all(|(i, b)| if matches!(i, 2 | 5 | 8) { b == b':' } else { b.is_ascii_digit() }) {
+        return Err(error());
+    }
+    let frame = filmcraft_time::parse_timecode(value, rate, drop, 0).map_err(|_| error())?;
+    // Reject overflowed fields and skipped drop-frame labels rather than normalizing them.
+    let formatted = filmcraft_time::format_timecode_frames(frame, rate, drop);
+    if !formatted.split([':', ';']).map(|s| s.parse::<u32>().ok()).eq(value.split(':').map(|s| s.parse::<u32>().ok())) {
+        return Err(error());
+    }
+    Ok(frame)
+}
+
+fn valid_times(draft: &Draft, rate: filmcraft_time::FrameRate, drop: bool) -> bool {
+    parse_marker_timecode(&draft.time, rate, drop).is_ok() && (!draft.range || parse_marker_timecode(&draft.duration, rate, drop).is_ok_and(|f| f > 0))
+}
+
 fn field_row(ui: &mut egui::Ui, label: &str, contents: impl FnOnce(&mut egui::Ui)) {
+    field_row_height(ui, label, 0.0, contents);
+}
+
+fn field_row_height(ui: &mut egui::Ui, label: &str, min_height: f32, contents: impl FnOnce(&mut egui::Ui)) {
+    // Match a TextEdit's first line and its two-pixel top/bottom margin, including Notes.
+    let label_height = (ui.text_style_height(&egui::TextStyle::Body) + ui.spacing().extra_text_line_spacing + 4.0).max(min_height);
     ui.horizontal_top(|ui| {
-        ui.allocate_ui_with_layout(vec2(76.0, 24.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.allocate_ui_with_layout(vec2(76.0, label_height), egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(label);
         });
         ui.vertical(contents);
     });
 }
 
-fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
+fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, rate: filmcraft_time::FrameRate) {
     field_row(ui, tl!("Name"), |ui| {
         let response = ui.add(egui::TextEdit::singleline(&mut draft.name).desired_width(f32::INFINITY));
         app.auto.add_response("markerProperties.name", &response, tl!("Name"));
@@ -269,34 +325,44 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
             draft.focus_name = false;
         }
     });
+    ui.add_space(6.0);
+    // Useful for multi-user projects: attribution belongs to the marker, not the current OS user.
+    field_row(ui, tl!("Author"), |ui| {
+        let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
+        app.auto.add_response("markerProperties.author", &response, tl!("Author"));
+    });
     ui.add_space(10.0);
-    field_row(ui, tl!("Time"), |ui| {
+    field_row_height(ui, tl!("Time"), ui.spacing().interact_size.y, |ui| {
         ui.horizontal_wrapped(|ui| {
-            let response = ui.add(egui::TextEdit::singleline(&mut draft.time).desired_width(110.0));
+            let response = timecode_field(ui, &mut draft.time, rate);
             app.auto.add_response("markerProperties.time", &response, tl!("Time"));
             ui.add_space(16.0);
-            ui.label(tl!("Duration"));
-            let response = ui.add_enabled(draft.range, egui::TextEdit::singleline(&mut draft.duration).desired_width(110.0));
-            app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
-            let response = ui.checkbox(&mut draft.range, tl!("Range"));
+            let response = ui.checkbox(&mut draft.range, tl!("Duration")).on_hover_text(tl!("Range marker"));
             app.auto.add_response("markerProperties.range", &response, tl!("Range marker"));
             if response.changed() && draft.range && draft.original_duration == filmcraft_time::Tick::ZERO && draft.duration == draft.initial_duration {
-                draft.duration = "00:00:00:01".into();
+                draft.duration = filmcraft_time::format_timecode_frames(1, rate, false);
             }
+            let response = ui.add_enabled(draft.range, |ui: &mut egui::Ui| timecode_field(ui, &mut draft.duration, rate));
+            app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
         });
     });
     ui.add_space(10.0);
     field_row(ui, tl!("Notes"), |ui| {
-        let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8));
-        app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
+        egui::ScrollArea::vertical().id_salt("marker-notes").max_height(120.0).auto_shrink([false, false]).show(ui, |ui| {
+            let mut response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8));
+            // Register the visible editor area so automation can still focus a long scrolled note.
+            response.rect = response.rect.intersect(ui.clip_rect());
+            app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
+        });
     });
     ui.add_space(14.0);
     ui.group(|ui| {
         ui.set_width(ui.available_width().max(100.0));
         ui.label(tl!("Options"));
-        field_row(ui, tl!("Color"), |ui| {
+        ui.label(tl!("Color"));
+        ui.vertical(|ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing.x = 5.0;
+                ui.spacing_mut().item_spacing.x = 3.0;
                 for preset in Label::ALL {
                     let response =
                         swatch(ui, app.session.prefs.labels.rgb(preset), !draft.custom && draft.preset == preset).on_hover_text(crate::i18n::t(preset.name()));
@@ -317,7 +383,7 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
             }
             egui::ScrollArea::vertical().id_salt("marker-custom-colors").max_height(100.0).show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing.x = 5.0;
+                    ui.spacing_mut().item_spacing.x = 3.0;
                     for color in colors {
                         let hex = color.hex();
                         let response =
@@ -339,47 +405,49 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
         });
         ui.add_space(10.0);
         let group = ui.vertical(|ui| {
-            for kind in [MarkerKind::Comment, MarkerKind::Chapter, MarkerKind::Segmentation, MarkerKind::WebLink, MarkerKind::FlashCue] {
-                let label = kind_label(kind);
-                let response = ui.radio_value(&mut draft.kind, kind, label);
-                app.auto.add_response(&format!("markerProperties.kind.{}", kind_id(kind)), &response, label);
-                if kind == MarkerKind::WebLink && draft.kind == MarkerKind::WebLink {
-                    field_row(ui, tl!("URL"), |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            let response = ui.add(
-                                egui::TextEdit::singleline(&mut draft.url)
-                                    .desired_width((ui.available_width() - 90.0).max(100.0))
-                                    .char_limit(8192)
-                                    .hint_text("https://"),
-                            );
-                            app.auto.add_response("markerProperties.url", &response, tl!("URL"));
-                            let address = filmcraft_project::marker_web_url(&draft.url);
-                            let response = ui.add_enabled(address.is_some(), egui::Button::new(tl!("Open Link")));
-                            let response = response.on_hover_text(tl!("Opens this address in your web browser"));
-                            app.auto.add_response("markerProperties.openLink", &response, tl!("Open Link"));
-                            if response.clicked()
-                                && let Some(address) = address
-                            {
-                                crate::links::open(app, ui.ctx(), &address);
-                                if let Some(failure) = app.ui.failed_link.as_ref().filter(|failure| failure.url == address) {
-                                    draft.error.clone_from(&failure.error);
-                                }
-                            }
+            for kind in [MarkerKind::Comment, MarkerKind::Chapter, MarkerKind::Segmentation, MarkerKind::WebLink] {
+                ui.horizontal_wrapped(|ui| {
+                    let label = kind_label(kind);
+                    let response = ui.radio_value(&mut draft.kind, kind, label);
+                    app.auto.add_response(&format!("markerProperties.kind.{}", kind_id(kind)), &response, label);
+                    if kind == MarkerKind::WebLink && draft.kind == MarkerKind::WebLink {
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut draft.url)
+                                .desired_width((ui.available_size_before_wrap().x - ui.spacing().item_spacing.x - 24.0).max(60.0))
+                                .char_limit(8192)
+                                .hint_text("https://"),
+                        );
+                        app.auto.add_response("markerProperties.url", &response, tl!("URL"));
+                        let address = filmcraft_project::marker_web_url(&draft.url);
+                        let response = ui.add_enabled(address.is_some(), |ui: &mut egui::Ui| {
+                            let response = ui.add_sized(vec2(24.0, 24.0), egui::Button::new(""));
+                            response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Open Link")));
+                            let color = ui.style().interact(&response).fg_stroke.color;
+                            crate::icons::paint(ui.painter(), response.rect.shrink(4.0), crate::icons::Icon::ExternalLink, color);
+                            response
                         });
-                    });
-                    if !draft.url.trim().is_empty() && filmcraft_project::marker_web_url(&draft.url).is_none() {
-                        ui.colored_label(ui.visuals().error_fg_color, tl!("Enter a valid HTTP or HTTPS URL without credentials"));
+                        let response = response.on_hover_text(tl!("Opens this address in your web browser"));
+                        app.auto.add_response("markerProperties.openLink", &response, tl!("Open Link"));
+                        if response.clicked()
+                            && let Some(address) = address
+                        {
+                            crate::links::open(app, ui.ctx(), &address);
+                            if let Some(failure) = app.ui.failed_link.as_ref().filter(|failure| failure.url == address) {
+                                draft.error.clone_from(&failure.error);
+                            }
+                        }
                     }
+                });
+                if kind == MarkerKind::WebLink
+                    && draft.kind == MarkerKind::WebLink
+                    && !draft.url.trim().is_empty()
+                    && filmcraft_project::marker_web_url(&draft.url).is_none()
+                {
+                    ui.colored_label(ui.visuals().error_fg_color, tl!("Enter a valid HTTP or HTTPS URL without credentials"));
                 }
             }
         });
         app.auto.add_response("markerProperties.kind", &group.response, tl!("Type"));
-        ui.add_space(8.0);
-        ui.separator();
-        field_row(ui, tl!("Author"), |ui| {
-            let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
-            app.auto.add_response("markerProperties.author", &response, tl!("Author"));
-        });
     });
 }
 
@@ -408,7 +476,7 @@ fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, S
         return Err(tl!("Marker owner is unavailable").into());
     };
     let parse = |value: &str| -> Result<i64, String> {
-        let f = filmcraft_time::parse_timecode(value, rate, drop, 0).map_err(|e| e.to_string())?;
+        let f = parse_marker_timecode(value, rate, drop)?;
         if f < 0 || f > rate.frame_at(filmcraft_time::Tick::MAX) {
             return Err(tl!("Time is outside the supported range").into());
         }
@@ -524,4 +592,24 @@ pub(super) fn swatch(ui: &mut egui::Ui, rgb: [u8; 3], selected: bool) -> egui::R
 fn allocate_swatch(ui: &mut egui::Ui) -> (egui::Rect, egui::Response) {
     let (rect, response) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
     (rect.shrink(3.0), response)
+}
+
+#[cfg(test)]
+mod timecode_tests {
+    use super::parse_marker_timecode;
+    use filmcraft_time::FrameRate;
+
+    #[test]
+    fn marker_timecode_requires_complete_fields_and_valid_drop_frame_labels() {
+        let rate = FrameRate::FPS_29_97;
+        assert_eq!(parse_marker_timecode("00:01:00:02", rate, true), Ok(1800));
+        assert!(parse_marker_timecode("00:01:00:00", rate, true).is_err());
+        assert_eq!(parse_marker_timecode("00:10:00:00", rate, true), Ok(17982));
+        // High frame rates need three frame digits; their existing values remain editable.
+        assert_eq!(parse_marker_timecode("00:00:00:119", FrameRate::FPS_120, false), Ok(119));
+        assert!(parse_marker_timecode("00:00:00:120", FrameRate::FPS_120, false).is_err());
+        for value in ["00:00:0:01", "00;00;00;01", "00:60:00:00", "00:00:60:00", "00:00:00:30", "00:00:00:０1"] {
+            assert!(parse_marker_timecode(value, rate, true).is_err(), "{value}");
+        }
+    }
 }

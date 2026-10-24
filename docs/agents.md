@@ -349,10 +349,15 @@ include `author` and the effective `color`.
 `markers.edit` also accepts `kind:"comment|chapter|segmentation|webLink|flashCue"`.
 The editor's visible Type radio group (`markerProperties.kind`, with choices
 `markerProperties.kind.<kind>`) applies type changes with the other fields in one Undo
-step. The compact form follows Name, Time/Duration, Notes, then grouped Color and
-vertical Type choices. Author metadata follows the type-specific options. A narrow
-action column uses centered buttons; small windows move actions below the scrolling form.
+step. The compact form follows Name, Author, Time/Duration, Notes, then grouped Color
+and vertical Type choices. The editor offers Comment, Chapter, Segmentation and Web Link;
+existing legacy marker types are retained unless explicitly changed. A narrow action
+column uses centered buttons; small windows move actions below the scrolling form.
 It retains the same sequence/source owner.
+Notes scroll within a bounded field. Time and Duration accept only digits and colons
+in `HH:MM:SS:FF` form (three frame digits at 100 fps or higher); Done remains disabled for incomplete or invalid timecodes.
+Unchecked Duration ignores its draft value and saves a point marker with zero duration.
+Text fields use normal text editing shortcuts and their own Undo/Redo history.
 
 Previous/Next (`markerProperties.previous`, `markerProperties.next`) save valid changes
 to the current marker as one Undo step, then open its neighbour in chronological order

@@ -20,6 +20,108 @@ struct Driver {
 }
 
 #[test]
+fn marker_text_menu_commands_belong_to_each_field_not_the_timeline() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.addRange", json!({"frame":30,"durationFrames":24}))["marker"].as_u64().unwrap();
+    d.exec("markers.edit", json!({"marker":marker,"kind":"webLink","url":"https://example.com"}));
+    d.double_click(&format!("timeline.marker.{marker}"));
+    let before = d.exec("sequence.inspect", json!({}));
+    let project = d.app().session.project.to_json();
+    let history = d.app().session.history.undo.len();
+    for field in ["name", "author", "comment", "time", "duration", "url"] {
+        let id = format!("markerProperties.{field}");
+        let value = if matches!(field, "time" | "duration") { "01:02:03:04" } else { "Clipboard αβ" };
+        d.set_text(&id, value);
+        let menu = d.ok("ui.menu.list", json!({}));
+        for command in ["edit.copy", "edit.cut", "edit.paste", "edit.selectAll", "edit.undo", "edit.redo"] {
+            assert_eq!(menu.as_array().unwrap().iter().find(|item| item["id"] == command).unwrap()["enabled"], true);
+        }
+        d.ok("ui.menu.invoke", json!({"id":"edit.selectAll"}));
+        assert!(d.exec("sequence.inspect", json!({})) == before, "Select All in {field} must not select clips");
+        d.ok("ui.menu.invoke", json!({"id":"edit.copy"}));
+        assert!(d.harness.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::RequestCopy)));
+        d.harness.input_mut().events.push(egui::Event::Copy);
+        d.frames(1);
+        assert!(d.harness.output().platform_output.commands.iter().any(|c| matches!(c, egui::OutputCommand::CopyText(s) if s == value)), "Copy {field}");
+        d.ok("ui.menu.invoke", json!({"id":"edit.cut"}));
+        assert!(d.harness.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::RequestCut)));
+        d.harness.input_mut().events.push(egui::Event::Cut);
+        d.frames(1);
+        assert_eq!(marker_draft_text(&d, field), "");
+        d.ok("ui.menu.invoke", json!({"id":"edit.paste"}));
+        assert!(d.harness.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::RequestPaste)));
+        d.harness.input_mut().events.push(egui::Event::Paste(value.into()));
+        d.frames(2);
+        assert_eq!(marker_draft_text(&d, field), value);
+        d.ok("ui.menu.invoke", json!({"id":"edit.undo"}));
+        d.frames(3);
+        assert_ne!(marker_draft_text(&d, field), value, "text Undo {field}");
+        d.ok("ui.menu.invoke", json!({"id":"edit.redo"}));
+        d.frames(3);
+        assert_eq!(marker_draft_text(&d, field), value);
+        assert_eq!(d.app().session.project.to_json(), project);
+        assert_eq!(d.app().session.history.undo.len(), history);
+    }
+    d.click("markerProperties.cancel");
+    assert_eq!(d.exec("sequence.inspect", json!({})), before);
+}
+
+fn marker_draft_text<'a>(d: &'a Driver, field: &str) -> &'a str {
+    let m = d.harness.state().ui.marker_properties.as_ref().unwrap();
+    match field {
+        "name" => &m.name,
+        "author" => &m.author,
+        "comment" => &m.comment,
+        "time" => &m.time,
+        "duration" => &m.duration,
+        "url" => &m.url,
+        _ => panic!("field"),
+    }
+}
+
+#[test]
+fn high_frame_rate_marker_duration_starts_at_one_valid_frame() {
+    let mut d = Driver::demo();
+    d.exec("file.newSequence", json!({"name":"120 fps", "fps":120}));
+    let marker = d.exec("markers.add", json!({"frame":0}))["marker"].as_u64().unwrap();
+    d.double_click(&format!("timeline.marker.{marker}"));
+    assert_eq!(marker_draft_text(&d, "time"), "00:00:00:000");
+    d.click("markerProperties.range");
+    assert_eq!(marker_draft_text(&d, "duration"), "00:00:00:001");
+    assert_eq!(d.ok("ui.elements", json!({"prefix":"markerProperties.apply"}))[0]["enabled"], true);
+    d.click("markerProperties.apply");
+    assert_eq!(d.app().session.active_sequence().unwrap().markers[0].duration, filmcraft_time::FrameRate::FPS_120.tick_of(1));
+}
+
+#[test]
+fn marker_notes_scroll_and_timecode_fields_require_complete_valid_values() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.addRange", json!({"frame":30,"durationFrames":24}))["marker"].as_u64().unwrap();
+    d.double_click(&format!("timeline.marker.{marker}"));
+    let rect = |v: &Value, id: &str| v.as_array().unwrap().iter().find(|e| e["id"] == id).unwrap()["rect"].clone();
+    let before = d.ok("ui.elements", json!({"prefix":"markerProperties."}));
+    d.set_text("markerProperties.comment", &"Long note line\n".repeat(200));
+    let after = d.ok("ui.elements", json!({"prefix":"markerProperties."}));
+    assert_eq!(rect(&before, "markerProperties.apply"), rect(&after, "markerProperties.apply"), "Notes must not resize or move the dialog");
+    assert!(rect(&after, "markerProperties.comment")[3].as_f64().unwrap() <= 130.0);
+    d.set_text("markerProperties.time", "a00:b00:c00:d01");
+    assert_eq!(marker_draft_text(&d, "time"), "00:00:00:01");
+    for field in ["time", "duration"] {
+        for invalid in ["", "00:00:0:01", "00:60:00:00", "00:00:60:00", "00:00:00:99"] {
+            d.set_text(&format!("markerProperties.{field}"), invalid);
+            let v = d.ok("ui.elements", json!({"prefix":"markerProperties.apply"}));
+            assert_eq!(v[0]["enabled"], false, "{field}: {invalid}");
+        }
+        d.set_text(&format!("markerProperties.{field}"), "00:00:00:01");
+    }
+    assert_eq!(d.ok("ui.elements", json!({"prefix":"markerProperties.apply"}))[0]["enabled"], true);
+    d.snapshot("bounded-marker-notes", "markerProperties.");
+    d.click("markerProperties.cancel");
+}
+
+#[test]
 fn marker_navigation_saves_one_edit_skips_noops_and_orders_coincident_markers() {
     let mut d = Driver::demo();
     d.exec("markers.clearAll", json!({}));
@@ -167,12 +269,12 @@ fn marker_editor_wide_form_and_small_window_keep_actions_accessible() {
     let author = rect(&elements, "markerProperties.author");
     let notes = rect(&elements, "markerProperties.comment");
     let done = rect(&elements, "markerProperties.apply");
-    assert!(name[2] > 400.0);
-    assert!(author[2] > 400.0);
+    assert!(name[2] > 300.0 && name[2] < 400.0);
+    assert_eq!(author[2], name[2]);
     assert!(author[1] > name[1] + name[3]);
     assert!(notes[3] > 70.0);
     assert!(done[0] > notes[0] + notes[2]);
-    for kind in ["comment", "chapter", "segmentation", "webLink", "flashCue"] {
+    for kind in ["comment", "chapter", "segmentation", "webLink"] {
         assert!(!d.ids(&format!("markerProperties.kind.{kind}")).is_empty());
     }
     d.snapshot("marker-editor-wide-layout", "markerProperties.");
@@ -554,6 +656,11 @@ fn marker_editor_time_range_delete_and_source_owner() {
     assert_eq!(m.duration, rate.tick_of(rate.timecode_base()));
     d.right_marker(id, false);
     d.click("timeline.markerMenu.properties");
+    d.click("markerProperties.range");
+    assert_eq!(marker_draft_text(&d, "duration"), "00:00:01:00", "unchecking keeps the draft value");
+    assert_eq!(d.ok("ui.elements", json!({"prefix":"markerProperties.duration"}))[0]["enabled"], false);
+    d.click("markerProperties.range");
+    assert_eq!(marker_draft_text(&d, "duration"), "00:00:01:00", "rechecking restores the draft value");
     d.click("markerProperties.range");
     d.click("markerProperties.apply");
     assert_eq!(d.app().session.active_sequence().unwrap().markers[0].duration, filmcraft_time::Tick::ZERO);
