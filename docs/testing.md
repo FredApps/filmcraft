@@ -17,6 +17,27 @@ changes process-wide state (a global switch, pool, panic hook or fault injection
 stays a binary of its own in `tests/`. Select one file's tests with its module path:
 `cargo test -p filmcraft-h264 --test it conformance::`.
 
+## Native font checks
+
+Ordinary text tests discover the existing Inter Bold fixture through `DirectorySource` and
+verify its file-backed metadata and lazy loading. They do not require proprietary host fonts.
+The scan-once smoke test still runs when the host has no visible system fonts.
+
+The macOS system-font regression keeps its native contract: more than 20 system faces,
+Helvetica Bold resolution and glyph layout. It is explicitly invoked with:
+
+```sh
+cargo xtask native-fonts
+```
+
+Run that command on macOS with its system font folders visible, outside a restricted build
+sandbox. `cargo xtask ci` invokes it automatically on macOS, so the normal all-gates command
+retains native discovery coverage. The command first verifies that exactly one ignored native
+font test is listed, so a renamed or accidentally disabled test cannot silently pass with zero
+tests. Calling `native-fonts` on another operating system returns
+an error. The test is ignored by ordinary `cargo test` because its host requirements differ
+from the deterministic file-backed test; it must not be treated as optional in native macOS CI.
+
 ## 1. Kinds of tests
 
 | Kind | Where | Examples |
