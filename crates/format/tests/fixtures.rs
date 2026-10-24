@@ -298,6 +298,8 @@ fn next_id_is_raised_past_every_id_in_the_file() {
         comment: String::new(),
         kind: MarkerKind::Comment,
         color: Label::Green,
+        author: String::new(),
+        custom_color: None,
     };
     let kinds: Vec<(&str, Box<dyn Fn(&mut Project)>)> = vec![
         (

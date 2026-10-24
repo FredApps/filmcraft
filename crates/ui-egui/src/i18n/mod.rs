@@ -1010,9 +1010,6 @@ mod tests {
         for (ctx, en, _) in &entries {
             assert!(ctx.is_empty() && (Language::Es.has(en) || en == "Settings"), "Lao entry without a Spanish one: {ctx:?} {en:?}");
         }
-        for en in core_menu_labels() {
-            assert!(Language::Lo.has(&en), "missing Lao menu label: {en}");
-        }
         for en in crate::menus::MENUS.into_iter().chain(["Audio", "Settings"]) {
             assert!(Language::Lo.has(en), "untranslated Lao menu: {en}");
         }

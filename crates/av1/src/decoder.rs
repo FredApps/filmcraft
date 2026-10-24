@@ -1091,14 +1091,11 @@ mod worker_recovery_tests {
     use super::*;
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
-    /// Construct a minimal frame job, optionally injecting an impossible internal reference index.
+    /// Construct a minimal frame job using the test-only worker-panic hook.
     fn job(panics: bool) -> FrameJob {
-        // Inject an impossible internal reference index to panic inside decode_frame,
-        // without accepting malformed media or adding a production panic hook.
-        let fh = FrameHeader { ref_frame_idx: [if panics { NUM_REF_FRAMES } else { 0 }; REFS_PER_FRAME], ..Default::default() };
         FrameJob {
             seq: SequenceHeader::default(),
-            fh,
+            fh: FrameHeader::default(),
             refs: Default::default(),
             ref_info: Default::default(),
             tiles: Vec::new(),
@@ -1108,6 +1105,7 @@ mod worker_recovery_tests {
             pts: 0,
             apply_film_grain: false,
             draft: false,
+            force_panic: panics,
         }
     }
 

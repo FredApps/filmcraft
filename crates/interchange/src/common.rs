@@ -768,6 +768,7 @@ mod tests {
         assert_eq!(seq.video_tracks.len(), MAX_IMPORTED_TRACKS);
     }
 
+    #[test]
     fn subclip_cycle_resolution_is_bounded() {
         let mut p = Project::new("Cycle Test");
         let info = MediaInfo {

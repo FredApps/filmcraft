@@ -367,21 +367,6 @@ pub fn workspace(name: &str) -> DockNode {
             ),
             tabs(&[EssentialGraphics, Properties], 0),
         ),
-        // Vertical (9:16 editing, #1822): the Program monitor runs the full height on the right, beside
-        // the source and project panels and the timeline
-        "Vertical" => hsplit(
-            FixedB(420.0),
-            vsplit(
-                Ratio(0.5),
-                hsplit(
-                    Ratio(0.5),
-                    tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 0),
-                    tabs(&[Project, MediaBrowser, Effects, Info, Markers, History], 0),
-                ),
-                bottom_editing(),
-            ),
-            tabs(&[Program], 0),
-        ),
         "All Panels" => vsplit(
             Ratio(0.5),
             hsplit(
@@ -391,6 +376,8 @@ pub fn workspace(name: &str) -> DockNode {
             ),
             hsplit(Ratio(0.26), tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0), bottom_editing()),
         ),
+        // Vertical (9:16 editing): keep Program full-height on the right while retaining the
+        // source, project, properties, graphics, and timeline groups from both layout variants.
         "Vertical" => hsplit(
             Ratio(0.66),
             vsplit(
@@ -400,7 +387,7 @@ pub fn workspace(name: &str) -> DockNode {
                     vsplit(
                         Ratio(0.48),
                         tabs(&[Source, EffectControls, AudioClipMixer, Metadata], 1),
-                        tabs(&[Project, MediaBrowser, Libraries, Info, Effects, Markers, History], 0),
+                        tabs(&[Project, MediaBrowser, Libraries, Effects, Info, Markers, History], 0),
                     ),
                     tabs(&[Properties, EssentialGraphics, Text], 0),
                 ),
