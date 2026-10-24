@@ -212,12 +212,7 @@ impl AudioEffect for DeNoise {
             let bins = n / 2 + 1;
             for k in 0..bins {
                 let p = re[k] * re[k] + im[k] * im[k];
-                let psd = if st.started { PSD_SMOOTH * st.psd[k] + (1.0 - PSD_SMOOTH) * p } else { p };
-                // A frame with a NaN or inf input sample would leave the recursion non-finite
-                // for good; skip it instead.
-                if psd.is_finite() {
-                    st.psd[k] = psd;
-                }
+                st.psd[k] = if st.started { PSD_SMOOTH * st.psd[k] + (1.0 - PSD_SMOOTH) * p } else { p };
                 st.cur_min[k] = st.cur_min[k].min(st.psd[k]);
             }
             st.started = true;
