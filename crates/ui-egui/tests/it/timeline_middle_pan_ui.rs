@@ -164,3 +164,36 @@ fn a_middle_button_drag_moves_the_audio_tracks_over_the_audio_tracks() {
     assert!(a1 > a0 + 20.0, "dragging up over the audio tracks scrolls them: {a0} -> {a1}");
     assert_eq!(v1, v0, "the video tracks stay where they were");
 }
+
+/// Adapt the #2677 cancellation regression to this branch's separate saved scrolls.
+#[test]
+fn cancelling_an_audio_pan_restores_its_own_scroll_for_middle_and_hand() {
+    for button in [egui::PointerButton::Middle, egui::PointerButton::Primary] {
+        let mut d = Driver::demo();
+        d.setup();
+        if button == egui::PointerButton::Primary {
+            d.ok("ui.set", json!({"tool": "Hand"}));
+        }
+        d.app().ui.timeline.video_track_h = 320.0;
+        d.app().ui.timeline.audio_track_h = 320.0;
+        d.app().ui.timeline.v_scroll = 30.0;
+        d.app().ui.timeline.a_scroll = 70.0;
+        d.frames(4);
+        let (v0, a0) = (d.app().ui.timeline.v_scroll, d.app().ui.timeline.a_scroll);
+        assert_ne!(v0, a0, "the fixture must distinguish the halves' saved scrolls");
+        let tracks = d.rect("timeline.tracks");
+        let from = egui::pos2(tracks.center().x, tracks.min.y + tracks.height() * 0.75);
+        let to = from - egui::vec2(0.0, 40.0);
+        d.send(egui::Event::PointerMoved(from));
+        d.send(egui::Event::PointerButton { pos: from, button, pressed: true, modifiers: Default::default() });
+        for k in 1..=8 {
+            d.send(egui::Event::PointerMoved(from.lerp(to, k as f32 / 8.0)));
+        }
+        assert_ne!(d.app().ui.timeline.a_scroll, a0, "the drag must move audio before cancellation");
+        d.send(egui::Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() });
+        d.send(egui::Event::PointerButton { pos: to, button, pressed: false, modifiers: Default::default() });
+        d.frames(2);
+        assert_eq!(d.app().ui.timeline.a_scroll, a0, "audio restores its own saved scroll");
+        assert_eq!(d.app().ui.timeline.v_scroll, v0, "video remains unchanged");
+    }
+}
