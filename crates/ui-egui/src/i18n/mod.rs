@@ -49,6 +49,8 @@ pub enum Language {
     It,
     /// Korean; Hangul needs an installed system font ([`korean_font_available`]).
     Ko,
+    /// Lao; requires an installed Lao system font or craft-fonts.
+    Lo,
 }
 
 static JAPANESE: OnceLock<Catalog> = OnceLock::new();
@@ -62,9 +64,10 @@ static FRENCH: OnceLock<Catalog> = OnceLock::new();
 static KOREAN: OnceLock<Catalog> = OnceLock::new();
 static INDONESIAN: OnceLock<Catalog> = OnceLock::new();
 static ITALIAN: OnceLock<Catalog> = OnceLock::new();
+static LAO: OnceLock<Catalog> = OnceLock::new();
 
 impl Language {
-    pub const ALL: [Self; 12] = [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It];
+    pub const ALL: [Self; 13] = [Self::En, Self::Ja, Self::Es, Self::PtBr, Self::Uk, Self::ZhCn, Self::De, Self::Ru, Self::Fr, Self::Id, Self::Ko, Self::It, Self::Lo];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -80,6 +83,7 @@ impl Language {
             Self::Id => "Bahasa Indonesia",
             Self::It => "Italiano",
             Self::Ko => "한국어",
+            Self::Lo => "ພາສາລາວ",
         }
     }
 
@@ -97,6 +101,7 @@ impl Language {
             "id" => Some(Self::Id),
             "it" => Some(Self::It),
             "ko" => Some(Self::Ko),
+            "lo" => Some(Self::Lo),
             _ => None,
         }
     }
@@ -111,7 +116,7 @@ impl Language {
     /// only for Simplified locales (`zh`, `zh-CN`, `zh-SG`, `zh-Hans…`); Traditional ones (`zh-TW`,
     /// `zh-HK`, `zh-MO`, `zh-Hant…`) are skipped.
     pub fn from_locales(tags: &[String]) -> Self {
-        const PRIMARY: [(&str, Language); 12] = [
+        const PRIMARY: [(&str, Language); 13] = [
             ("en", Language::En),
             ("ja", Language::Ja),
             ("es", Language::Es),
@@ -124,6 +129,7 @@ impl Language {
             ("in", Language::Id),
             ("it", Language::It),
             ("ko", Language::Ko),
+            ("lo", Language::Lo),
         ];
         tags.iter()
             .find_map(|tag| {
@@ -156,6 +162,7 @@ impl Language {
             Self::Id => "id",
             Self::It => "it",
             Self::Ko => "ko",
+            Self::Lo => "lo",
         }
     }
 
@@ -174,6 +181,7 @@ impl Language {
             Self::Id => Some(INDONESIAN.get_or_init(|| Catalog::parse(include_str!("id.tsv")))),
             Self::It => Some(ITALIAN.get_or_init(|| Catalog::parse(include_str!("it.tsv")))),
             Self::Ko => Some(KOREAN.get_or_init(|| Catalog::parse(include_str!("ko.tsv")))),
+            Self::Lo => Some(LAO.get_or_init(|| Catalog::parse(include_str!("lo.tsv")))),
         }
     }
 
@@ -355,6 +363,7 @@ mod tests {
             Language::Id => Some(include_str!("id.tsv")),
             Language::It => Some(include_str!("it.tsv")),
             Language::Ko => Some(include_str!("ko.tsv")),
+            Language::Lo => Some(include_str!("lo.tsv")),
         }
     }
 
@@ -925,6 +934,9 @@ mod tests {
         for tag in ["it", "IT", "it-IT", "it-CH", "it-SM", "it_IT.UTF-8", "it_IT.UTF-8@euro", "it_CH"] {
             assert_eq!(l(&[tag]), Language::It, "{tag}");
         }
+        for tag in ["lo", "LO", "lo-LA", "lo_LA", "lo_LA.UTF-8", "LO-la"] {
+            assert_eq!(l(&[tag]), Language::Lo, "{tag}");
+        }
         assert_eq!(l(&["it-CH", "de-CH", "fr-CH", "en"]), Language::It);
         for tag in ["ko", "ko-KR", "ko_KR.UTF-8"] {
             assert_eq!(l(&[tag]), Language::Ko, "{tag}");
@@ -978,6 +990,30 @@ mod tests {
         assert_eq!(asked.get(), asked_before + 1);
         set_current(Language::En);
     }
+
+    #[test]
+    fn lao_covers_the_menus_and_has_no_dead_entries() {
+        let (entries, errors) = catalog::parse_entries(include_str!("lo.tsv"));
+        assert!(errors.is_empty(), "{errors:?}");
+        for (ctx, en, _) in &entries {
+            assert!(ctx.is_empty() && (Language::Es.has(en) || en == "Settings"), "Lao entry without a Spanish one: {ctx:?} {en:?}");
+        }
+        for en in core_menu_labels() {
+            assert!(Language::Lo.has(&en), "missing Lao menu label: {en}");
+        }
+        for en in crate::menus::MENUS.into_iter().chain(["Audio", "Settings"]) {
+            assert!(Language::Lo.has(en), "untranslated Lao menu: {en}");
+        }
+        for (en, lo) in [("File", "ໄຟລ໌"), ("Edit", "ແກ້ໄຂ"), ("Sequence", "ຊີຄວນສ໌"), ("Settings", "ການຕັ້ງຄ່າ")] {
+            assert_eq!(Language::Lo.tr(en), lo);
+        }
+        assert_eq!(Language::Lo.name(), "ພາສາລາວ");
+        assert_eq!(Language::parse("lo"), Some(Language::Lo));
+        for tag in ["lo", "lo-LA", "lo_LA.UTF-8"] {
+            assert_eq!(Language::from_locales(&[tag.to_string()]), Language::Lo, "{tag}");
+        }
+    }
+
 
     /// Every non-ASCII character of `text` renders with the bundled interface fonts, in every family.
     fn assert_bundled_fonts_cover(text: impl Iterator<Item = char>) {
