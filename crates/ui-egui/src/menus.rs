@@ -123,6 +123,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("window.workspace.saveChanges", "Save Changes to this Workspace", ["Window", "Workspaces"], None),
     uic!("window.workspace.saveAs", "Save as New Workspace…", ["Window", "Workspaces"], None),
     uic!("window.workspace.edit", "Edit Workspaces…", ["Window", "Workspaces"], None),
+    uic!("window.workspace.importFromProjects", "Import Workspace from Projects", ["Window", "Workspaces"], None),
     uic!("tool.selection", "Selection Tool", [], Some("V")),
     uic!("tool.trackSelectForward", "Track Select Forward Tool", [], Some("A")),
     uic!("tool.trackSelectBackward", "Track Select Backward Tool", [], Some("Shift+A")),
@@ -724,6 +725,9 @@ pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
             "app.language.lao" => it.checked = Some(app.ui.language == crate::i18n::Language::Lo),
             _ => {}
         }
+        if let Some(on) = engine_toggle(&app.session, &it.id) {
+            it.checked = Some(on);
+        }
         if it.id.starts_with("view.") {
             it.checked = crate::panels::monitor_view::checked(app, &it.id).or(crate::panels::menu_dialogs::checked(app, &it.id));
             it.enabled &= crate::panels::monitor_view::enabled(app, &it.id);
@@ -732,6 +736,21 @@ pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
     crate::panels::workspaces::menu(app, &mut v);
     open_recent(&mut v, &app.session, |n| app.ui.language.tr(n).to_string());
     v
+}
+
+/// Checkmark state of the engine's on/off menu commands (`{"on":bool?}`, toggled when invoked from a
+/// menu without parameters). None = not one of them.
+fn engine_toggle(session: &filmcraft_engine::Session, id: &str) -> Option<bool> {
+    let st = &session.state;
+    Some(match id {
+        "sequence.snap" => st.snapping,
+        "sequence.linkedSelection" => st.linked_selection,
+        "sequence.selectionFollowsPlayhead" => st.selection_follows_playhead,
+        "sequence.showThroughEdits" => st.show_through_edits,
+        "markers.rippleSequenceMarkers" => st.ripple_sequence_markers,
+        "markers.copyPasteIncludesSequenceMarkers" => st.copy_paste_sequence_markers,
+        _ => return None,
+    })
 }
 
 /// File ▸ Open Recent, after Open Project…: the recent projects (General ▸ `recentProjects`),

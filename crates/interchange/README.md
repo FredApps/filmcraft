@@ -28,6 +28,17 @@ The other formats' editions are listed in the module docs (`edl`, `fcp7`, `fcpxm
 falls inside a UTF-8 character. Timeline importers use the shared converter; `tests/it/file_urls.rs`
 checks expected Unicode paths through the public converter, resolver and EDL importer.
 
+## Absurd frame rates and start timecodes
+
+Importers accept frame rates up to 1 000 000 per second (above video rates and PCM audio sample
+rates such as 192 000 Hz, which OTIO uses as a rate). An FCP7 `timebase` is clamped to it and an OTIO rate beyond it
+uses the default, each with a warning (DSD audio at 2.8 or 5.6 MHz is beyond it, so an OTIO DSD clip is retimed at
+the default rate and reported). Also, a sequence
+or media rate beyond it (an FCPXML `frameDuration` of `1/9223372036854775807s`) is reset to the
+default with a warning: such a rate overflowed the frame arithmetic of every export. Sequence and
+media start timecodes beyond 360 000 000 000 frames are reset the same way. Covered by
+`tests/rates.rs` (including the warnings), `src/common.rs` (`rates`) and `tests/fcp7.rs` (`absurd_start_timecode_is_bounded`).
+
 ## AAF and OMF
 
 `comp` holds a format-neutral mob-style model (compositions of slots whose sequences of fillers,
@@ -76,7 +87,7 @@ none of the exports brings one back. Each such clip is named in the export `Repo
 | Format | Written as | On import into FilmCraft |
 |---|---|---|
 | FCP7 XML | a clip item without media (its layers as FilmCraft filter ids) | not read back; the import report names the skipped clip item |
-| FCPXML | a clip without media | not read back |
+| FCPXML | a gap on V1; left out on other tracks (a gap exists only in the primary storyline) | not read back |
 | OTIO | a clip with a `MissingReference` (effects in the `filmcraft` metadata) | offline media |
 | EDL | an ordinary event with the reel the reel mode gives | an ordinary clip |
 | AAF | a gap | nothing |
@@ -86,6 +97,10 @@ OMF carries no video at all.
 ## Tests
 
 - `tests/it/aaf_omf.rs`: AAF round trips at 25, 29.97 DF, 23.976 and 59.94 DF (clips, gaps,
+- `src/otio.rs` (unit tests): OTIO repeats a nested sequence for every use, so compound clips that each hold
+  several uses of the next are exponential (a 3 KB FCPXML nested 12 deep made the export run for minutes and grow to
+  gigabytes). After 25 000 clips written inside nested sequences the rest are gaps, with one warning; an ordinary
+  project is far below that and unchanged.
   two-sided and one-sided transitions, links, markers, start timecodes, constant and keyframed
   gain, media markers and timecode); 512-byte sectors; breakout to mono; embedded trimmed audio
   (sample data and source offsets); separate consolidated files with a video mixdown; OMF round

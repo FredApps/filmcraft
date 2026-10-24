@@ -204,15 +204,25 @@ pub(crate) fn timebase(rate: FrameRate) -> (i64, bool) {
     (rate.timecode_base(), rate.is_ntsc())
 }
 
-/// Rate from FCP7-style `(timebase, ntsc)`.
+/// Highest rate (per second) an importer accepts. OTIO audio uses sample rates (192000 and more) as
+/// time bases, so this is far above any video rate and still far below where frame arithmetic
+/// overflows: a rate near `i64::MAX` made `frame_at` clamp to `i64::MAX`, and the `+ 1` after it overflowed.
+pub(crate) const MAX_RATE: i64 = 1_000_000;
+
+/// Whether `rate` is positive and at most [`MAX_RATE`] per second.
+pub(crate) fn plausible_rate(rate: FrameRate) -> bool {
+    rate.num > 0 && rate.den > 0 && i128::from(rate.num) <= i128::from(rate.den) * i128::from(MAX_RATE)
+}
+
+/// Rate from FCP7-style `(timebase, ntsc)`; the timebase is limited to `1..=MAX_RATE`.
 pub(crate) fn rate_from_timebase(timebase: i64, ntsc: bool) -> FrameRate {
-    let tb = timebase.max(1);
+    let tb = timebase.clamp(1, MAX_RATE);
     if ntsc { FrameRate::new(tb * 1000, 1001) } else { FrameRate::new(tb, 1) }
 }
 
 /// Snap a floating rate (OTIO) to an exact rate.
 pub(crate) fn rate_from_f64(r: f64) -> FrameRate {
-    if r <= 0.0 || !r.is_finite() {
+    if r <= 0.0 || !r.is_finite() || r > MAX_RATE as f64 {
         return FrameRate::FPS_24;
     }
     for c in FrameRate::COMMON {
@@ -294,31 +304,27 @@ pub(crate) fn media_clip(media: MediaRef, info: MediaInfo) -> MediaClip {
 
 /// The file path behind an item (following subclips), if it is file media.
 pub(crate) fn item_path(p: &Project, id: ItemId) -> Option<&str> {
-    match &p.item(id)?.kind {
-        ItemKind::Media(m) => match &m.media {
-            MediaRef::File { path } => Some(path),
-            MediaRef::Generator(_) => None,
-        },
-        ItemKind::Subclip { parent, .. } => item_path(p, *parent),
-        _ => None,
+    match &item_media(p, id)?.media {
+        MediaRef::File { path } => Some(path),
+        MediaRef::Generator(_) => None,
     }
 }
 
 /// The media clip behind an item (following subclips).
 pub(crate) fn item_media(p: &Project, id: ItemId) -> Option<&MediaClip> {
-    match &p.item(id)?.kind {
-        ItemKind::Media(m) => Some(m),
-        ItemKind::Subclip { parent, .. } => item_media(p, *parent),
-        _ => None,
-    }
+    p.resolve_media(id).map(|(_, m, _)| m)
 }
 
 /// The underlying item for exports (subclip → parent media).
 pub(crate) fn base_item(p: &Project, id: ItemId) -> ItemId {
-    match p.item(id).map(|i| &i.kind) {
-        Some(ItemKind::Subclip { parent, .. }) => base_item(p, *parent),
-        _ => id,
+    let mut cur = id;
+    for _ in 0..16 {
+        match p.item(cur).map(|i| &i.kind) {
+            Some(ItemKind::Subclip { parent, .. }) => cur = *parent,
+            _ => return cur,
+        }
     }
+    cur
 }
 
 /// How an export report names a clip whose source is a graphic (title) or an adjustment layer,
@@ -692,6 +698,7 @@ pub(crate) fn sanitize_reel(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use filmcraft_time::TimeRange;
 
     #[test]
     fn urls() {
@@ -735,6 +742,19 @@ mod tests {
         assert_eq!(rate_from_f64(24000.0 / 1001.0), FrameRate::FPS_23_976);
         assert_eq!(rate_from_f64(23.976), FrameRate::FPS_23_976);
         assert_eq!(rate_from_f64(48000.0), FrameRate::new(48000, 1));
+        assert_eq!(rate_from_f64(192_000.0), FrameRate::new(192_000, 1));
+        // absurd rates from a hostile file: bounded instead of overflowing frame arithmetic later
+        for ntsc in [false, true] {
+            let r = rate_from_timebase(i64::MAX, ntsc);
+            assert!(plausible_rate(r), "{r}");
+            assert_eq!(rate_from_timebase(-5, ntsc), rate_from_timebase(1, ntsc));
+        }
+        for r in [1e300, 9.3e18, 2_000_000.0, f64::INFINITY, f64::NAN, -1.0] {
+            assert_eq!(rate_from_f64(r), FrameRate::FPS_24, "{r}");
+        }
+        assert!(!plausible_rate(FrameRate::new(i64::MAX, 1)));
+        assert!(!plausible_rate(FrameRate { num: 0, den: 1 }));
+        assert!(plausible_rate(FrameRate::FPS_23_976));
         assert_eq!(frames_round(FrameRate::FPS_24, FrameRate::FPS_24.tick_of(5) + Tick(10)), 5);
     }
 
@@ -746,5 +766,85 @@ mod tests {
         assert_eq!(seq.video_tracks.len(), MAX_IMPORTED_TRACKS);
         assert!(!b.ensure_tracks(&mut seq, TrackKind::Video, MAX_IMPORTED_TRACKS + 1));
         assert_eq!(seq.video_tracks.len(), MAX_IMPORTED_TRACKS);
+    }
+
+    fn subclip_cycle_resolution_is_bounded() {
+        let mut p = Project::new("Cycle Test");
+        let info = MediaInfo {
+            name: "clip.mp4".into(),
+            kind: MediaKind::Movie,
+            duration: Tick(100_000),
+            video: None,
+            audio_streams: vec![],
+            container: "mp4".into(),
+            start_timecode: None,
+            file_size: None,
+        };
+        let media_id = p.add_item(
+            "Clip",
+            Label::Iris,
+            ItemKind::Media(MediaClip {
+                media: MediaRef::File { path: "/path/to/clip.mp4".into() },
+                info,
+                interpret: Default::default(),
+                mark_in: None,
+                mark_out: None,
+                markers: vec![],
+                offline: false,
+                proxy: None,
+                identity: None,
+            }),
+            None,
+        );
+
+        // Normal subclip and chained subclip
+        let sub1 = p.add_item(
+            "Sub 1",
+            Label::Iris,
+            ItemKind::Subclip { parent: media_id, range: TimeRange::new(Tick::ZERO, Tick(10_000)), restrict_trims: false },
+            None,
+        );
+        let sub2 =
+            p.add_item("Sub 2", Label::Iris, ItemKind::Subclip { parent: sub1, range: TimeRange::new(Tick(1_000), Tick(5_000)), restrict_trims: false }, None);
+
+        assert_eq!(base_item(&p, media_id), media_id);
+        assert_eq!(base_item(&p, sub1), media_id);
+        assert_eq!(base_item(&p, sub2), media_id);
+        assert_eq!(item_path(&p, sub2), Some("/path/to/clip.mp4"));
+        assert!(item_media(&p, sub2).is_some());
+
+        // Self-referencing subclip (direct cycle)
+        let self_cycle =
+            p.add_item("Self Cycle", Label::Iris, ItemKind::Subclip { parent: ItemId(9999), range: TimeRange::default(), restrict_trims: false }, None);
+        p.item_mut(self_cycle).unwrap().kind = ItemKind::Subclip { parent: self_cycle, range: TimeRange::default(), restrict_trims: false };
+
+        // Mutual cycle (A -> B -> A)
+        let cycle_a = p.add_item("Cycle A", Label::Iris, ItemKind::Subclip { parent: ItemId(9999), range: TimeRange::default(), restrict_trims: false }, None);
+        let cycle_b = p.add_item("Cycle B", Label::Iris, ItemKind::Subclip { parent: cycle_a, range: TimeRange::default(), restrict_trims: false }, None);
+        p.item_mut(cycle_a).unwrap().kind = ItemKind::Subclip { parent: cycle_b, range: TimeRange::default(), restrict_trims: false };
+
+        // Verify calls that previously caused infinite recursion now safely terminate
+        assert_eq!(base_item(&p, self_cycle), self_cycle);
+        assert_eq!(item_media(&p, self_cycle), None);
+        assert_eq!(item_path(&p, self_cycle), None);
+
+        let base_a = base_item(&p, cycle_a);
+        assert!(base_a == cycle_a || base_a == cycle_b);
+        assert_eq!(item_media(&p, cycle_a), None);
+        assert_eq!(item_path(&p, cycle_a), None);
+        assert_eq!(item_media(&p, cycle_b), None);
+        assert_eq!(item_path(&p, cycle_b), None);
+
+        // Missing item parent
+        let missing_parent = p.add_item(
+            "Missing Parent",
+            Label::Iris,
+            ItemKind::Subclip { parent: ItemId(123456789), range: TimeRange::default(), restrict_trims: false },
+            None,
+        );
+        assert_eq!(base_item(&p, missing_parent), ItemId(123456789));
+        assert_eq!(item_media(&p, missing_parent), None);
+        assert_eq!(item_path(&p, missing_parent), None);
+    }
     }
 }

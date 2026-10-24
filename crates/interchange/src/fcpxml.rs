@@ -19,8 +19,8 @@ use std::collections::{HashMap, HashSet};
 use filmcraft_geom::Vec2;
 use filmcraft_media::MediaKind;
 use filmcraft_project::{
-    BinId, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, Param, ParamValue, Project, Sequence, TrackItem, TrackKind, Transition,
-    TransitionAlign, TransitionId, effect::find_effect_by_name,
+    BinId, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, Param, ParamValue, Project, Sequence, SequenceSettings, TrackItem,
+    TrackKind, Transition, TransitionAlign, TransitionId, effect::find_effect_by_name,
 };
 use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick};
 use roxmltree::Node;
@@ -295,23 +295,38 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
             self.report.warn(format!("recursive FCPXML media resource {id:?} ignored"));
             return None;
         }
-        // Mark the resource before descending: a compound clip can reference itself through a
-        // ref-clip before a completed sequence is available to cache.
         let name = n.attribute("name").unwrap_or("Compound Clip").to_string();
-        let item = self.sequence(s, &name, None);
-        self.media_active.remove(id);
+        // Reserve and memoize before descending, so recursive references resolve to the placeholder.
+        let settings = self.sequence_settings(s);
+        let item = self.b.reserve_sequence(&name, settings.clone(), None);
         self.media_items.insert(id.into(), item);
+        self.fill_sequence(s, item, settings);
+        self.media_active.remove(id);
         Some(item)
     }
 
-    fn sequence(&mut self, s: Node<'a, 'i>, name: &str, bin: Option<BinId>) -> ItemId {
+    /// The settings a `<sequence>` element declares: its format, timecode format and audio rate.
+    fn sequence_settings(&mut self, s: Node<'a, 'i>) -> SequenceSettings {
         let (rate, w, h) = s.attribute("format").and_then(|f| self.formats.get(f)).copied().unwrap_or((FrameRate::default(), 1920, 1080));
         let df = s.attribute("tcFormat") == Some("DF");
         let mut settings = settings_for(rate, w, h, df);
         if let Some(sr) = s.attribute("audioRate").and_then(parse_audio_rate) {
             settings.sample_rate = sr;
         }
+        settings
+    }
+
+    fn sequence(&mut self, s: Node<'a, 'i>, name: &str, bin: Option<BinId>) -> ItemId {
+        let settings = self.sequence_settings(s);
         let id = self.b.reserve_sequence(name, settings.clone(), bin);
+        self.fill_sequence(s, id, settings);
+        id
+    }
+
+    /// Build a sequence's tracks and storyline into an item already reserved by
+    /// [`Builder::reserve_sequence`].
+    fn fill_sequence(&mut self, s: Node<'a, 'i>, id: ItemId, settings: SequenceSettings) {
+        let (rate, w, h) = s.attribute("format").and_then(|f| self.formats.get(f)).copied().unwrap_or((FrameRate::default(), 1920, 1080));
         let mut seq = empty_sequence(settings);
         let tc_start = attr_time(s, "tcStart").unwrap_or(Tick::ZERO);
         seq.start_timecode = rate.frame_at(tc_start);
@@ -324,7 +339,6 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
         }
         seq.markers.sort_by_key(|m| m.start);
         self.b.put_sequence(id, seq);
-        id
     }
 
     /// Lay out a storyline. `origin` maps the storyline's offsets to timeline time
@@ -897,6 +911,10 @@ impl Exp<'_, '_> {
                     if merged_audio.contains(&it.id) {
                         continue;
                     }
+                    if let Some(what) = self.unsupported(it, rate) {
+                        self.report.warn(format!("{what}: it is left out and is not read back on import"));
+                        continue;
+                    }
                     let Some(pi) = els.iter().position(|e| e.start <= it.start && it.start < e.end) else {
                         self.report.warn("a connected clip could not be attached and was dropped");
                         continue;
@@ -964,30 +982,29 @@ impl Exp<'_, '_> {
         )
     }
 
+    /// How the report names a clip FCPXML cannot carry (a generator, a title, an adjustment layer); `None` for any
+    /// other clip. Such a clip has no asset to reference, and an empty `ref` is not a valid IDREF: Final Cut Pro
+    /// rejects the whole file. A `<gap>` exists only in a spine, so a connected one is left out instead.
+    fn unsupported(&self, it: &TrackItem, rate: FrameRate) -> Option<String> {
+        if let Some(g) = generator_of(self.p, base_item(self.p, it.item)) {
+            return Some(format!("generator \"{}\" is not supported in FCPXML", g.label()));
+        }
+        crate::common::uncarried_clip(self.p, it, rate).map(|clip| format!("{clip} is not supported in FCPXML"))
+    }
+
     /// A clip element at `offset` (in its parent's local time).
     #[allow(clippy::too_many_arguments)]
     fn clip_el(&mut self, it: &TrackItem, audio: Option<&TrackItem>, kind: TrackKind, offset: Tick, lane: Option<i32>, seq: &Sequence, primary: bool) -> El {
         let rate = seq.settings.frame_rate;
         let base = base_item(self.p, it.item);
         let is_seq = matches!(self.p.item(base).map(|i| &i.kind), Some(ItemKind::Sequence(_)));
-        let generator = generator_of(self.p, base).cloned();
         let lane_attr = lane.map(|l| format!(" lane=\"{l}\"")).unwrap_or_default();
         let name = crate::xml::escape_attr(&it.name);
-        if let Some(g) = generator {
-            self.report.warn(format!("generator \"{}\" is not supported in FCPXML; written as a gap", g.label()));
-            return El {
-                start: it.start,
-                end: it.end(),
-                local: offset,
-                xml_open: format!(
-                    "<gap name=\"{name}\"{lane_attr} offset=\"{}\" start=\"{}\" duration=\"{}\"",
-                    fmt_time(offset, rate),
-                    fmt_time(offset, rate),
-                    fmt_time(it.duration, rate)
-                ),
-                children: vec![],
-                close: "gap".into(),
-            };
+        // Keep unsupported items in the primary storyline as timing-preserving gaps.
+        if let Some(what) = self.unsupported(it, rate) {
+            self.report.warn(format!("{what}: it is written as a gap and is not read back on import"));
+            return gap_el(it, &name, offset, rate);
+        }
         }
         // Local timeline of the element: origin + source time (retimed clips use a timeMap).
         let (tag, r, origin) = if is_seq {
@@ -1000,13 +1017,7 @@ impl Exp<'_, '_> {
             let origin = self.p.sequence(base).map(|s| s.settings.frame_rate.tick_of(s.start_timecode)).unwrap_or(Tick::ZERO);
             ("ref-clip", r, origin)
         } else {
-            let r = match crate::common::uncarried_clip(self.p, it, rate) {
-                Some(clip) => {
-                    self.report.warn(format!("{clip} is not supported in FCPXML: it is written as a clip without media and is not read back on import"));
-                    String::new()
-                }
-                None => self.asset(base, rate),
-            };
+            let r = self.asset(base, rate);
             let m = item_media(self.p, base);
             let mrate = m.and_then(|m| m.info.video.as_ref().map(|v| v.frame_rate)).unwrap_or(rate);
             let st = m.and_then(|m| m.info.start_timecode).map(|f| mrate.tick_of(f)).unwrap_or(Tick::ZERO);
@@ -1161,6 +1172,23 @@ impl Exp<'_, '_> {
             self.report.warn("blend modes are not exported to FCPXML");
         }
         let _ = (db_to_gain(0.0), gain_to_db(1.0));
+    }
+}
+
+/// A primary-storyline `<gap>` standing in for a clip FCPXML cannot carry; it keeps the clip's place and length.
+fn gap_el(it: &TrackItem, name: &str, offset: Tick, rate: FrameRate) -> El {
+    El {
+        start: it.start,
+        end: it.end(),
+        local: offset,
+        xml_open: format!(
+            "<gap name=\"{name}\" offset=\"{}\" start=\"{}\" duration=\"{}\"",
+            fmt_time(offset, rate),
+            fmt_time(offset, rate),
+            fmt_time(it.duration, rate)
+        ),
+        children: vec![],
+        close: "gap".into(),
     }
 }
 

@@ -5,6 +5,7 @@ cargo test --workspace                          # everything; oracle tests skip 
 cargo nextest run --workspace                   # the same in parallel processes (doctests: cargo test --doc)
 cargo test -p filmcraft-h264                    # one crate
 cargo test --release -p filmcraft-hevc          # codec tests are much faster in release
+cargo xtask fmt                                 # complete workspace formatting check
 cargo xtask ci                                  # all gates (fmt, clippy, tests, layers, assets, wasm)
 cargo xtask fixtures                            # pre-generate the ffmpeg fixture matrix
 FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
@@ -16,6 +17,27 @@ line in `main.rs`; shared helpers live in `tests/it/common/` or `tests/it/suppor
 changes process-wide state (a global switch, pool, panic hook or fault injection) or times a workload
 stays a binary of its own in `tests/`. Select one file's tests with its module path:
 `cargo test -p filmcraft-h264 --test it conformance::`.
+
+## Native font checks
+
+Ordinary text tests discover the existing Inter Bold fixture through `DirectorySource` and
+verify its file-backed metadata and lazy loading. They do not require proprietary host fonts.
+The scan-once smoke test still runs when the host has no visible system fonts.
+
+The macOS system-font regression keeps its native contract: more than 20 system faces,
+Helvetica Bold resolution and glyph layout. It is explicitly invoked with:
+
+```sh
+cargo xtask native-fonts
+```
+
+Run that command on macOS with its system font folders visible, outside a restricted build
+sandbox. `cargo xtask ci` invokes it automatically on macOS, so the normal all-gates command
+retains native discovery coverage. The command first verifies that exactly one ignored native
+font test is listed, so a renamed or accidentally disabled test cannot silently pass with zero
+tests. Calling `native-fonts` on another operating system returns
+an error. The test is ignored by ordinary `cargo test` because its host requirements differ
+from the deterministic file-backed test; it must not be treated as optional in native macOS CI.
 
 ## 1. Kinds of tests
 
@@ -68,9 +90,9 @@ are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
   Generators write to a per-process/thread temporary name (`testkit::temp_path`) and rename it into
   place, so concurrent tests never see half-written files. Delete the directory to regenerate.
   Never commit media.
-- Every crate's `tests/common/mod.rs` delegates discovery and fixture paths to testkit, except
-  `crates/codecs/src/tests.rs`, which still has its own lookup (the crate was being edited
-  concurrently; migrate it when convenient).
+- Every crate's `tests/common/mod.rs` delegates discovery and fixture paths to testkit. The unit
+  tests in `crates/codecs/src/tests.rs` also use shared oracle discovery, but retain older local
+  fixture-generation and path helpers; migrate those separately when convenient.
 - `cargo xtask fixtures [crate…]` pre-generates the whole fixture matrix up front (useful before a
   parallel test run or on a fresh machine). It runs each crate's ignored `generate_fixtures` test —
   the same generators the oracle tests call — for `h264`, `hevc`, `isobmff`, `matroska`, `dnx`,

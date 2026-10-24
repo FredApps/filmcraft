@@ -3,19 +3,79 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use filmcraft_media::FrameRequest;
 use filmcraft_time::{TICKS_PER_SECOND, Tick};
 
-pub(crate) fn ffmpeg() -> Option<&'static str> {
-    ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg"].into_iter().find(|p| std::path::Path::new(p).exists())
+pub(crate) fn ffmpeg() -> Option<PathBuf> {
+    filmcraft_testkit::ffmpeg_or_skip("filmcraft-codecs unit tests")
+}
+
+const ORACLE_PROBE_ENV: &str = "FILMCRAFT_CODECS_ORACLE_PROBE";
+
+fn oracle_probe(path: &std::path::Path) -> std::process::Output {
+    Command::new(std::env::current_exe().expect("test executable path"))
+        .args(["--exact", "tests::oracle_lookup_probe", "--nocapture"])
+        .env(ORACLE_PROBE_ENV, "1")
+        .env("FILMCRAFT_FFMPEG", path)
+        .env("FILMCRAFT_REQUIRE_ORACLES", "1")
+        .output()
+        .expect("run isolated oracle lookup test")
+}
+
+fn oracle_probe_dir() -> PathBuf {
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../target/fixtures/codecs/oracle-lookup-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(&dir).expect("create isolated oracle lookup directory");
+    dir
+}
+
+#[test]
+fn oracle_lookup_probe() {
+    if std::env::var(ORACLE_PROBE_ENV).as_deref() != Ok("1") {
+        return;
+    }
+    if let Some(path) = ffmpeg() {
+        println!("CODECS_FFMPEG_PATH={}", path.display());
+    }
+}
+
+#[test]
+fn oracle_lookup_honors_explicit_ffmpeg_override() {
+    let dir = oracle_probe_dir();
+    let fake_ffmpeg = dir.join("ffmpeg");
+    std::fs::write(&fake_ffmpeg, b"discovery-only test file").expect("write fake ffmpeg path");
+
+    let output = oracle_probe(&fake_ffmpeg);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let expected = format!("CODECS_FFMPEG_PATH={}", fake_ffmpeg.display());
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert!(output.status.success(), "child failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(stdout.contains(&expected), "expected `{expected}` in child output: {stdout}");
+}
+
+#[test]
+fn oracle_lookup_rejects_invalid_ffmpeg_override() {
+    let dir = oracle_probe_dir();
+    let missing_ffmpeg = dir.join("missing-ffmpeg");
+
+    let output = oracle_probe(&missing_ffmpeg);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert!(!output.status.success(), "invalid explicit override unexpectedly succeeded: {output:?}");
+    assert!(stderr.contains("FILMCRAFT_FFMPEG"), "missing override diagnostic: {stderr}");
+    assert!(stderr.contains(&missing_ffmpeg.to_string_lossy().to_string()), "missing path in diagnostic: {stderr}");
 }
 
 fn fixture(name: &str, args: &[&str]) -> Option<Arc<[u8]>> {
-    let ff = ffmpeg().or_else(|| {
-        eprintln!("ffmpeg not found; skipping");
-        None
-    })?;
+    let ff = ffmpeg()?;
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures/codecs");
     std::fs::create_dir_all(&dir).ok()?;
     let out = dir.join(name);
@@ -246,6 +306,35 @@ fn matroska_undecodable_audio_is_labelled_unsupported() {
         let Some(b) = fixture(name, &args) else { return };
         let src = crate::open_bytes(name, b).expect("open");
         assert_eq!(src.info().audio_streams.first().map(|a| a.codec.as_str()), Some(want), "{name}");
+    }
+}
+
+/// #2340: uncompressed QuickTime video (`raw ` 24-bit RGB, `2vuy`, `v210`) decodes, with fl32
+/// audio, instead of being reported unreadable.
+#[test]
+fn quicktime_uncompressed_video() {
+    let src = ["-f", "lavfi", "-i", "color=c=0x3060C0:s=64x36:r=24:d=0.5", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:d=0.5"];
+    for (name, vcodec) in [
+        ("raw_rgb24.mov", ["-c:v", "rawvideo", "-pix_fmt", "rgb24"]),
+        ("raw_2vuy.mov", ["-c:v", "rawvideo", "-pix_fmt", "uyvy422"]),
+        ("raw_v210.mov", ["-c:v", "v210", "-pix_fmt", "yuv422p10le"]),
+    ] {
+        let args: Vec<&str> = src.iter().copied().chain(vcodec).chain(["-c:a", "pcm_f32be", "-shortest"]).collect();
+        let Some(b) = fixture(name, &args) else { return };
+        let src = crate::open_bytes(name, b).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let f = src.video_frame(FrameRequest { time: Tick(TICKS_PER_SECOND / 4), scale: 1.0 }).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!((f.width, f.height), (64, 36), "{name}");
+        assert!(src.info().video.as_ref().is_some_and(|v| v.codec.starts_with("Uncompressed")), "{name}: {:?}", src.info().video);
+        let rgba = f.to_rgba8();
+        let px = &rgba[(18 * 64 + 32) * 4..][..3];
+        for (got, want) in px.iter().zip([0x30u8, 0x60, 0xc0]) {
+            assert!((*got as i32 - want as i32).abs() <= 6, "{name}: {px:?}");
+        }
+        let a = src.audio(12_000, 4800, 48_000).expect("fl32 audio");
+        let peak = a.channels[0].iter().fold(0f32, |m, s| m.max(s.abs()));
+        assert!(peak > 0.05 && peak < 1.0, "{name}: audio peak {peak}");
+    }
+}
     }
 }
 
