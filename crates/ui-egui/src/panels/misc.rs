@@ -151,7 +151,7 @@ pub(crate) fn marker_owned_menu(
             app.auto.add_response(&format!("{prefix}.color.{}", color.name()), &r, name);
             if r.clicked() {
                 if let Err(error) = app.session.execute("markers.edit", params(color.name())) {
-                    app.ui.status = error.to_string();
+                    app.ui.fail(error.to_string());
                 }
                 ui.close();
             }
@@ -212,6 +212,7 @@ pub(crate) fn marker_owned_menu(
 
 pub fn markers(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     super::markers_panel::show(app, ui, rect);
+
 }
 
 pub fn info(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
