@@ -1323,7 +1323,7 @@ impl FrameHeader {
 }
 
 #[cfg(test)]
-mod tests {
+mod scaling_points_tests {
     use super::strictly_increasing;
 
     #[test]

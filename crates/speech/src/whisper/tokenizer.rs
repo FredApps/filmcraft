@@ -127,7 +127,7 @@ impl Tokenizer {
 }
 
 #[cfg(test)]
-mod tests {
+mod vocab_limits_tests {
     use super::*;
 
     #[test]
