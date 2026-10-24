@@ -29,7 +29,7 @@ gh workflow run rc-candidate.yml -R FredApps/filmcraft --ref rc/20261024
 gh run list -R FredApps/filmcraft --branch rc/20261024
 ```
 
-The next required work is to resolve any hosted failures, obtain successful packages, verify downloaded artifact hashes and binary metadata as data, inspect the Linux graphical smoke capture, and then execute native graphical/hardware/parity cases. No tests, packages, graphics results or parity results are claimed to have passed.
+The next required work is to resolve any hosted failures, obtain successful packages, verify downloaded artifact hashes and binary metadata as data, then execute Windows native graphical/hardware/parity cases. No tests, packages, graphics results or parity results are claimed to have passed.
 
 ## Acceptance and maintainer decisions
 

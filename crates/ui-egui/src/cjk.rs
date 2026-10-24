@@ -106,21 +106,6 @@ pub(crate) fn is_system_face(name: &str) -> bool {
     matches!(name, "system-chinese" | "system-korean" | "system-lao")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lao_sample_covers_every_lao_character_in_the_catalog() {
-        for line in include_str!("i18n/lo.tsv").lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
-            let translation = line.split('\t').nth(2).unwrap_or_default();
-            for ch in translation.chars().filter(|ch| ('\u{0e80}'..='\u{0eff}').contains(ch)) {
-                assert!(LAO_SAMPLE.contains(ch), "Lao catalog character U+{:04X} is absent from the font coverage sample", ch as u32);
-            }
-        }
-    }
-}
-
 fn install_chinese(fonts: &mut FontDefinitions) {
     let chinese: Vec<_> = craft_fonts().collect();
     if chinese.is_empty() {
@@ -141,5 +126,20 @@ fn install_chinese(fonts: &mut FontDefinitions) {
         let mut order = chinese.clone();
         order.sort_by_key(|f| (f.family.contains("Serif") && !f.family.contains("Sans"), (f.style == "Bold") != heavy));
         stack.extend(order.iter().map(|f| name(f)));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lao_sample_covers_every_lao_character_in_the_catalog() {
+        for line in include_str!("i18n/lo.tsv").lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
+            let translation = line.split('\t').nth(2).unwrap_or_default();
+            for ch in translation.chars().filter(|ch| ('\u{0e80}'..='\u{0eff}').contains(ch)) {
+                assert!(LAO_SAMPLE.contains(ch), "Lao catalog character U+{:04X} is absent from the font coverage sample", ch as u32);
+            }
+        }
     }
 }

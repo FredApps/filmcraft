@@ -20,7 +20,7 @@ For every attempt capture PR, full candidate and base SHAs, workflow URL/run ID,
 | Native visual | Qualified QA GPU/display; default, CPU, DX12 and Vulkan when supported | Qualified GPU/display; default, CPU, Vulkan when supported | Qualified Apple GPU/display; default, CPU, Metal when supported |
 | Premiere parity | Manual local comparison when installed | NOT_RUN unless qualified local installation exists | NOT_RUN unless qualified local installation exists |
 
-Keep statuses separate. Linux/macOS rows describe desired matrix only; mark unrun lanes `NOT_RUN` or `NOT_APPLICABLE`, never pass. Compare default, forced CPU and available explicit compositor backends; collect FilmCraft-only UI and backend logs.
+Keep statuses separate. This RC builds and qualifies Windows x64 only. Linux/macOS rows are historical reference lanes outside the current build scope; mark them `NOT_APPLICABLE` for this attempt, never pass. Compare default, forced CPU and available explicit compositor backends; collect FilmCraft-only UI and backend logs.
 
 ## Original neutral fixtures
 
@@ -44,4 +44,4 @@ There are 116 integrated PR cases, each bound to `reviewed_pr_head`; integration
 
 116 selected PR changes ship, including five selective adaptations recorded in integration-receipts-expanded.json. #2951 is excluded because its security fix targets a replaced Matroska implementation; #3077 is covered by current playback cleanup. The #3148 paired FFT and #2123 Lao interface have additional RC integration corrections and regressions. All native visual, Premiere and hardware results remain NOT_RUN until executed.
 
-Four no-op integrations (#2033, #2909, #2947, #2964) are covered controls, not new changes. The final accounting is 116 integrated / 628 held / 10 covered. GitHub rejected dispatch before creating a run; every hosted and manual result remains NOT_RUN.
+Four no-op integrations (#2033, #2909, #2947, #2964) are covered controls, not new changes. The final accounting is 116 integrated / 628 held / 10 covered. GitHub Actions was re-enabled and the Windows-only build is running. The earlier dispatch rejection is historical; hosted results must be filled from the completed exact-SHA run. Every manual result remains NOT_RUN.
