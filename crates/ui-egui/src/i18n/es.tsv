@@ -3632,3 +3632,7 @@
 	Show Audio Names	Mostrar nombres de audio
 	Video Names	Nombres de vídeo
 	Audio Names	Nombres de audio
+	Group Clips into Cameras	Agrupar clips en cámaras
+	Camera Label	Etiqueta de cámara
+	Leave out clips without timecode	Omitir clips sin código de tiempo
+	No timecode: {names}	Sin código de tiempo: {names}
