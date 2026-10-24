@@ -48,6 +48,15 @@ $MsiVersion = ($Version -split '-')[0]
 $Target = switch ($Arch) { 'x64' { 'x86_64-pc-windows-msvc' } 'x86' { 'i686-pc-windows-msvc' } 'arm64' { 'aarch64-pc-windows-msvc' } }
 $Dist = if ($env:DIST) { $env:DIST } else { Join-Path $Root 'dist\release' }
 $TargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $Root 'target' }
+
+function Remove-PackageStage([string] $Path) {
+  $stageRoot = [IO.Path]::GetFullPath((Join-Path $TargetDir 'windows-package')).TrimEnd([IO.Path]::DirectorySeparatorChar)
+  $stagePath = [IO.Path]::GetFullPath($Path)
+  if (-not $stagePath.StartsWith($stageRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to remove a directory outside the package staging area: $stagePath"
+  }
+  Remove-Item -LiteralPath $stagePath -Recurse -Force -ErrorAction SilentlyContinue
+}
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 
 if (-not $env:FILMCRAFT_BUILD_SHA) { $env:FILMCRAFT_BUILD_SHA = (git -C $Root rev-parse HEAD 2>$null) }
@@ -84,9 +93,21 @@ foreach ($check in @(@('filmcraft.exe', 2), @('filmcraft-cli.exe', 3))) {
   Write-Output "ok $($check[0]): $Arch, PE subsystem $($h.Subsystem)"
 }
 $Stage = Join-Path $TargetDir "windows-package\$Arch"
-Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
+Remove-PackageStage $Stage
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe') $Stage
+
+# Include project notices and embedded-font licences in the installer as well as the portable ZIP.
+$LicenceStage = Join-Path $Stage 'licenses'
+New-Item -ItemType Directory -Force -Path $LicenceStage | Out-Null
+foreach ($notice in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') {
+  Copy-Item -LiteralPath (Join-Path $Root $notice) -Destination $LicenceStage
+}
+if ($env:CRAFT_FONTS_DIR) {
+  foreach ($lic in Get-ChildItem -Path (Join-Path $env:CRAFT_FONTS_DIR 'fonts\*\OFL.txt') -ErrorAction SilentlyContinue) {
+    Copy-Item -LiteralPath $lic.FullName -Destination (Join-Path $LicenceStage "OFL-$($lic.Directory.Name).txt")
+  }
+}
 
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'filmcraft.exe') (Join-Path $Stage 'filmcraft-cli.exe')
 
@@ -103,7 +124,7 @@ Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Ms
 
 # ---- portable zip ------------------------------------------------------------------------------
 $Portable = Join-Path $TargetDir "windows-package\filmcraft-$Version-windows-$Arch-portable"
-Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
+Remove-PackageStage $Portable
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
 # The marker that makes FilmCraft keep its data in .\data next to the exe instead of %APPDATA% (#139).
