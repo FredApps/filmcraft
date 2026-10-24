@@ -284,6 +284,75 @@ fn collections_and_bare_tracks() {
     assert!(import(b"not json", Format::Otio, None).is_err());
 }
 
+fn palette_collection(first: serde_json::Value, second: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({"OTIO_SCHEMA":"SerializableCollection.1","children":[
+        {"OTIO_SCHEMA":"Timeline.1","name":"First","metadata":{"filmcraft":first},"tracks":{"OTIO_SCHEMA":"Stack.1","children":[]}},
+        {"OTIO_SCHEMA":"Timeline.1","name":"Second","metadata":{"filmcraft":second},"tracks":{"OTIO_SCHEMA":"Stack.1","children":[]}}
+    ]})
+}
+
+#[test]
+fn review_collection_palettes_union_distinct_colors_and_preserve_first_names() {
+    use filmcraft_project::HexColor;
+    use serde_json::json;
+    let doc = palette_collection(
+        json!({"custom_colors":["#112233"],"custom_color_names":{"#112233":"First name"}}),
+        json!({"custom_colors":["#445566","#112233"],"custom_color_names":{"#445566":"Second name","#112233":"Later name"}}),
+    );
+    let (imp, _) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+    let colors = [HexColor([0x11, 0x22, 0x33]), HexColor([0x44, 0x55, 0x66])];
+    assert_eq!(imp.project.custom_colors, colors);
+    assert_eq!(imp.project.custom_color_names[&colors[0]], "First name");
+    assert_eq!(imp.project.custom_color_names[&colors[1]], "Second name");
+    let mut target = Project::new("Existing");
+    filmcraft_interchange::merge_into(&mut target, imp, None);
+    assert_eq!(target.custom_colors, colors);
+    assert_eq!(target.custom_color_names[&colors[0]], "First name");
+}
+
+#[test]
+fn review_collection_empty_or_absent_palettes_do_not_clear_earlier_colors() {
+    use serde_json::json;
+    for later in [json!({"custom_colors":[]}), json!({})] {
+        let doc = palette_collection(json!({"custom_colors":["#112233"],"custom_color_names":{"#112233":"Saved"}}), later);
+        let (imp, _) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+        let mut target = Project::new("Existing");
+        filmcraft_interchange::merge_into(&mut target, imp, None);
+        let color = filmcraft_project::HexColor([0x11, 0x22, 0x33]);
+        assert_eq!(target.custom_colors, [color]);
+        assert_eq!(target.custom_color_names[&color], "Saved");
+    }
+}
+
+#[test]
+fn review_collection_full_palette_keeps_names_with_retained_colors() {
+    use filmcraft_project::HexColor;
+    use serde_json::json;
+    let colors: Vec<_> = (0..64).map(|i| HexColor([0, 0, i])).collect();
+    let doc = palette_collection(
+        json!({"custom_colors":colors.iter().map(|c|c.hex()).collect::<Vec<_>>(),"custom_color_names":{"#000000":"Original"}}),
+        json!({"custom_colors":["#445566","#000001","#000000"],"custom_color_names":{"#445566":"Cannot retain","#000001":"Filled","#000000":"Later"}}),
+    );
+    let (imp, report) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+    assert_eq!(imp.project.custom_colors, colors);
+    assert_eq!(imp.project.custom_color_names[&colors[0]], "Original");
+    assert_eq!(imp.project.custom_color_names[&colors[1]], "Filled");
+    assert!(!imp.project.custom_color_names.contains_key(&HexColor([0x44, 0x55, 0x66])));
+    assert!(report.to_string().contains("64"), "discarded palette entries must be reported: {report}");
+}
+
+#[test]
+fn review_collection_palette_deduplicates_before_applying_capacity() {
+    use filmcraft_project::HexColor;
+    use serde_json::json;
+    let mut entries = vec!["#000000".to_owned(); 70];
+    entries.extend((0..70).map(|i| HexColor([0, 0, i]).hex()));
+    let doc = palette_collection(json!({"custom_colors":entries}), json!({}));
+    let (imp, report) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+    assert_eq!(imp.project.custom_colors, (0..64).map(|i| HexColor([0, 0, i])).collect::<Vec<_>>());
+    assert!(report.to_string().contains("64"));
+}
+
 #[derive(Clone, Debug)]
 struct G {
     track: usize,

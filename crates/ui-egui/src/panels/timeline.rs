@@ -2843,15 +2843,20 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
         }
     }
 
-    if resp.double_clicked()
+    // Marker flags overlap the work area's hit padding; a double-click has one owner.
+    let marker_double_clicked = if resp.double_clicked()
         && let Some(p) = resp.interact_pointer_pos()
         && let Some(marker) = marker_under_pointer(seq, layout, p)
     {
         crate::panels::marker_properties::open(app, marker);
-    }
+        true
+    } else {
+        false
+    };
 
     // ---- double-click the work area bar: it spans the part of the sequence the ruler shows
     if resp.double_clicked()
+        && !marker_double_clicked
         && let Some(p) = resp.interact_pointer_pos()
         && let Hit::WorkArea { .. } = hit(seq, layout, p)
     {

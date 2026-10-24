@@ -211,8 +211,10 @@ pub(crate) fn marker_color_p(p: &Value, cmd: &str) -> Result<Option<(Label, Opti
     Err(bad(cmd, format!("unknown marker color {v}; use #RRGGBB or one of: {}", names.join(", "))))
 }
 
+/// Missing/null authors preserve the existing value; an empty string explicitly clears it.
+/// Reject non-text values, control characters and more than 1024 UTF-8 bytes before editing.
 pub(crate) fn marker_author_p(p: &Value, cmd: &str) -> Result<Option<String>> {
-    let Some(value) = p.get("author") else { return Ok(None) };
+    let Some(value) = p.get("author").filter(|v| !v.is_null()) else { return Ok(None) };
     let text = value.as_str().ok_or_else(|| bad(cmd, "author must be text"))?;
     if text.len() > 1024 || text.chars().any(char::is_control) {
         return Err(bad(cmd, "author must be at most 1024 UTF-8 bytes without control characters"));

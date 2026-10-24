@@ -237,7 +237,7 @@ frames: the warning stays and the exit status is 0. The export result lists the 
 in the UI and markers outside In/Out, sorted by start then id. The UTF-8 CSV has a header and CRLF
 records; quotes, commas and embedded newlines are escaped. Columns are Sequence, Marker ID, Name,
 Comment, Kind, Color, Start Timecode, End Timecode, Duration Frames, Start Ticks, Duration Ticks,
-Frame Rate (exact numerator/denominator), and Author. Custom colors use canonical `#RRGGBB`;
+Frame Rate (exact numerator/denominator), Author, and URL. Custom colors use canonical `#RRGGBB`;
 preset Color uses the user's display label from Settings ▸ Labels. Timecodes include the sequence's start timecode and
 drop-frame setting; End is exclusive, and a point marker's End equals Start. Duration Frames is
 rounded down; tick columns preserve sub-frame timing (254016000000 ticks per second).
@@ -341,7 +341,8 @@ ROADMAP.md and [target-app-parity.md](target-app-parity.md) keep two numbers: **
 `author` (text, at most 1024 UTF-8 bytes without control characters) and `color` (an
 existing label name or six hex digits, optionally prefixed with `#`). Commands and CSV
 report custom colors as uppercase `#RRGGBB`. Omitting either property while editing
-preserves it; `author: ""` clears attribution, and choosing a preset clears custom color.
+preserves it; `author: null` also preserves the author, `author: ""` clears attribution,
+and choosing a preset clears custom color.
 The source-target variants of Add/Edit accept the same properties. Inspect reports
 include `author` and the effective `color`.
 
@@ -363,6 +364,9 @@ report URL loss. Imported addresses are checked again before opening.
 Interchange imports fill missing names on existing swatches while preserving target names,
 even when the palette is full. Formats that cannot retain the saved palette warn about its
 loss even if none of its colors are assigned; FilmCraft projects and OTIO retain it.
+An OTIO collection unions its timelines' saved palettes in encounter order, preserving the
+first valid name and filling missing names for retained colors. Empty later palettes do
+not clear earlier colors. Colors beyond the project's 64-entry limit produce a warning.
 
 `edit.label` also accepts a hex `label` and `saveColor:true` to save and apply a custom clip color atomically. Markers and clips share the unchanged sixteen clip presets; Red, Orange, Cyan and Pink are aliases for Rose, Mango, Teal and Magenta.
 

@@ -410,6 +410,38 @@ fn first_rate(v: &Value) -> Option<FrameRate> {
 }
 
 impl Imp<'_, '_> {
+    /// Union each timeline's saved palette into the project's 64 retained colors.
+    /// Keep the first valid name, fill missing names even at capacity, and never keep orphan names.
+    fn merge_palette(&mut self, meta: Option<&Value>) {
+        if let Some(colors) = meta.and_then(|m| m.get("custom_colors")).and_then(Value::as_array) {
+            let mut overflow = false;
+            for color in colors.iter().filter_map(Value::as_str).filter_map(filmcraft_project::HexColor::parse) {
+                if self.b.p.custom_colors.contains(&color) {
+                    continue;
+                }
+                if self.b.p.custom_colors.len() >= 64 {
+                    overflow = true;
+                    break;
+                }
+                self.b.p.custom_colors.push(color);
+            }
+            if overflow {
+                self.report.warn("OTIO saved palettes exceed the 64-color project limit; additional colors were not imported.");
+            }
+        }
+        if let Some(names) = meta.and_then(|m| m.get("custom_color_names")).and_then(Value::as_object) {
+            for (key, value) in names.iter().take(64) {
+                if let (Some(color), Some(name)) = (filmcraft_project::HexColor::parse(key), value.as_str())
+                    && self.b.p.custom_colors.contains(&color)
+                    && name.len() <= 128
+                    && !name.chars().any(char::is_control)
+                {
+                    self.b.p.custom_color_names.entry(color).or_insert_with(|| name.to_owned());
+                }
+            }
+        }
+    }
+
     fn timeline(&mut self, tl: &Value) -> ItemId {
         let name = name_of(tl);
         let name = if name.is_empty() { self.opts.name.clone().unwrap_or_else(|| "Timeline".into()) } else { name };
@@ -423,20 +455,7 @@ impl Imp<'_, '_> {
             _ => tl,
         };
         let meta = fc(tl).or_else(|| fc(stack));
-        if let Some(colors) = meta.and_then(|m| m.get("custom_colors")).and_then(Value::as_array) {
-            self.b.p.custom_colors = colors.iter().filter_map(Value::as_str).filter_map(filmcraft_project::HexColor::parse).take(64).collect();
-        }
-        if let Some(names) = meta.and_then(|m| m.get("custom_color_names")).and_then(Value::as_object) {
-            for (key, value) in names.iter().take(64) {
-                if let (Some(color), Some(name)) = (filmcraft_project::HexColor::parse(key), value.as_str())
-                    && self.b.p.custom_colors.contains(&color)
-                    && name.len() <= 128
-                    && !name.chars().any(char::is_control)
-                {
-                    self.b.p.custom_color_names.insert(color, name.to_owned());
-                }
-            }
-        }
+        self.merge_palette(meta);
 
         let rate = tl.get("global_start_time").and_then(read_rate).or_else(|| first_rate(stack)).unwrap_or_default();
         let id = self.sequence(stack, &name, meta, rate);

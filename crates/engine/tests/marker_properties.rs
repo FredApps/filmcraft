@@ -3,6 +3,25 @@ use filmcraft_project::{HexColor, Label};
 use serde_json::json;
 
 #[test]
+fn review_null_author_is_omitted_for_creation_and_preserves_existing_author() {
+    let mut s = Session::default();
+    s.execute("file.newSequence", json!({})).unwrap();
+    for cmd in ["markers.add", "markers.addRange"] {
+        let id = s.execute(cmd, json!({"frame":0,"durationFrames":10,"author":null})).unwrap()["marker"].as_u64().unwrap();
+        s.execute("markers.edit", json!({"marker":id,"author":"Editor"})).unwrap();
+        let before = s.project.to_json();
+        let history = s.history.undo.len();
+        s.execute("markers.edit", json!({"marker":id,"author":null,"name":"Updated"})).unwrap();
+        let marker = s.active_sequence().unwrap().markers.iter().find(|m| m.id.0 == id).unwrap();
+        assert_eq!(marker.author, "Editor");
+        assert_eq!(marker.name, "Updated");
+        assert_eq!(s.history.undo.len(), history + 1);
+        s.execute("edit.undo", json!({})).unwrap();
+        assert_eq!(s.project.to_json(), before);
+    }
+}
+
+#[test]
 fn web_link_url_is_separate_from_notes_atomic_persistent_and_optional_in_old_projects() {
     use filmcraft_project::MarkerKind;
     let mut s = Session::default();

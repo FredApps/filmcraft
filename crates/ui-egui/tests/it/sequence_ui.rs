@@ -20,6 +20,51 @@ struct Driver {
 }
 
 #[test]
+fn review_marker_double_click_over_work_area_preserves_project_and_history() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let point = d.exec("markers.add", json!({"frame":36}))["marker"].as_u64().unwrap();
+    let range = d.exec("markers.addRange", json!({"frame":48,"durationFrames":24}))["marker"].as_u64().unwrap();
+    let rate = d.app().session.sequence_rate();
+    d.exec("sequence.setWorkArea", json!({"start":rate.tick_of(24).0,"end":rate.tick_of(120).0}));
+    d.ok("ui.menu.invoke", json!({"id":"view.zoomToSequence"}));
+    d.frames(60);
+    let before = d.app().session.project.to_json();
+    let area = d.app().session.active_sequence().unwrap().work_area;
+    let history = d.app().session.history.undo.len();
+    for (id, marker) in
+        [(format!("timeline.marker.{point}"), point), (format!("timeline.marker.{range}"), range), (format!("timeline.markerEnd.{range}"), range)]
+    {
+        let elements = d.ok("ui.elements", json!({"prefix":id}));
+        let rect = elements.as_array().unwrap().iter().find(|e| e["id"] == id).unwrap()["rect"].as_array().unwrap();
+        let pos = egui::pos2(
+            (rect[0].as_f64().unwrap() + rect[2].as_f64().unwrap() / 2.0) as f32,
+            (rect[1].as_f64().unwrap() + rect[3].as_f64().unwrap() - 0.5) as f32,
+        );
+        let hit = d.ok("ui.timeline.hit", json!({"x":pos.x,"y":pos.y}));
+        assert_eq!(hit["hit"], "workArea", "the regression must exercise the overlapping hit rectangles");
+        d.double_click_at(pos);
+        assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, marker);
+        assert_eq!(d.app().session.active_sequence().unwrap().work_area, area, "opening marker properties must not change the work area");
+        assert_eq!(d.app().session.history.undo.len(), history);
+        d.snapshot("marker-work-area-overlap", "markerProperties.");
+        d.click("markerProperties.cancel");
+        assert_eq!(d.app().session.project.to_json(), before);
+        assert_eq!(d.app().session.history.undo.len(), history);
+    }
+    let elements = d.ok("ui.elements", json!({"prefix":"timeline.workArea"}));
+    let rect = elements.as_array().unwrap().iter().find(|e| e["id"] == "timeline.workArea").unwrap()["rect"].as_array().unwrap();
+    let pos =
+        egui::pos2((rect[0].as_f64().unwrap() + rect[2].as_f64().unwrap() / 2.0) as f32, (rect[1].as_f64().unwrap() + rect[3].as_f64().unwrap() / 2.0) as f32);
+    d.double_click_at(pos);
+    assert!(d.app().ui.marker_properties.is_none());
+    assert_ne!(d.app().session.active_sequence().unwrap().work_area, area);
+    assert_eq!(d.app().session.history.undo.len(), history + 1);
+    d.exec("edit.undo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), before);
+}
+
+#[test]
 fn web_link_editor_keeps_notes_and_opens_only_after_an_explicit_click() {
     use std::{cell::RefCell, rc::Rc};
     let mut d = Driver::demo();
@@ -746,6 +791,10 @@ impl Driver {
             (rect[0].as_f64().unwrap() + rect[2].as_f64().unwrap() / 2.0) as f32,
             (rect[1].as_f64().unwrap() + rect[3].as_f64().unwrap() / 2.0) as f32,
         );
+        self.double_click_at(pos);
+    }
+
+    fn double_click_at(&mut self, pos: egui::Pos2) {
         // Control-channel event pacing is too slow for a physical double click.
         self.frames(60);
         self.harness.input_mut().events.push(egui::Event::PointerMoved(pos));
