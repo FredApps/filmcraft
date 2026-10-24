@@ -16,6 +16,10 @@
 //! stream is cut into blocks. Recursive state is flushed to zero when it decays below ~1e-30 so
 //! denormals never appear (no FTZ/DAZ CPU flags needed, which keeps the crate `unsafe`-free and
 //! portable to wasm).
+//!
+//! **Stability.** This crate is internal to the FilmCraft workspace (layer L1) and is not
+//! published. Its public surface exists for the other workspace crates only and may change
+//! without notice or a deprecation period; there is no supported use from outside the workspace.
 
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable))]
 
