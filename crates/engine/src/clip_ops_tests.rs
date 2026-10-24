@@ -1184,7 +1184,6 @@ fn video_options_are_enabled_only_with_a_video_clip_selected() {
     s.execute("edit.deselectAll", json!({})).unwrap();
     s.execute("clip.fitToFrame", json!({"clips": [picture.0]})).unwrap();
     s.execute("clip.timeInterpolation.frameBlending", json!({"clips": [picture.0]})).unwrap();
-    }
 }
 
 /// Transform's Anchor Point and Position are centred in the clip's own picture (on apply and on reset), so Scale grows it
@@ -1219,6 +1218,4 @@ fn applied_transform_centres_its_points_in_the_clip_picture() {
     for m in clip(&s, c).effects.iter().filter(|e| e.effect == "motion") {
         assert_eq!(m.param("position").unwrap().value.as_vec2().unwrap(), frame_centre);
     }
-    }
-}
 }

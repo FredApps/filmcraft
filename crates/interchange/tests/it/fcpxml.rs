@@ -292,11 +292,7 @@ fn a_self_referential_media_imports_instead_of_overflowing_the_stack() {
     // Before, this overflowed the stack rather than returning.
     let (imp, _rep) = import(d.as_bytes(), Format::Fcpxml, Some("/proj")).unwrap();
     let p = &imp.project;
-    let loop_seq = p
-        .items
-        .values()
-        .find(|i| i.name == "Loop" && matches!(i.kind, ItemKind::Sequence(_)))
-        .expect("the <media> became a sequence");
+    let loop_seq = p.items.values().find(|i| i.name == "Loop" && matches!(i.kind, ItemKind::Sequence(_))).expect("the <media> became a sequence");
     let s = p.sequence(loop_seq.id).unwrap();
     // The self-referencing ref-clip resolved to the same sequence item, not a fresh recursion.
     assert_eq!(s.video_tracks[0].items.len(), 2, "the spine's two elements are both there");

@@ -19,8 +19,8 @@ use std::collections::{HashMap, HashSet};
 use filmcraft_geom::Vec2;
 use filmcraft_media::MediaKind;
 use filmcraft_project::{
-    BinId, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, Param, ParamValue, Project, Sequence, SequenceSettings, TrackItem,
-    TrackKind, Transition, TransitionAlign, TransitionId, effect::find_effect_by_name,
+    BinId, ItemId, ItemKind, Keyframe, Label, Marker, MarkerId, MarkerKind, Param, ParamValue, Project, Sequence, SequenceSettings, TrackItem, TrackKind,
+    Transition, TransitionAlign, TransitionId, effect::find_effect_by_name,
 };
 use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick};
 use roxmltree::Node;
@@ -1004,7 +1004,6 @@ impl Exp<'_, '_> {
         if let Some(what) = self.unsupported(it, rate) {
             self.report.warn(format!("{what}: it is written as a gap and is not read back on import"));
             return gap_el(it, &name, offset, rate);
-        }
         }
         // Local timeline of the element: origin + source time (retimed clips use a timeMap).
         let (tag, r, origin) = if is_seq {

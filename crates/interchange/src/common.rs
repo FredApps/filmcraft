@@ -846,5 +846,4 @@ mod tests {
         assert_eq!(item_media(&p, missing_parent), None);
         assert_eq!(item_path(&p, missing_parent), None);
     }
-    }
 }

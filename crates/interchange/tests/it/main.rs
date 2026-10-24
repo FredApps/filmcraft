@@ -10,3 +10,6 @@ mod otio;
 mod point_markers;
 mod support;
 mod uncarried_clips;
+
+mod cyclic_subclips;
+mod rates;

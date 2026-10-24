@@ -335,8 +335,6 @@ fn quicktime_uncompressed_video() {
         assert!(peak > 0.05 && peak < 1.0, "{name}: audio peak {peak}");
     }
 }
-    }
-}
 
 #[test]
 fn matroska_prores_pcm() {

@@ -113,7 +113,8 @@ fn output_device(h: &cpal::Host, name: &str, cache: &Mutex<Option<(String, Strin
     }
     let host_name = h.id().name().to_string();
     let mut cache = cache.lock().unwrap_or_else(PoisonError::into_inner);
-    let mut devs: Vec<(String, cpal::Device)> = h.output_devices().ok()?.filter_map(|d| d.description().ok().map(|desc| (desc.name().to_string(), d))).collect();
+    let mut devs: Vec<(String, cpal::Device)> =
+        h.output_devices().ok()?.filter_map(|d| d.description().ok().map(|desc| (desc.name().to_string(), d))).collect();
     if let Some((cached_host, cached)) = cache.as_ref()
         && *cached_host == host_name
         && let Some(i) = devs.iter().position(|(n, _)| n == cached)
