@@ -1104,6 +1104,7 @@ mod tests {
         crate::theme::install(&ctx, &crate::theme::Tokens::for_kind(crate::theme::ThemeKind::default()));
         let r = crate::menus::invoke(&mut app, &ctx, "app.language.japanese", serde_json::json!({}));
         let craft = craft_japanese_font();
+        let japanese_fonts: Vec<_> = filmcraft_text::fonts::craft_japanese().map(|font| format!("craft:{} {}", font.family, font.style)).collect();
         if !craft && system_japanese_font().is_none() {
             // no craft-fonts and no system font: refused, and the interface stays English
             assert!(r.is_err(), "{r:?}");
@@ -1129,7 +1130,10 @@ mod tests {
                     .filter(|n| !crate::rtl::is_system_face(n) && !crate::cjk::is_system_face(n))
                     .collect();
                 if craft {
-                    assert!(stack.last().is_some_and(|n| n.starts_with("craft:")), "{family:?}: {stack:?}");
+                    let first_japanese = stack.iter().position(|name| japanese_fonts.contains(name));
+                    assert!(first_japanese.is_some_and(|index| index > 0), "{family:?}: {stack:?}");
+                    assert_eq!(stack.iter().position(|name| name.starts_with("craft:")), first_japanese, "{family:?}: {stack:?}");
+                    assert!(japanese_fonts.iter().all(|name| stack.contains(name)), "{family:?}: {stack:?}");
                     assert!(!stack.iter().any(|n| n == JAPANESE_FONT), "{family:?}: {stack:?}");
                 } else {
                     assert_eq!(stack.last().map(String::as_str), Some(JAPANESE_FONT), "{family:?}: {stack:?}");
