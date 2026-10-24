@@ -1,0 +1,33 @@
+{
+  "branch": "rc-helper-root",
+  "tip": "d3cd834e",
+  "base": "724c6daff1f",
+  "validation": "git diff --check and static conflict-marker/catalog-key inspection only; no candidate execution",
+  "records": [
+    {
+      "pr": 1944,
+      "merge_commit_prefix": "f9e19d6aa4b",
+      "resolution": "Retained both CJK and RTL optional-face filters in generalized Japanese fallback test."
+    },
+    {
+      "pr": 2034,
+      "merge_commit_prefix": "53aaa01766d",
+      "resolution": "Applied name elision/hover galley while retaining custom_label_color label helper argument."
+    },
+    {
+      "pr": 2123,
+      "merge_commit_prefix": "871eddbc5dc",
+      "resolution": "Preserved generalized current catalog tests, added Lao catalog_text arm and Lao-specific regression; retained new locale tags."
+    },
+    {
+      "pr": 2364,
+      "merge_commit_prefix": "a267769d",
+      "resolution": "Applied full timecode-group multicam behavior/tests; unioned independent catalog additions in eight languages and checked duplicate context/source keys."
+    },
+    {
+      "pr": 2412,
+      "merge_commit_prefix": "d3cd834e",
+      "resolution": "Selected reviewed Vertical-before-Learning/Review workspace ordering."
+    }
+  ]
+}

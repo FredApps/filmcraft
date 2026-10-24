@@ -1,0 +1,8 @@
+{
+  "pr": 3148,
+  "commit": "bfc7b90e1e96e8fec4d50535ca226f506fe5cf9f",
+  "change": "Non-finite sample becomes silence in its own channel before STFT single/shared FFT ingestion. Finite input unchanged.",
+  "regression_test": "effects::stft::tests::non_finite_stft_input_does_not_contaminate_neighboring_channels",
+  "local_validation": "Trusted rustfmt + git diff --check only. No tests or candidate execution.",
+  "hosted_validation": "PENDING"
+}

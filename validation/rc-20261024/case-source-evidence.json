@@ -1,0 +1,2955 @@
+{
+  "1041": {
+    "sha": "5861dc9bd01b742cc2a44073135846437cae2bf5",
+    "changed_files": [
+      "packaging/macos/package.sh"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "1435": {
+    "sha": "1f13dcb12ff0925e22b6f7d2a1223be1301bf93c",
+    "changed_files": [
+      "ROADMAP.md",
+      "apps/filmcraft/src/audio.rs",
+      "crates/edit/src/frame_size.rs",
+      "crates/edit/src/tests.rs",
+      "crates/edit/src/through.rs",
+      "crates/edit/src/transcript/tests.rs",
+      "crates/edit/src/transitions.rs",
+      "crates/engine/src/clip_ops.rs",
+      "crates/engine/src/clip_ops_tests.rs",
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/demo.rs",
+      "crates/engine/src/lib.rs",
+      "crates/engine/src/marker_edit.rs",
+      "crates/engine/src/marker_export.rs",
+      "crates/engine/src/multicam_tests.rs",
+      "crates/engine/src/palette.rs",
+      "crates/engine/src/panels.rs",
+      "crates/engine/src/project_panel.rs",
+      "crates/engine/src/project_tools.rs",
+      "crates/engine/src/scene_detect.rs"
+    ],
+    "added_test_attributes": 30,
+    "tests_added_by_diff": [
+      "csv_preserves_exact_custom_color_and_author",
+      "custom_marker_properties_survive_undo_and_project_reopen",
+      "invalid_marker_properties_leave_project_and_undo_unchanged",
+      "all_marker_creation_commands_accept_hex_and_author",
+      "custom_palette_is_project_local_bounded_and_undoable",
+      "custom_clip_colors_share_palette_and_survive_save_preset_switch_and_undo",
+      "metadata_label_edits_use_the_effective_color_and_clear_custom_overrides",
+      "marker_and_clip_aliases_resolve_to_the_same_unchanged_presets",
+      "marker_time_edits_are_sorted_exact_and_reject_hostile_ranges_atomically",
+      "bulk_marker_changes_are_owner_scoped_atomic_and_one_undo"
+    ],
+    "tests_existing_in_changed_files": [
+      "fallback_prefers_sound_servers_over_raw_hardware",
+      "notes_name_the_fallback_device",
+      "integer_conversion_clips_and_preserves_interleaved_channels",
+      "full_scale_24_bit_samples_remain_representable",
+      "stream_errors_ask_for_a_restart_instead_of_failing_playback",
+      "an_error_while_samples_keep_flowing_is_only_a_hiccup",
+      "a_stream_that_errors_and_stops_consuming_is_restarted",
+      "a_lost_device_restarts_at_once_and_repeated_failures_give_up",
+      "the_device_callback_never_panics_and_counts_played_frames",
+      "a_panicking_mixer_plays_silence_and_fails_the_stream",
+      "same_aspect_scales_position_and_scale_together",
+      "aspect_change_fits_the_old_frame_inside_the_new_one",
+      "keyframes_scale_too",
+      "automatic_position_stays_automatic",
+      "scale_to_frame_clips_keep_their_scale_but_move",
+      "scale_is_capped_at_the_parameter_range",
+      "same_size_or_empty_frame_changes_nothing",
+      "overwrite_splits_underlying",
+      "insert_ripples_sync_locked_tracks",
+      "razor_keeps_content_continuous"
+    ]
+  },
+  "1560": {
+    "sha": "da00963a0e34fed4b65ccf7feafe42f05c8d437a",
+    "changed_files": [
+      "crates/gpu/src/blend_tests.rs",
+      "crates/gpu/src/composite.wgsl",
+      "crates/gpu/src/lib.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "mixed_axis_yuv_detail_matches_cpu"
+    ],
+    "tests_existing_in_changed_files": [
+      "gpu_blend_modes_match_cpu",
+      "gpu_blend_edge_cases_match_cpu",
+      "gpu_dissolve_pattern_is_exact",
+      "normal_fast_path_and_blend_layers_off_output",
+      "quad_bounds_clamps_and_handles_non_finite",
+      "upscaled_yuv_detail_matches_cpu",
+      "mixed_axis_yuv_detail_matches_cpu",
+      "upscaled_yuv_chroma_edges_match_cpu",
+      "yuv_not_magnified_keeps_code_value_sampling"
+    ]
+  },
+  "1598": {
+    "sha": "a5fcc60bb0c76562e855709ff8a5788bc73cbf76",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_scroll_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "zooming_out_stops_where_the_whole_timeline_is_in_view"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "the_wheel_moves_the_tracks_up_and_down",
+      "cmd_wheel_moves_the_timeline_sideways_and_option_wheel_zooms",
+      "the_mouse_scrolling_setting_swaps_wheel_and_cmd_wheel",
+      "the_view_stops_ten_minutes_past_the_end_of_the_sequence",
+      "zooming_out_stops_where_the_whole_timeline_is_in_view"
+    ]
+  },
+  "1602": {
+    "sha": "1d70c41b9d49bc3a9d6ec71e54d41d444880d914",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_tool_pointer_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "an_option_drag_keeps_the_copy_pointer"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "the_editing_tools_draw_their_own_pointer_over_the_tracks",
+      "the_razor_line_crosses_the_linked_clips_or_every_track_with_shift",
+      "the_tool_pointer_stays_on_during_a_drag",
+      "an_option_drag_keeps_the_copy_pointer"
+    ]
+  },
+  "1610": {
+    "sha": "495843465a2e94e6f2be63a37d89eab318f31207",
+    "changed_files": [
+      "crates/ui-egui/src/widgets.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "the_text_of_a_search_field_is_centred_vertically_in_it"
+    ],
+    "tests_existing_in_changed_files": [
+      "the_text_of_a_search_field_is_centred_vertically_in_it",
+      "clicking_a_hot_number_selects_its_whole_value",
+      "dialogs_open_centered_and_drag"
+    ]
+  },
+  "1619": {
+    "sha": "2b798193f3caab862bf860b16d92507e3500065c",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_transition_move_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "dragging_a_clip_to_another_track_carries_its_fade_in_the_preview"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "dragging_a_clip_carries_its_fade_in_the_preview_and_on_the_drop",
+      "dragging_both_clips_of_a_cut_carries_the_transition",
+      "dragging_two_clips_drops_the_transition_on_the_cut_that_stayed",
+      "option_drag_copies_show_a_ghost_transition_with_the_copy",
+      "dragging_one_side_to_another_track_drops_the_transition"
+    ]
+  },
+  "1626": {
+    "sha": "784bbc06e4f9691b85896ca1e9db0a7f9f31261c",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_linked_move_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "moving_a_linked_video_clip_up_a_track_leaves_its_audio_on_its_track",
+      "moving_a_linked_audio_clip_down_a_track_leaves_its_video_on_its_track"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "moving_a_linked_video_clip_up_a_track_leaves_its_audio_on_its_track",
+      "moving_a_linked_audio_clip_down_a_track_leaves_its_video_on_its_track"
+    ]
+  },
+  "1629": {
+    "sha": "5a94daf66129d0a2a673633b1d698caaa6b0db40",
+    "changed_files": [
+      "crates/ui-egui/src/dock_ui.rs",
+      "crates/ui-egui/src/graphics_notice.rs",
+      "crates/ui-egui/src/lib.rs",
+      "crates/ui-egui/src/menus.rs",
+      "crates/ui-egui/src/native_dialogs.rs",
+      "crates/ui-egui/src/panels/audio_fx_editor.rs",
+      "crates/ui-egui/src/panels/clip_dialogs.rs",
+      "crates/ui-egui/src/panels/color_dialogs.rs",
+      "crates/ui-egui/src/panels/dialogs.rs",
+      "crates/ui-egui/src/panels/effect_controls.rs",
+      "crates/ui-egui/src/panels/effect_controls_selection.rs",
+      "crates/ui-egui/src/panels/effects.rs",
+      "crates/ui-egui/src/panels/essential_sound.rs",
+      "crates/ui-egui/src/panels/events.rs",
+      "crates/ui-egui/src/panels/export_mode.rs",
+      "crates/ui-egui/src/panels/file_dialogs.rs",
+      "crates/ui-egui/src/panels/frame_export.rs",
+      "crates/ui-egui/src/panels/graphics.rs",
+      "crates/ui-egui/src/panels/graphics_templates.rs",
+      "crates/ui-egui/src/panels/interchange_export.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "an_error_is_marked_and_a_note_is_not",
+      "a_click_on_the_status_bar_dismisses_an_error"
+    ],
+    "tests_existing_in_changed_files": [
+      "ctrl_c_x_v_become_key_presses",
+      "extra_modifiers_are_kept",
+      "windows_insert_and_delete_variants",
+      "other_events_are_left_alone",
+      "ctrl_click_is_a_secondary_click",
+      "synthesized_click_fires_secondary_clicked",
+      "release_is_paired_to_the_ctrl_press",
+      "plain_click_is_untouched",
+      "new_plain_press_clears_a_stale_pairing",
+      "software_rasterizers_are_detected",
+      "plan_side_covers_output_and_every_layer",
+      "forward_shuttle_playback_keeps_audio_enabled",
+      "maintain_pitch_shuttling_controls_the_samples_sent_to_the_device",
+      "changing_pitch_preference_restarts_audio_at_the_current_playhead",
+      "changing_hardware_recovers_wall_clock_playback_without_rewinding",
+      "a_failed_device_clock_resumes_from_the_displayed_frame",
+      "a_restarted_stream_keeps_the_device_clock_and_the_sound",
+      "an_unmodified_key_reaches_a_focused_text_field",
+      "an_unmodified_key_still_fires_without_a_text_field",
+      "a_modified_chord_still_fires_while_text_is_focused"
+    ]
+  },
+  "1630": {
+    "sha": "96eccecd9d9f673007da02e344f545817d98d241",
+    "changed_files": [
+      "crates/ui-egui/tests/timeline_track_menu_ui.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "a_track_header_menu_adds_and_deletes_tracks",
+      "the_empty_part_of_the_header_column_offers_the_dialogs",
+      "a_right_click_on_a_header_button_opens_the_menu"
+    ]
+  },
+  "1634": {
+    "sha": "0c9c4df8a632ca7551f524f114438f975b23d320",
+    "changed_files": [
+      "crates/engine/src/settings.rs",
+      "crates/engine/src/settings_tests.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "the_progress_window_preference_is_wired"
+    ],
+    "tests_existing_in_changed_files": [
+      "interface_language_persists_and_rejects_hostile_values",
+      "interface_language_defaults_to_the_system_language",
+      "categories_follow_premiere_order",
+      "every_schema_key_exists_with_a_valid_default",
+      "prefs_persist_through_the_data_directory",
+      "v1_preferences_migrate_and_bad_values_are_repaired",
+      "prefs_set_validates_and_reset_works_per_category",
+      "schema_command_describes_every_category",
+      "still_image_default_duration_and_indeterminate_timebase",
+      "default_transition_durations",
+      "step_many_frames",
+      "label_defaults_names_and_colours",
+      "default_media_scaling",
+      "recent_projects_are_remembered",
+      "media_cache_location_policy_and_clean",
+      "output_mapping_and_smart_quotes",
+      "graphics_text_uses_the_text_settings",
+      "auto_transcribe_on_import_and_transcription_defaults",
+      "transcription_without_speech_to_text_says_so",
+      "hardware_decoding_setting_drives_the_decoder_switch"
+    ]
+  },
+  "1636": {
+    "sha": "459f185e3d444c52da69ebb52faaf2407c1c5a86",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/src/panels/timeline_hit.rs",
+      "crates/ui-egui/tests/timeline_transition_size_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "a_transition_fills_a_compact_track_and_sits_below_the_name_on_a_tall_one"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "the_side_of_a_cut_picks_the_clip",
+      "a_narrow_gap_splits_at_its_middle",
+      "free_edges_reach_into_the_gap_beside_them",
+      "edges_do_not_depend_on_the_order_of_the_items",
+      "a_narrow_clip_keeps_its_middle_third"
+    ]
+  },
+  "1637": {
+    "sha": "3ee7b223674affece56441045d05b2dc861e1e33",
+    "changed_files": [
+      "crates/ui-egui/src/panels/mod.rs",
+      "crates/ui-egui/tests/timeline_show_names_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "the_timeline_panel_menu_has_the_name_toggles"
+    ],
+    "tests_existing_in_changed_files": [
+      "the_name_toggles_hide_the_clip_names_of_video_or_audio_tracks",
+      "a_hidden_name_keeps_the_speed_label",
+      "the_timeline_panel_menu_has_the_name_toggles"
+    ]
+  },
+  "1638": {
+    "sha": "88646ba7f0f6877cbed145644af792a4667a3958",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "a_compact_clip_has_its_whole_height_for_the_waveform_and_a_tall_one_the_lower_part"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "a_compact_clip_has_its_whole_height_for_the_waveform_and_a_tall_one_the_lower_part"
+    ]
+  },
+  "1650": {
+    "sha": "084cd8292b74653d55929f47d53c2d79ff78b2af",
+    "changed_files": [
+      "crates/ui-egui/src/panels/monitor.rs",
+      "crates/ui-egui/src/panels/monitor_view.rs",
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/settings_menus_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "the_timeline_settings_menu_stays_open_while_options_are_toggled",
+      "the_monitor_wrench_stays_open_for_toggles_and_closes_on_a_display_choice"
+    ],
+    "tests_existing_in_changed_files": [
+      "button_editor_updates_visibility_without_affecting_other_monitor",
+      "eyedropper_averages_the_pixels_around_the_point",
+      "eyedropper_clamps_to_the_picture_edges",
+      "eyedropper_rejects_empty_and_truncated_frames",
+      "snap_axis_picks_the_closest_target_within_reach",
+      "channel_view_greyscales",
+      "picture_rect_fits_or_magnifies_with_clamped_pan",
+      "effective_resolution_follows_paused_and_high_quality",
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track"
+    ]
+  },
+  "1654": {
+    "sha": "3febc1d30dadc3e10d9e6dce43a59cd571a0029d",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "remix_drag_keeps_the_waveform_anchored"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "remix_drag_keeps_the_waveform_anchored",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track"
+    ]
+  },
+  "1681": {
+    "sha": "838170d800c89801ff83ad31f9ab9d9add42f96d",
+    "changed_files": [
+      "Cargo.lock",
+      "apps/filmcraft/Cargo.toml",
+      "apps/filmcraft/src/audio.rs",
+      "apps/filmcraft/src/audio_in.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "fallback_prefers_sound_servers_over_raw_hardware",
+      "notes_name_the_fallback_device",
+      "integer_conversion_clips_and_preserves_interleaved_channels",
+      "full_scale_24_bit_samples_remain_representable",
+      "stream_errors_ask_for_a_restart_instead_of_failing_playback",
+      "an_error_while_samples_keep_flowing_is_only_a_hiccup",
+      "a_stream_that_errors_and_stops_consuming_is_restarted",
+      "a_lost_device_restarts_at_once_and_repeated_failures_give_up",
+      "the_device_callback_never_panics_and_counts_played_frames",
+      "a_panicking_mixer_plays_silence_and_fails_the_stream",
+      "signed_and_unsigned_input_is_deinterleaved_to_float",
+      "invalid_input_is_reported_without_panicking_or_appending"
+    ]
+  },
+  "1693": {
+    "sha": "b4c4480171208d87151959c29639365d51530372",
+    "changed_files": [
+      "apps/filmcraft/src/file_filters.rs",
+      "apps/filmcraft/src/main.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "all_files_filter_admits_every_file"
+    ],
+    "tests_existing_in_changed_files": [
+      "camera_files_are_visible_in_every_capitalization",
+      "all_files_filter_admits_every_file",
+      "save_filters_keep_the_literal_default_extension",
+      "native_filters_receive_only_literal_extensions",
+      "startup_registers_the_hardware_decoders_without_a_logger",
+      "off_thread_dialogs_keep_case_insensitive_filters"
+    ]
+  },
+  "1718": {
+    "sha": "158163650dce96b26eb374ee1c53688f90cdab4c",
+    "changed_files": [
+      "crates/cfb/src/lib.rs",
+      "crates/cfb/src/read.rs",
+      "crates/cfb/src/tests.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "nul_in_a_name_is_rejected",
+      "span_is_checked",
+      "compare_names_matches_the_allocating_version"
+    ],
+    "tests_existing_in_changed_files": [
+      "round_trip_v3_and_v4",
+      "header_fields",
+      "large_file_needs_difat",
+      "names",
+      "unicode_names",
+      "not_cfb",
+      "truncation_never_panics",
+      "mutation_never_panics_or_hangs",
+      "difat_self_loop_fails_fast",
+      "duplicated_fat_sector_chain_loop_fails_fast",
+      "chains_filling_the_file_still_read",
+      "nul_in_a_name_is_rejected",
+      "span_is_checked",
+      "compare_names_matches_the_allocating_version"
+    ]
+  },
+  "1772": {
+    "sha": "d17ee28500525f7afe85562039acbac67f9630ed",
+    "changed_files": [
+      "crates/ui-egui/src/i18n/es.tsv",
+      "crates/ui-egui/src/i18n/it.tsv",
+      "crates/ui-egui/src/i18n/ja.tsv",
+      "crates/ui-egui/src/i18n/ko.tsv",
+      "crates/ui-egui/src/i18n/zh-cn.tsv",
+      "crates/ui-egui/src/links.rs",
+      "crates/ui-egui/src/menus.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "urls_follow_the_artcraft_scheme",
+      "links_open_through_the_host_hook",
+      "failed_link_dialog_keeps_the_address_until_closed",
+      "help_menu_items_say_where_they_go",
+      "edit_label_menu_swatch_uses_current_custom_palette",
+      "ctrl_and_cmd_are_one_key_off_macos",
+      "default_menu_items_are_the_shipped_menu_bar",
+      "hovering_another_title_switches_the_open_menu"
+    ]
+  },
+  "1788": {
+    "sha": "9bea3b0552ec124b519dd796ab052cdd58d9da1c",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_trim_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "the_trim_cursor_stays_while_an_edge_is_dragged",
+      "the_trim_cursor_stays_while_a_transition_end_is_dragged"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "dragging_an_out_edge_inward_trims_the_clip",
+      "right_of_a_cut_trims_the_right_clip",
+      "a_wobbly_click_on_an_edge_selects_the_edit_point",
+      "a_moved_clip_follows_the_pointer_from_where_it_was_grabbed",
+      "cursor_hit_test_and_press_agree_at_a_cut"
+    ]
+  },
+  "1841": {
+    "sha": "52df478479bab7b8782b35c625b6f96e9d529604",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/file_tests.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "new_project_answers_with_its_name_and_revision"
+    ],
+    "tests_existing_in_changed_files": [
+      "saved_file_is_versioned_and_save_copy_keeps_state",
+      "legacy_project_opens_and_first_save_keeps_a_backup",
+      "project_is_named_after_its_file",
+      "new_project_answers_with_its_name_and_revision",
+      "open_demo_project_clears_saved_path_so_save_does_not_overwrite"
+    ]
+  },
+  "1869": {
+    "sha": "e8d20a39e74dae0e855ce050b85bcb1cbf31ded2",
+    "changed_files": [
+      "crates/export/src/lib.rs",
+      "crates/export/src/settings.rs",
+      "crates/export/src/settings_tests.rs",
+      "crates/export/src/still.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "png_stills_keep_their_alpha_channel"
+    ],
+    "tests_existing_in_changed_files": [
+      "image_sequences_are_numbered_like_premiere",
+      "jpeg_targa_and_dpx_sequences",
+      "openexr_sequences",
+      "openexr_sequences_compress",
+      "image_sequences_keep_alpha_when_asked",
+      "png_stills_keep_their_alpha_channel",
+      "wav_and_aiff_audio_only",
+      "aac_audio_writes_m4a_and_adts",
+      "aac_audio_settings_and_names",
+      "wav_export_honours_explicit_sample_rates",
+      "aac_export_rejects_unsupported_explicit_sample_rates",
+      "flac_is_lossless_against_wav",
+      "flac_audio_in_mp4_and_mov",
+      "flac_settings_round_trip_and_summary",
+      "invalid_export_allocations_are_rejected_before_rendering",
+      "hostile_export_ranges_are_rejected_before_time_arithmetic",
+      "frame_size_rate_and_scaling",
+      "loudness_normalization_hits_target_and_true_peak",
+      "two_pass_and_cbr_h264",
+      "crf_h264"
+    ]
+  },
+  "1870": {
+    "sha": "32b857744094a6db55b7fe354c22c5a23062a5e3",
+    "changed_files": [
+      "crates/engine/src/export_tests.rs",
+      "crates/engine/src/export_tools.rs",
+      "crates/export/src/determinism_tests.rs",
+      "crates/export/src/lib.rs"
+    ],
+    "added_test_attributes": 5,
+    "tests_added_by_diff": [
+      "max_threads_reaches_the_export_settings",
+      "max_threads_caps_the_threads_an_export_runs_on",
+      "max_threads_never_adds_threads",
+      "max_threads_does_not_change_the_file",
+      "max_threads_is_a_setting_of_the_json_interface"
+    ],
+    "tests_existing_in_changed_files": [
+      "hostile_export_ranges_are_rejected_without_panicking",
+      "export_integer_parameters_cannot_wrap_or_overflow",
+      "wav_resolve_honours_explicit_sample_rates",
+      "nested_camel_case_settings_are_honoured",
+      "every_builtin_preset_exports_and_ffprobe_confirms",
+      "aac_audio_keeps_a_dot_aac_path_as_adts_and_adds_m4a_otherwise",
+      "h264_presets_hit_their_bitrates",
+      "user_presets_persist_with_favourites_import_and_export",
+      "queue_orders_cancels_and_retries",
+      "queue_move_by_extreme_offsets_clamps_instead_of_overflowing",
+      "queue_cancels_a_running_export_and_retries_a_failed_one",
+      "jobs_and_queue_items_report_the_time_they_have_left",
+      "hardware_encoding_is_off_unless_asked_for",
+      "crf_param_picks_constant_quality",
+      "exr_compression_param_is_parsed_and_defaults_to_none",
+      "queue_exports_several_sequences_and_ranges",
+      "queue_folder_paths_expand_home_and_take_either_separator",
+      "quick_export_uses_and_remembers_a_preset",
+      "ranges_resolve_and_sidecar_captions_are_written",
+      "default_export_dir_never_needs_a_real_filesystem"
+    ]
+  },
+  "1896": {
+    "sha": "37bf04409daf4ba9f552b7092a5e63e485f203eb",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_move_snap_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "moved_to_another_track_a_clip_keeps_its_time_over_a_nearby_cut",
+      "dragged_along_its_track_a_clip_still_snaps_to_a_nearby_cut"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "moved_to_another_track_a_clip_keeps_its_time_over_a_nearby_cut",
+      "dragged_along_its_track_a_clip_still_snaps_to_a_nearby_cut"
+    ]
+  },
+  "1901": {
+    "sha": "20bbd3d91202631f82142fe0fd17ae509418a170",
+    "changed_files": [
+      "docs/releasing.md",
+      "packaging/linux/nfpm.yaml"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "1905": {
+    "sha": "851cf2fe52ded83e2eba928d095a66bdcfb6aa35",
+    "changed_files": [
+      "crates/ui-egui/src/panels/graphics.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "1915": {
+    "sha": "b474ca6ca488388eb6edc04da1db1c20c3a0217a",
+    "changed_files": [
+      "AGENTS.md",
+      "crates/edit/src/lib.rs",
+      "crates/edit/src/tests.rs",
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/keyboard.rs",
+      "crates/engine/src/timeline_move_tests.rs",
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_option_drag_ui.rs"
+    ],
+    "added_test_attributes": 14,
+    "tests_added_by_diff": [
+      "move_rejects_repeated_clip_ids_without_mutation",
+      "duplicate_selection_inputs_keep_first_occurrence_and_toggle_once",
+      "duplicate_selection_expansion_is_unique_without_an_active_sequence",
+      "duplicate_selection_public_admission_keeps_nudges_equivalent_to_unique_selection",
+      "duplicate_selection_already_in_session_keeps_nudges_equivalent_to_unique_selection",
+      "duplicate_selection_delete_matches_unique_selection_with_and_without_links",
+      "duplicate_move_targets_are_rejected_and_retry_is_undoable",
+      "duplicate_new_track_move_preserves_redo_and_retry_is_undoable",
+      "duplicate_new_track_move_preserves_full_undo_history",
+      "unique_new_track_moves_keep_linked_partner_behavior"
+    ],
+    "tests_existing_in_changed_files": [
+      "move_rejects_repeated_clip_ids_without_mutation",
+      "overwrite_splits_underlying",
+      "insert_ripples_sync_locked_tracks",
+      "razor_keeps_content_continuous",
+      "extract_and_lift",
+      "ripple_delete_and_conflict",
+      "ripple_delete_closes_the_time_free_on_every_track",
+      "close_gap_works",
+      "reversed_trim_uses_the_handle_its_playback_direction_consumes",
+      "regular_trim_respects_neighbours_and_handles",
+      "trim_on_a_locked_track_is_refused",
+      "held_regular_in_trim_stops_at_previous_clip",
+      "ripple_trim_shifts_following",
+      "ripple_trim_group_takes_a_split_edit_along",
+      "roll_slip_slide",
+      "slide_keeps_reversed_neighbours_content",
+      "transitions_stay_on_their_cuts",
+      "fades_follow_a_regular_trim",
+      "fades_follow_a_non_ripple_speed_change",
+      "transitions_travel_with_moved_clips"
+    ]
+  },
+  "1924": {
+    "sha": "67e3dfa55dc10f020bbbbadd7de7379fb281c7a2",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/keyframe_move.rs",
+      "crates/ui-egui/src/panels/effect_controls.rs",
+      "crates/ui-egui/tests/keyframes_ui.rs"
+    ],
+    "added_test_attributes": 4,
+    "tests_added_by_diff": [
+      "interpolation_of_listed_keys_across_lanes_is_one_undo_step",
+      "keyframe_menu_interpolation_applies_to_every_selected_keyframe"
+    ],
+    "tests_existing_in_changed_files": [
+      "movement_across_lanes_is_atomic_and_one_undo_step",
+      "bounds_clamp_the_group_without_changing_its_spacing",
+      "invalid_references_and_hostile_requests_cannot_make_partial_edits",
+      "interpolation_of_listed_keys_across_lanes_is_one_undo_step",
+      "media_times_follow_clip_speed_and_reverse",
+      "readable_values_for_text_lut_and_curve_params",
+      "each_press_begins_its_own_undo_step",
+      "a_scale_drag_with_idle_frames_is_one_undo_step",
+      "a_clip_without_a_duration_still_draws",
+      "ruler_survives_damaged_numbers",
+      "ruler_labels_sequence_timecode",
+      "scalar_graph_press_starts_at_the_pointer_origin_and_release_is_one_undo_step",
+      "position_graph_drags_one_coordinate_of_a_point_keyframe",
+      "properties_diamond_adds_and_removes_the_keyframe_at_the_playhead",
+      "effect_controls_reset_button_keeps_keyframes",
+      "properties_diamond_applies_crop_first",
+      "effect_controls_ruler_moves_the_playhead",
+      "clicking_a_lane_keyframe_selects_only_that_keyframe",
+      "select_all_in_effect_controls_selects_its_keyframes_not_the_clips",
+      "effect_controls_divider_and_scrolling_anywhere"
+    ]
+  },
+  "1944": {
+    "sha": "61ea28e538a718bc64182e8dbeebec37d7f82fee",
+    "changed_files": [
+      "crates/ui-egui/src/cjk.rs",
+      "crates/ui-egui/src/i18n/mod.rs",
+      "crates/ui-egui/src/theme.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "catalogs_are_well_formed",
+      "the_current_language_is_per_thread",
+      "template_values_are_not_interpreted_as_placeholders",
+      "searches_match_spanish_labels_and_english_names",
+      "spanish_translates_every_menu_label",
+      "portuguese_covers_the_menus_and_has_no_dead_entries",
+      "spanish_translates_every_tl_literal",
+      "chinese_translates_every_menu_label_and_tl_literal",
+      "japanese_translates_every_menu_label_tl_literal_and_name",
+      "chinese_switches_and_persists_or_is_refused_without_a_font",
+      "spanish_translates_dynamic_names",
+      "tl_literals_are_found_and_unescaped",
+      "language_commands_switch_and_persist_without_a_document",
+      "system_language_follows_the_preferred_locales",
+      "system_language_preference_uses_the_host_languages",
+      "ukrainian_entries_cover_the_original_menu_catalog",
+      "german_entries_cover_the_original_menu_catalog",
+      "french_covers_the_menus_and_has_no_dead_entries",
+      "korean_covers_the_menus_and_has_no_dead_entries",
+      "russian_entries_cover_the_original_menu_catalog"
+    ]
+  },
+  "1950": {
+    "sha": "7cb72e6d3173591e344310c8ae8b40bffa635ad9",
+    "changed_files": [
+      "crates/engine/src/clip_ops.rs",
+      "crates/media/src/generators.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "deterministic_and_scaled",
+      "bars_values",
+      "counting_leader_beeps_last_exactly_one_source_frame",
+      "counting_leader_custom_rate_stops_at_exact_sample_boundary",
+      "counting_leader_gate_is_independent_of_request_boundaries",
+      "counting_leader_malformed_rates_use_default_frame_gate",
+      "counting_leader_gate_handles_zero_and_hostile_rates",
+      "all_scenes_render"
+    ]
+  },
+  "1993": {
+    "sha": "98d3241f3b56fff9809fa768398c169bc80e6559",
+    "changed_files": [
+      "Cargo.lock",
+      "apps/filmcraft/Cargo.toml",
+      "apps/filmcraft/src/apple_events.rs",
+      "apps/filmcraft/src/main.rs",
+      "crates/ui-egui/src/lib.rs",
+      "packaging/macos/Info.plist.in"
+    ],
+    "added_test_attributes": 4,
+    "tests_added_by_diff": [
+      "media_the_os_opens_is_imported_into_the_project",
+      "a_project_the_os_opens_replaces_the_current_one",
+      "the_first_project_opens_and_the_rest_is_media",
+      "quit_and_empty_requests_do_not_panic"
+    ],
+    "tests_existing_in_changed_files": [
+      "startup_registers_the_hardware_decoders_without_a_logger",
+      "off_thread_dialogs_keep_case_insensitive_filters",
+      "ctrl_c_x_v_become_key_presses",
+      "extra_modifiers_are_kept",
+      "windows_insert_and_delete_variants",
+      "other_events_are_left_alone",
+      "ctrl_click_is_a_secondary_click",
+      "synthesized_click_fires_secondary_clicked",
+      "release_is_paired_to_the_ctrl_press",
+      "plain_click_is_untouched",
+      "new_plain_press_clears_a_stale_pairing",
+      "software_rasterizers_are_detected",
+      "plan_side_covers_output_and_every_layer",
+      "forward_shuttle_playback_keeps_audio_enabled",
+      "maintain_pitch_shuttling_controls_the_samples_sent_to_the_device",
+      "changing_pitch_preference_restarts_audio_at_the_current_playhead",
+      "changing_hardware_recovers_wall_clock_playback_without_rewinding",
+      "a_failed_device_clock_resumes_from_the_displayed_frame",
+      "a_restarted_stream_keeps_the_device_clock_and_the_sound",
+      "an_unmodified_key_reaches_a_focused_text_field"
+    ]
+  },
+  "2008": {
+    "sha": "1a946e764b562456bdce4d8f7457ec16ba53e4d3",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/gap_selection_tests.rs",
+      "crates/engine/src/sequence_extras.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "close_gap_without_a_selected_gap_closes_every_gap_in_one_undo_step",
+      "close_gap_without_a_selected_gap_only_closes_gaps_between_in_and_out",
+      "close_gap_without_a_selected_gap_refuses_without_editing"
+    ],
+    "tests_existing_in_changed_files": [
+      "clicking_between_two_clips_selects_the_gap_and_delete_closes_it",
+      "ripple_delete_closes_a_selected_gap_too",
+      "the_empty_time_before_the_first_clip_is_a_gap",
+      "empty_time_after_the_last_clip_is_not_a_gap",
+      "selecting_a_clip_or_deselecting_all_drops_the_gap",
+      "an_edit_that_changes_the_gap_drops_it",
+      "a_stale_gap_is_refused",
+      "a_gap_on_a_locked_track_cannot_be_selected_or_closed",
+      "hostile_select_gap_parameters_are_errors",
+      "the_gap_selection_is_part_of_the_ui_state",
+      "close_gap_is_available_for_custom_shortcuts",
+      "close_gap_without_params_closes_selected_gap_in_one_undo_step",
+      "close_gap_rejects_invalid_context_and_explicit_parameters_without_editing",
+      "close_gap_without_a_selected_gap_closes_every_gap_in_one_undo_step",
+      "close_gap_without_a_selected_gap_only_closes_gaps_between_in_and_out",
+      "close_gap_without_a_selected_gap_refuses_without_editing"
+    ]
+  },
+  "2011": {
+    "sha": "869e40701ce2dbbbff30834664a5f57946881834",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/explicit_targets_tests.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "unlink_with_an_unlinked_clip_in_the_selection_still_unlinks"
+    ],
+    "tests_existing_in_changed_files": [
+      "replace_from_bin_takes_an_explicit_item_and_clips_without_any_selection",
+      "clip_commands_take_explicit_clips_without_a_selection",
+      "naming_nothing_usable_does_not_enable_a_command",
+      "link_and_speed_take_explicit_clips_without_a_selection",
+      "named_clips_that_are_not_usable_say_why",
+      "naming_targets_lifts_only_the_selection_condition",
+      "project_delete_takes_explicit_bins_and_items_without_a_selection",
+      "link_multiple_video_and_audio_pairs_creates_one_link_per_pair",
+      "link_leaves_clips_without_a_partner_unlinked",
+      "unlink_with_an_unlinked_clip_in_the_selection_still_unlinks"
+    ]
+  },
+  "2030": {
+    "sha": "3753833e0a75b4f5d07f6bfbe01a7b91e37fb7b0",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/shortcuts_tests.rs",
+      "crates/ui-egui/tests/sequence_tabs_ui.rs"
+    ],
+    "added_test_attributes": 4,
+    "tests_added_by_diff": [
+      "nest_is_bindable_without_a_default_key",
+      "nest_can_be_assigned_a_key_that_asks_for_the_name"
+    ],
+    "tests_existing_in_changed_files": [
+      "chords_parse_normalise_and_display_per_os",
+      "defaults_follow_the_registry_and_the_premiere_audit",
+      "assign_reassigns_conflicts_and_undoes",
+      "clear_close_sequence_also_clears_file_close",
+      "clear_new_bin_frees_cmd_b_in_the_project_panel_too",
+      "reassigning_new_bin_moves_its_project_panel_key_too",
+      "panel_shortcuts_override_application_ones_with_focus",
+      "delete_clears_timeline_clips_and_project_items",
+      "compat_presets_map_other_editors",
+      "custom_presets_persist_export_and_import",
+      "list_searches_labels_and_keys",
+      "nest_is_bindable_without_a_default_key",
+      "default_keymaps_have_no_conflicts_on_any_platform",
+      "nest_asks_for_a_name_and_numbers_the_default",
+      "nest_can_be_assigned_a_key_that_asks_for_the_name",
+      "clip_context_menu_offers_nest_and_make_subsequence",
+      "timeline_has_a_tab_per_open_sequence"
+    ]
+  },
+  "2033": {
+    "sha": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
+    "changed_files": [
+      "crates/automation/src/server.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "screenshot_paths_are_unique"
+    ],
+    "tests_existing_in_changed_files": [
+      "screenshot_paths_are_unique",
+      "render_scale_zero_means_no_limit",
+      "headless_commands_and_render",
+      "rendering_at_a_time_does_not_move_the_playhead",
+      "media_import_schema_and_params"
+    ]
+  },
+  "2034": {
+    "sha": "06068a8a1cbc34b36463cec4c21203ac6bbf8161",
+    "changed_files": [
+      "crates/ui-egui/src/panels/project_views.rs",
+      "crates/ui-egui/tests/project_panel_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "icon_view_cuts_long_names_and_shows_them_on_hover"
+    ],
+    "tests_existing_in_changed_files": [
+      "clear_falls_back_to_the_selected_bin",
+      "shift_click_selects_the_range_from_the_anchor",
+      "command_click_toggles_and_plain_click_replaces",
+      "list_view_columns_sort_resize_and_rename",
+      "icon_view_hover_scrub_sets_in_and_out",
+      "icon_view_cuts_long_names_and_shows_them_on_hover",
+      "freeform_view_places_and_stacks_cards",
+      "metadata_display_dialog_and_view_presets",
+      "bins_open_in_place_in_a_tab_or_in_a_window",
+      "select_all_takes_only_the_shown_bin",
+      "a_dragged_bin_nests_in_another_and_back_out",
+      "footer_buttons_are_wired",
+      "new_bin_asks_for_its_name",
+      "new_bin_then_clear_removes_the_bin",
+      "file_dialog_import_uses_shown_bin_unless_explicit",
+      "media_browser_navigation_import_and_columns",
+      "media_browser_drag_imports_into_the_project_panel",
+      "media_browser_drag_places_every_selected_file",
+      "dragging_a_selection_to_the_timeline_places_every_item",
+      "double_click_empty_area_imports_with_a_project_loaded"
+    ]
+  },
+  "2035": {
+    "sha": "3a9b43d804ce58ff4455cd408597a661fcaef347",
+    "changed_files": [
+      "crates/ui-egui/src/panels/project.rs",
+      "crates/ui-egui/tests/project_panel_ui.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "list_view_columns_sort_resize_and_rename",
+      "icon_view_hover_scrub_sets_in_and_out",
+      "freeform_view_places_and_stacks_cards",
+      "metadata_display_dialog_and_view_presets",
+      "bins_open_in_place_in_a_tab_or_in_a_window",
+      "select_all_takes_only_the_shown_bin",
+      "a_dragged_bin_nests_in_another_and_back_out",
+      "footer_buttons_are_wired",
+      "new_bin_asks_for_its_name",
+      "new_bin_then_clear_removes_the_bin",
+      "file_dialog_import_uses_shown_bin_unless_explicit",
+      "media_browser_navigation_import_and_columns",
+      "media_browser_drag_imports_into_the_project_panel",
+      "media_browser_drag_places_every_selected_file",
+      "dragging_a_selection_to_the_timeline_places_every_item",
+      "double_click_empty_area_imports_with_a_project_loaded",
+      "double_click_imports_with_audio_in_the_timeline",
+      "marquee_selects_cards_in_icon_view",
+      "escape_cancels_a_marquee_and_keeps_the_selection",
+      "only_the_left_button_draws_a_marquee"
+    ]
+  },
+  "2041": {
+    "sha": "0a51fa39a96dde8bb0741a40a9a81956a1b7e7da",
+    "changed_files": [
+      "crates/ui-egui/src/dock.rs",
+      "crates/ui-egui/src/menus.rs",
+      "crates/ui-egui/tests/vertical_workspace_ui.rs",
+      "crates/ui-egui/tests/workspaces_ui.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "vertical_workspace_preset_registration_and_switching",
+      "vertical_workspace_with_portrait_sequence",
+      "responsive_vertical_layout_at_standard_resolutions"
+    ],
+    "tests_existing_in_changed_files": [
+      "split_first_never_panics_on_tiny_areas",
+      "workspaces_contain_core_panels",
+      "close_and_open",
+      "open_near_falls_back_to_the_first_group",
+      "edit_label_menu_swatch_uses_current_custom_palette",
+      "ctrl_and_cmd_are_one_key_off_macos",
+      "default_menu_items_are_the_shipped_menu_bar",
+      "hovering_another_title_switches_the_open_menu",
+      "vertical_workspace_preset_registration_and_switching",
+      "vertical_workspace_with_portrait_sequence",
+      "responsive_vertical_layout_at_standard_resolutions",
+      "save_switch_reset_rename_delete_and_restart",
+      "save_rename_and_delete_through_the_dialogs"
+    ]
+  },
+  "2043": {
+    "sha": "2cb6abdeec54e94bd935f2129855a485c8cdecb1",
+    "changed_files": [
+      "contributors/people.toml"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2050": {
+    "sha": "1be269889f3a13a312d0d2baa7816b14df648825",
+    "changed_files": [
+      "crates/project/src/lib.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "auto_point_default_only_matches_unset_points"
+    ],
+    "tests_existing_in_changed_files": [
+      "json_roundtrip",
+      "hostile_frame_rates_are_rejected_before_frame_arithmetic",
+      "corrupt_timeline_times_are_rejected_before_end_arithmetic",
+      "point_params_keep_auto_through_json_and_no_other_point_reads_null",
+      "auto_point_default_only_matches_unset_points",
+      "media_resolution_bounds_depth_and_preserves_the_outer_range",
+      "placed_auto_points_resolve_once_the_source_size_is_final",
+      "item_at_and_source_time",
+      "projects_without_caption_tracks_load",
+      "caption_tracks_roundtrip",
+      "bins",
+      "a_bin_moves_into_another_bin_with_its_contents",
+      "project_clone_shares_sequences_until_mutated",
+      "nest_cycle_finds_sequences_that_contain_themselves",
+      "nest_overhang_is_the_part_past_the_contents",
+      "pixel_aspect_ratios_are_reduced_and_hostile_ones_are_square",
+      "source_par_follows_interpret_footage_subclips_and_sequences"
+    ]
+  },
+  "2051": {
+    "sha": "e4adbd339f4afb93cf20410e2b770b437bf520e1",
+    "changed_files": [
+      "crates/captions/src/vtt.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "stored_arrow_entity_decodes_to_bare_arrow",
+      "other_entities_are_preserved_verbatim",
+      "arrow_spellings_converge_on_write_parse_loop"
+    ],
+    "tests_existing_in_changed_files": [
+      "parse_sample",
+      "voices",
+      "multiple_voices_with_tab_separator",
+      "without_signature",
+      "arrow_text_survives_a_write_parse_round_trip",
+      "stored_arrow_entity_decodes_to_bare_arrow",
+      "other_entities_are_preserved_verbatim",
+      "arrow_spellings_converge_on_write_parse_loop"
+    ]
+  },
+  "2072": {
+    "sha": "ae76a26d66cbd8299b80a65a026a3b47bafa4d6e",
+    "changed_files": [
+      "crates/text/src/fonts.rs",
+      "docs/testing.md",
+      "xtask/src/main.rs"
+    ],
+    "added_test_attributes": 4,
+    "tests_added_by_diff": [
+      "require_native_font_test",
+      "directory_source_discovers_and_lazily_loads_inter_bold",
+      "macos_system_fonts_resolve_and_layout",
+      "native_font_discovery_rejects_a_successful_zero_test_listing"
+    ],
+    "tests_existing_in_changed_files": [
+      "bundled_families_and_resolution",
+      "missing_family_falls_back_to_inter",
+      "directory_source_discovers_and_lazily_loads_inter_bold",
+      "system_scan_finds_fonts",
+      "macos_system_fonts_resolve_and_layout",
+      "japanese_falls_back_to_craft_fonts",
+      "metrics_and_coverage",
+      "covers_text_does_not_keep_file_bytes",
+      "native_font_discovery_rejects_a_successful_zero_test_listing",
+      "macos_bundle_may_use_the_microphone"
+    ]
+  },
+  "2086": {
+    "sha": "ec35dd36855e05923d3c191b8f67b7f5bac413bb",
+    "changed_files": [
+      "xtask/src/fmt_check.rs",
+      "xtask/tests/format_arguments.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "workspace_members_include_xtask_in_sorted_order",
+      "commands_preserve_args_and_workspace_root",
+      "runner_failure_stops_before_next_package",
+      "non_windows_uses_original_single_command",
+      "malformed_metadata_never_runs_formatter",
+      "non_unicode_extra_argument_returns_usage_error"
+    ]
+  },
+  "2091": {
+    "sha": "8252d46aca57d04c9c08e16fa0f2186d0272186a",
+    "changed_files": [
+      "crates/engine/src/clip_ops.rs",
+      "crates/engine/src/clip_ops_tests.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "video_options_are_enabled_only_with_a_video_clip_selected"
+    ],
+    "tests_existing_in_changed_files": [
+      "menus_and_shortcuts_follow_premiere",
+      "label_commands_and_select_label_group",
+      "select_all_matching_selects_every_use_of_the_source",
+      "paste_attributes_with_scaled_keyframes_and_remove_attributes",
+      "remove_unused_and_consolidate_duplicates",
+      "new_sequence_from_clip_bin_from_selection_and_offline_file",
+      "close_project_and_save_all",
+      "make_and_edit_subclips",
+      "modify_audio_channels_and_breakout_to_mono",
+      "modify_timecode_and_reset",
+      "frame_hold_options_add_frame_hold_and_hold_segment",
+      "field_options_and_time_interpolation_are_stored",
+      "frame_blending_renders_in_between_frames",
+      "fit_and_fill_frame",
+      "extract_audio_writes_a_wav_and_imports_it",
+      "replace_with_clip_from_source_match_frame_and_bin",
+      "replace_from_source_match_frame_on_a_reversed_clip",
+      "replace_from_bin_keeps_the_source_in_on_request",
+      "replace_with_clip_reports_clips_that_run_past_the_new_media",
+      "audio_source_channels_pick_what_a_clip_plays"
+    ]
+  },
+  "2116": {
+    "sha": "e9127e0890e7aad1ae0056b1040bf2eaf0838ed3",
+    "changed_files": [
+      "docs/file-format-parity.md",
+      "docs/gaps.md"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2123": {
+    "sha": "e63cf15165e8dce3b47897a4dd3040f4b54a413a",
+    "changed_files": [
+      "crates/ui-egui/src/i18n/mod.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "catalogs_are_well_formed",
+      "the_current_language_is_per_thread",
+      "template_values_are_not_interpreted_as_placeholders",
+      "searches_match_spanish_labels_and_english_names",
+      "spanish_translates_every_menu_label",
+      "portuguese_covers_the_menus_and_has_no_dead_entries",
+      "spanish_translates_every_tl_literal",
+      "chinese_translates_every_menu_label_and_tl_literal",
+      "japanese_translates_every_menu_label_tl_literal_and_name",
+      "chinese_switches_and_persists_or_is_refused_without_a_font",
+      "spanish_translates_dynamic_names",
+      "tl_literals_are_found_and_unescaped",
+      "language_commands_switch_and_persist_without_a_document",
+      "system_language_follows_the_preferred_locales",
+      "system_language_preference_uses_the_host_languages",
+      "ukrainian_entries_cover_the_original_menu_catalog",
+      "german_entries_cover_the_original_menu_catalog",
+      "french_covers_the_menus_and_has_no_dead_entries",
+      "korean_covers_the_menus_and_has_no_dead_entries",
+      "lao_covers_the_menus_and_has_no_dead_entries"
+    ]
+  },
+  "2132": {
+    "sha": "9702efcfe7fe8a7e7a049644577957d51e168c45",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/locked_clip_edits_tests.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "move_refuses_a_clip_listed_twice"
+    ],
+    "tests_existing_in_changed_files": [
+      "locked_track_refuses_trim_out_and_keeps_duration",
+      "unlocked_track_still_trims_out",
+      "locked_track_refuses_move_on_the_same_track",
+      "locked_track_refuses_roll_slip_slide_speed",
+      "move_refuses_a_clip_listed_twice"
+    ]
+  },
+  "2136": {
+    "sha": "967c73f4792f1ac6883ee21daa1ccde4c4a93d1f",
+    "changed_files": [
+      "crates/engine/src/commands.rs",
+      "crates/engine/src/shortcuts_tests.rs",
+      "crates/ui-egui/src/panels/clip_dialogs.rs",
+      "crates/ui-egui/src/panels/menu_dialogs.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "chords_parse_normalise_and_display_per_os",
+      "defaults_follow_the_registry_and_the_premiere_audit",
+      "assign_reassigns_conflicts_and_undoes",
+      "clear_close_sequence_also_clears_file_close",
+      "clear_new_bin_frees_cmd_b_in_the_project_panel_too",
+      "reassigning_new_bin_moves_its_project_panel_key_too",
+      "panel_shortcuts_override_application_ones_with_focus",
+      "delete_clears_timeline_clips_and_project_items",
+      "compat_presets_map_other_editors",
+      "custom_presets_persist_export_and_import",
+      "list_searches_labels_and_keys",
+      "commands_that_open_dialogs_can_be_bound",
+      "default_keymaps_have_no_conflicts_on_any_platform",
+      "every_command_with_a_clip_dialog_can_be_bound",
+      "every_command_with_a_menu_dialog_can_be_bound"
+    ]
+  },
+  "2138": {
+    "sha": "54cb4589f09c809db6e34c857bb313e52edc1506",
+    "changed_files": [
+      "apps/filmcraft/src/graphics.rs",
+      "crates/gpu/src/fx.wgsl",
+      "crates/gpu/src/fx_tests.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "gpu_effects_match_cpu_exactly_with_fxc"
+    ],
+    "tests_existing_in_changed_files": [
+      "no_mode_validates_indirect_calls",
+      "windows_default_leaves_out_gl",
+      "only_the_windows_default_and_software_modes_choose_the_adapter",
+      "explicit_backend_override_is_preserved",
+      "fallback_modes_leave_out_the_crashing_backends",
+      "two_failed_starts_in_a_row_move_on_to_the_next_mode_and_keep_it",
+      "only_starts_that_died_soon_after_launch_in_the_current_mode_count",
+      "the_files_round_trip_and_reject_anything_else",
+      "a_start_that_paints_keeps_its_mode_and_clears_its_attempt",
+      "two_dead_starts_move_on_and_a_painted_one_resets_the_count",
+      "concurrent_launches_neither_count_nor_disturb_each_other",
+      "corrupt_huge_or_foreign_files_start_with_the_default",
+      "many_attempt_files_are_bounded_per_launch",
+      "graphics_flag_picks_the_mode_and_default_undoes_a_fallback",
+      "reset_to_default_wins_over_a_later_confirm",
+      "an_explicit_backend_leaves_the_data_folder_alone",
+      "step_down_walks_the_ladder_and_saves_each_mode_at_once",
+      "the_software_selector_only_picks_a_software_adapter",
+      "gpu_effects_match_cpu_exactly",
+      "gpu_effects_match_cpu_exactly_with_fxc"
+    ]
+  },
+  "2140": {
+    "sha": "ae8d39fe5eb3530ca994147276136e21a709fe93",
+    "changed_files": [
+      "crates/gpu/src/fx.wgsl",
+      "crates/render/src/effects.rs",
+      "crates/render/src/gpufx.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "lumetri_shadows_do_not_saturate_near_black_pixels"
+    ],
+    "tests_existing_in_changed_files": [
+      "median_radius_stays_in_the_parameter_range",
+      "every_effect_runs_and_stays_finite",
+      "gaussian_preserves_mean_and_blurs",
+      "flip_and_crop",
+      "lumetri_shadows_do_not_saturate_near_black_pixels",
+      "identity_lumetri_is_identity",
+      "identity_and_monotone",
+      "lumetri_gpu_op_matches_original_fn_lumetri_cpu",
+      "lumetri_vignette_roundness_shapes_the_vignette",
+      "extract_zero_softness_has_no_fractional_edge"
+    ]
+  },
+  "2151": {
+    "sha": "060c71aceecd22dedd98f9e0797afbdb55e62a38",
+    "changed_files": [
+      "crates/ui-egui/tests/drop_preview_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "a_sequence_dropped_unnested_on_v2_previews_the_tracks_its_clips_land_on"
+    ],
+    "tests_existing_in_changed_files": [
+      "a_clip_with_picture_and_sound_previews_its_video_and_audio_tracks",
+      "a_picture_only_item_over_an_audio_track_previews_the_video_track_it_goes_to",
+      "a_sequence_dropped_unnested_on_v2_previews_the_tracks_its_clips_land_on"
+    ]
+  },
+  "2153": {
+    "sha": "4ff5c22f78a0a6473b82a218c4413781714e316f",
+    "changed_files": [
+      "crates/gpu/src/fx.wgsl",
+      "crates/render/src/effects.rs",
+      "crates/render/src/gpufx.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "lumetri_shadow_lift_is_unchanged_at_and_above_the_luma_floor"
+    ],
+    "tests_existing_in_changed_files": [
+      "median_radius_stays_in_the_parameter_range",
+      "every_effect_runs_and_stays_finite",
+      "gaussian_preserves_mean_and_blurs",
+      "flip_and_crop",
+      "identity_lumetri_is_identity",
+      "lumetri_shadow_lift_is_unchanged_at_and_above_the_luma_floor",
+      "lumetri_shadow_lift_does_not_amplify_near_black_chroma",
+      "identity_and_monotone",
+      "lumetri_gpu_op_matches_original_fn_lumetri_cpu",
+      "lumetri_vignette_roundness_shapes_the_vignette",
+      "extract_zero_softness_has_no_fractional_edge"
+    ]
+  },
+  "2169": {
+    "sha": "2e3ced88557ed5e333ca8d1d47be373a3a5b497b",
+    "changed_files": [
+      "apps/filmcraft/src/main.rs",
+      "crates/ui-egui/src/lib.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "eframe_does_not_persist_egui_memory"
+    ],
+    "tests_existing_in_changed_files": [
+      "native_window_geometry_uses_the_app_data_directory",
+      "eframe_does_not_persist_egui_memory",
+      "startup_registers_the_hardware_decoders_without_a_logger",
+      "off_thread_dialogs_keep_case_insensitive_filters",
+      "ctrl_c_x_v_become_key_presses",
+      "extra_modifiers_are_kept",
+      "windows_insert_and_delete_variants",
+      "other_events_are_left_alone",
+      "ctrl_click_is_a_secondary_click",
+      "synthesized_click_fires_secondary_clicked",
+      "release_is_paired_to_the_ctrl_press",
+      "plain_click_is_untouched",
+      "new_plain_press_clears_a_stale_pairing",
+      "software_rasterizers_are_detected",
+      "plan_side_covers_output_and_every_layer",
+      "forward_shuttle_playback_keeps_audio_enabled",
+      "maintain_pitch_shuttling_controls_the_samples_sent_to_the_device",
+      "changing_pitch_preference_restarts_audio_at_the_current_playhead",
+      "changing_hardware_recovers_wall_clock_playback_without_rewinding",
+      "a_failed_device_clock_resumes_from_the_displayed_frame"
+    ]
+  },
+  "2197": {
+    "sha": "acf861a5363689ddbef67b97323a83b2efe2f375",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/src/panels/timeline_captions.rs",
+      "crates/ui-egui/tests/timeline_trim_ui.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "a_trimmed_caption_edge_snaps_to_a_cut",
+      "a_moved_caption_snaps_to_another_caption",
+      "a_moved_caption_does_not_snap_to_itself"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "dragging_an_out_edge_inward_trims_the_clip",
+      "right_of_a_cut_trims_the_right_clip",
+      "a_wobbly_click_on_an_edge_selects_the_edit_point",
+      "a_moved_clip_follows_the_pointer_from_where_it_was_grabbed",
+      "cursor_hit_test_and_press_agree_at_a_cut"
+    ]
+  },
+  "2232": {
+    "sha": "a6c5555e1534d0f554601ab2609c7bd5da26b02e",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/track_select_drag_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "track_select_forward_skips_a_locked_music_track_and_still_moves_the_rest"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "a_drag_with_track_select_forward_moves_every_clip_after_the_pointer",
+      "clips_selected_with_track_select_forward_move_with_the_selection_tool",
+      "track_select_forward_skips_a_locked_music_track_and_still_moves_the_rest"
+    ]
+  },
+  "2242": {
+    "sha": "b4652c7552c733afb15122b77fd8b959371dee49",
+    "changed_files": [
+      "crates/engine/src/commands.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2247": {
+    "sha": "95eff789062b47a8a30017676ba8c1eb70c17261",
+    "changed_files": [
+      "crates/tts-text/src/normalize.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "numbers_longer_than_twenty_digits_are_read_fully_digit_by_digit"
+    ],
+    "tests_existing_in_changed_files": [
+      "plain_words_pass_through",
+      "cardinals",
+      "oversized_and_leading_zero_numbers_go_digit_by_digit",
+      "numbers_longer_than_twenty_digits_are_read_fully_digit_by_digit",
+      "negatives_and_decimals",
+      "ordinals",
+      "magnitude_is_kept_before_exact_tens_ordinals",
+      "money",
+      "first_digit_group_keeps_leading_zeros",
+      "short_hyphenated_groups_keep_every_number",
+      "percent",
+      "years",
+      "times",
+      "dates",
+      "digit_groups",
+      "abbreviations",
+      "acronyms",
+      "symbols",
+      "fractions",
+      "fraction_operands_may_have_three_digits"
+    ]
+  },
+  "2248": {
+    "sha": "217511e9388575e2b1943e343cf652cfc1020ff5",
+    "changed_files": [
+      "crates/interchange/src/edl.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "aud_line_out_of_range_channel_is_ignored"
+    ],
+    "tests_existing_in_changed_files": [
+      "channels",
+      "aud_line_out_of_range_channel_is_ignored",
+      "event_lines"
+    ]
+  },
+  "2252": {
+    "sha": "9717f7e2a61caba14657631441058d833451e952",
+    "changed_files": [
+      "contributors/people.toml",
+      "crates/interchange/README.md",
+      "crates/interchange/src/fcpxml.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "zero_frame_duration_falls_back_to_the_default_rate"
+    ],
+    "tests_existing_in_changed_files": [
+      "rational_times_are_exact",
+      "zero_frame_duration_falls_back_to_the_default_rate"
+    ]
+  },
+  "2282": {
+    "sha": "4f2c9189fee6f5a285b9e11623d3f7fa521d316d",
+    "changed_files": [
+      "crates/interchange/src/aaf/mod.rs",
+      "crates/interchange/src/lib.rs",
+      "crates/interchange/src/omf/mod.rs",
+      "crates/interchange/tests/rates.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "aaf_and_omf_start_timecodes_are_bounded"
+    ],
+    "tests_existing_in_changed_files": [
+      "absurd_fcpxml_frame_duration_does_not_overflow_the_export",
+      "clamped_timebase_and_replaced_otio_rate_are_reported",
+      "aaf_and_omf_start_timecodes_are_bounded"
+    ]
+  },
+  "2287": {
+    "sha": "6cb14e7c441018d8be5429a49da1823cef4295db",
+    "changed_files": [
+      "crates/interchange/README.md",
+      "crates/interchange/src/otio.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "nested_copies_stop_at_the_limit",
+      "ordinary_nesting_is_not_capped"
+    ],
+    "tests_existing_in_changed_files": [
+      "rational_time",
+      "nested_copies_stop_at_the_limit",
+      "ordinary_nesting_is_not_capped"
+    ]
+  },
+  "2359": {
+    "sha": "a58515aa0b45db35c9c97ad9225cf57beb35c0ea",
+    "changed_files": [
+      "crates/ui-egui/src/panels/monitor.rs",
+      "crates/ui-egui/src/panels/transition_controls.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "the_eyedropper_stores_the_colour_it_samples"
+    ],
+    "tests_existing_in_changed_files": [
+      "the_eyedropper_stores_the_colour_it_samples",
+      "button_editor_updates_visibility_without_affecting_other_monitor",
+      "eyedropper_averages_the_pixels_around_the_point",
+      "eyedropper_clamps_to_the_picture_edges",
+      "eyedropper_rejects_empty_and_truncated_frames",
+      "durations_read_as_timecode"
+    ]
+  },
+  "2364": {
+    "sha": "66f71177e2c8c34932c49cf8146f5ce50272579a",
+    "changed_files": [
+      "crates/ui-egui/tests/multicam_ui.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "create_multicam_dialog_view_and_live_switching",
+      "synchronize_and_merge_dialogs",
+      "multicam_view_pages_beyond_sixteen_angles_and_edit_cameras",
+      "create_multicam_groups_takes_by_camera_label",
+      "create_multicam_from_clips_selected_in_the_timeline"
+    ]
+  },
+  "2365": {
+    "sha": "263579c644fe869683c825d6be36010f4c56b343",
+    "changed_files": [
+      "crates/engine/src/clip_ops_tests.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "menus_and_shortcuts_follow_premiere",
+      "label_commands_and_select_label_group",
+      "select_all_matching_selects_every_use_of_the_source",
+      "paste_attributes_with_scaled_keyframes_and_remove_attributes",
+      "remove_unused_and_consolidate_duplicates",
+      "new_sequence_from_clip_bin_from_selection_and_offline_file",
+      "close_project_and_save_all",
+      "make_and_edit_subclips",
+      "modify_audio_channels_and_breakout_to_mono",
+      "modify_timecode_and_reset",
+      "frame_hold_options_add_frame_hold_and_hold_segment",
+      "field_options_and_time_interpolation_are_stored",
+      "frame_blending_renders_in_between_frames",
+      "fit_and_fill_frame",
+      "extract_audio_writes_a_wav_and_imports_it",
+      "replace_with_clip_from_source_match_frame_and_bin",
+      "replace_from_source_match_frame_on_a_reversed_clip",
+      "replace_from_bin_keeps_the_source_in_on_request",
+      "replace_with_clip_reports_clips_that_run_past_the_new_media",
+      "audio_source_channels_pick_what_a_clip_plays"
+    ]
+  },
+  "2381": {
+    "sha": "6e62760f8ba633b091015889847fee545550decf",
+    "changed_files": [
+      "crates/tts-text/src/normalize.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "currency_followed_by_scale_word_reads_scale_before_unit"
+    ],
+    "tests_existing_in_changed_files": [
+      "plain_words_pass_through",
+      "cardinals",
+      "oversized_and_leading_zero_numbers_go_digit_by_digit",
+      "negatives_and_decimals",
+      "ordinals",
+      "magnitude_is_kept_before_exact_tens_ordinals",
+      "money",
+      "money_fraction_beyond_two_digits_is_not_hundreds_of_cents",
+      "first_digit_group_keeps_leading_zeros",
+      "short_hyphenated_groups_keep_every_number",
+      "percent",
+      "years",
+      "times",
+      "dates",
+      "digit_groups",
+      "abbreviations",
+      "acronyms",
+      "symbols",
+      "fractions",
+      "fraction_operands_may_have_three_digits"
+    ]
+  },
+  "2386": {
+    "sha": "3413825016e599ee46e053fcb8594f7ee25e4736",
+    "changed_files": [
+      "crates/platform/src/nvenc/export.rs",
+      "crates/platform/tests/nvenc_hevc_hdr_export.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "off_and_unsupported_settings_never_open_the_driver",
+      "missing_or_rejecting_driver_declines_for_software_fallback",
+      "bitrate_ceiling_does_not_wrap",
+      "composition_offsets_saturate",
+      "hevc_takes_what_nvenc_can_write_and_declines_the_rest",
+      "the_sei_messages_are_the_hdr10_static_metadata_the_software_h264_path_writes",
+      "oversized_pictures_are_declined",
+      "hdr_sequences_export_as_main_10",
+      "sdr_stays_main_8_bit_and_the_sdr_setting_tone_maps_hdr_sequences",
+      "the_factory_rejects_mismatched_pictures_and_clamps_hostile_floats"
+    ]
+  },
+  "2387": {
+    "sha": "b1df3b2ef96175466f16845fcdaeca10275ff718",
+    "changed_files": [
+      "crates/engine/src/previews.rs",
+      "crates/engine/src/previews_tests.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "saving_without_previews_creates_no_previews_folder"
+    ],
+    "tests_existing_in_changed_files": [
+      "render_turns_green_edit_invalidates_and_undo_restores",
+      "render_in_to_out_renders_only_the_marked_frames",
+      "previews_survive_save_and_open",
+      "saving_without_previews_creates_no_previews_folder",
+      "render_selection_and_audio_previews",
+      "render_commands_are_registered_like_premiere",
+      "float_wav_round_trip",
+      "bar_state_serializes_lowercase"
+    ]
+  },
+  "2391": {
+    "sha": "32fde18874a4636e4cda2cdf91567e4436aa6f51",
+    "changed_files": [
+      "crates/codecs/src/mkv.rs",
+      "crates/codecs/src/tests.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "matroska_undecodable_audio_is_labelled_unsupported"
+    ],
+    "tests_existing_in_changed_files": [
+      "every_audio_track_is_inspected_and_decoded_independently",
+      "timestamp_preserving_remux_starts_at_the_first_picture",
+      "mjpeg_mov_with_pcm",
+      "aac_mp4_decodes",
+      "mp3_file_decodes",
+      "aiff_file_decodes",
+      "seek_backwards_and_forwards_mjpeg",
+      "h264_mp4_decodes_and_seeks",
+      "prores_mov_decodes",
+      "dnxhd_and_dnxhr_movs_decode",
+      "matroska_h264_aac",
+      "matroska_hevc_flac",
+      "mp4_flac_audio",
+      "matroska_undecodable_audio_is_labelled_unsupported",
+      "matroska_prores_pcm",
+      "matroska_reordered_video_without_default_duration_keeps_its_rate",
+      "mp4_av1_intra_seeks_bit_exact",
+      "mp4_av1_inter_gop_seeks_bit_exact",
+      "webm_av1_inter_gop_10bit_seeks_bit_exact",
+      "webm_av1_intra_10bit_seeks_bit_exact"
+    ]
+  },
+  "2393": {
+    "sha": "1fb198b5beb5634f5efb631ec83fcec8a92dea7e",
+    "changed_files": [
+      "crates/ui-egui/src/panels/effect_controls.rs",
+      "crates/ui-egui/tests/color_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "effect_controls_lut_browse_imports_and_sets_in_one_undo_step"
+    ],
+    "tests_existing_in_changed_files": [
+      "readable_values_for_text_lut_and_curve_params",
+      "each_press_begins_its_own_undo_step",
+      "a_scale_drag_with_idle_frames_is_one_undo_step",
+      "a_clip_without_a_duration_still_draws",
+      "ruler_survives_damaged_numbers",
+      "ruler_labels_sequence_timecode",
+      "a_dropped_graph_keyframe_stays_where_it_was_dropped",
+      "scalar_graph_press_starts_at_the_pointer_origin_and_release_is_one_undo_step",
+      "position_graph_drags_one_coordinate_of_a_point_keyframe",
+      "lumetri_lut_menus_and_section_switches",
+      "effect_controls_lut_rows_pick_a_lut",
+      "effect_controls_lut_browse_imports_and_sets_in_one_undo_step",
+      "interpret_footage_and_sequence_color_dialogs_and_hdr_scopes",
+      "apply_match_from_the_color_wheels_section",
+      "hdr_lumetri_controls_hsl_refine_and_comparison_view",
+      "lumetri_presets_in_the_effects_panel",
+      "lumetri_presets_drag_onto_a_timeline_clip",
+      "lumetri_rows_keep_their_width_when_the_clip_name_is_long"
+    ]
+  },
+  "2394": {
+    "sha": "a073371bc67ff014301cbdd47eac7b4f66c455f5",
+    "changed_files": [
+      "crates/captions/src/ttml.rs",
+      "crates/captions/tests/ttml_clock_overflow.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "ttml_and_dfxp_write_survive_tick_max"
+    ],
+    "tests_existing_in_changed_files": [
+      "invalid_timing_parameters_return_an_error",
+      "missing_timing_parameters_keep_defaults",
+      "default_tick_rate_preserves_fractional_frame_rate",
+      "time_expressions",
+      "invalid_and_overflowed_time_expressions_are_ignored",
+      "fractional_tick_offsets_keep_exact_caption_times",
+      "reads_styles_spans_and_nesting",
+      "writes_imsc1_with_frames_and_spans",
+      "ttml_and_dfxp_write_survive_tick_max"
+    ]
+  },
+  "2396": {
+    "sha": "3ccfe477e9e63733e214fac69bfa7484d5cabcc8",
+    "changed_files": [
+      "docs/gaps.md",
+      "docs/testing.md",
+      "docs/ui-parity.md"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2410": {
+    "sha": "24ee5c0ab780e5f9200883998967330b01f17e55",
+    "changed_files": [
+      "crates/tts-text/src/normalize.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "money_run_past_the_cap_is_read_digit_by_digit"
+    ],
+    "tests_existing_in_changed_files": [
+      "plain_words_pass_through",
+      "cardinals",
+      "oversized_and_leading_zero_numbers_go_digit_by_digit",
+      "negatives_and_decimals",
+      "ordinals",
+      "magnitude_is_kept_before_exact_tens_ordinals",
+      "money",
+      "money_fraction_beyond_two_digits_is_not_hundreds_of_cents",
+      "first_digit_group_keeps_leading_zeros",
+      "short_hyphenated_groups_keep_every_number",
+      "percent",
+      "years",
+      "times",
+      "dates",
+      "digit_groups",
+      "abbreviations",
+      "acronyms",
+      "symbols",
+      "fractions",
+      "fraction_operands_may_have_three_digits"
+    ]
+  },
+  "2412": {
+    "sha": "5734770918709a417fd7bdd086abe61baf7e94e3",
+    "changed_files": [
+      "crates/ui-egui/src/dock.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "vertical_workspace_gives_program_the_full_height"
+    ],
+    "tests_existing_in_changed_files": [
+      "split_first_never_panics_on_tiny_areas",
+      "vertical_workspace_gives_program_the_full_height",
+      "workspaces_contain_core_panels",
+      "close_and_open",
+      "open_near_falls_back_to_the_first_group"
+    ]
+  },
+  "2415": {
+    "sha": "dd2d3111d68855ef4262d32b5e5f66724f48a622",
+    "changed_files": [
+      "crates/codecs/src/lib.rs",
+      "crates/codecs/src/mp4.rs",
+      "crates/codecs/src/tests.rs",
+      "crates/codecs/src/video.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "quicktime_uncompressed_video"
+    ],
+    "tests_existing_in_changed_files": [
+      "duration_follows_the_edit_list",
+      "unedited_composition_delay_starts_at_the_first_picture",
+      "damaged_track_headers_never_panic",
+      "display_matrix_rotates_frames_and_reported_size",
+      "clean_aperture_crops_frames_and_reported_size",
+      "mirrored_or_scaled_matrices_are_not_mistaken_for_rotations",
+      "hevc_pixel_format_comes_from_hvcc",
+      "avc_pixel_format_comes_from_avcc_not_the_profile",
+      "hevc_pixel_format_prefers_the_sps_over_the_hvcc_fields",
+      "prores_alpha_comes_from_the_frame_header",
+      "rtmd_fields_parse_and_reject_damaged_metadata",
+      "rtmd_fields_reject_drop_frame_skipped_labels",
+      "every_audio_track_is_inspected_and_decoded_independently",
+      "he_aac_plays_at_the_output_rate",
+      "hostile_audio_edit_offset_never_overflows",
+      "mjpeg_mov_with_pcm",
+      "aac_mp4_decodes",
+      "mp3_file_decodes",
+      "aiff_file_decodes",
+      "seek_backwards_and_forwards_mjpeg"
+    ]
+  },
+  "2427": {
+    "sha": "7cd5acfcf9a34246d1e6891f8a0267a74cac91a6",
+    "changed_files": [
+      "crates/color/src/lut.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "cube_title_with_hash_roundtrips"
+    ],
+    "tests_existing_in_changed_files": [
+      "tetrahedral_matches_brute_force",
+      "tetrahedral_exact_on_affine_and_nodes",
+      "cube_title_with_hash_roundtrips",
+      "cube_roundtrip_3d_1d_and_shaper",
+      "cube_sizes_up_to_65_and_errors",
+      "threedl_roundtrip_and_orientation",
+      "huge_3dl_mesh_is_rejected"
+    ]
+  },
+  "2446": {
+    "sha": "59ea04d6e5d9536620b4f8fc539e9ae13a54e657",
+    "changed_files": [
+      "crates/ui-egui/tests/frame_export_ui.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "both_camera_buttons_open_the_dialog_and_cancel_writes_nothing",
+      "program_export_ignores_source_focus_and_imports_the_saved_still",
+      "focused_source_command_captures_the_frame_and_save_cancel_keeps_the_dialog",
+      "depth_dropdown_is_format_aware_and_existing_files_require_confirmation",
+      "white_header_moves_both_dialogs_and_controls_still_work",
+      "exported_frame_timecode_matches_each_monitor_and_stays_captured",
+      "clicking_outside_dismisses_without_export_and_dropdowns_stay_open",
+      "a_failed_export_shows_its_error_in_the_dialog"
+    ]
+  },
+  "2456": {
+    "sha": "f0dd617590099df16d1374687800cff1fb28e0af",
+    "changed_files": [
+      "crates/ui-egui/src/lib.rs",
+      "crates/ui-egui/tests/panels_ui.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "effects_are_indented_under_their_folders"
+    ],
+    "tests_existing_in_changed_files": [
+      "ctrl_c_x_v_become_key_presses",
+      "extra_modifiers_are_kept",
+      "windows_insert_and_delete_variants",
+      "other_events_are_left_alone",
+      "ctrl_click_is_a_secondary_click",
+      "synthesized_click_fires_secondary_clicked",
+      "release_is_paired_to_the_ctrl_press",
+      "plain_click_is_untouched",
+      "new_plain_press_clears_a_stale_pairing",
+      "software_rasterizers_are_detected",
+      "plan_side_covers_output_and_every_layer",
+      "forward_shuttle_playback_keeps_audio_enabled",
+      "maintain_pitch_shuttling_controls_the_samples_sent_to_the_device",
+      "changing_pitch_preference_restarts_audio_at_the_current_playhead",
+      "changing_hardware_recovers_wall_clock_playback_without_rewinding",
+      "a_failed_device_clock_resumes_from_the_displayed_frame",
+      "a_restarted_stream_keeps_the_device_clock_and_the_sound",
+      "an_unmodified_key_reaches_a_focused_text_field",
+      "an_unmodified_key_still_fires_without_a_text_field",
+      "a_modified_chord_still_fires_while_text_is_focused"
+    ]
+  },
+  "2463": {
+    "sha": "f307409636e4608cda538f850a1c57ca6da8d273",
+    "changed_files": [
+      "crates/ui-egui/src/panels/effect_controls.rs",
+      "crates/ui-egui/src/panels/effect_controls_selection.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "shift_scrub_snaps_to_a_keyframe_within_reach_only"
+    ],
+    "tests_existing_in_changed_files": [
+      "readable_values_for_text_lut_and_curve_params",
+      "each_press_begins_its_own_undo_step",
+      "a_scale_drag_with_idle_frames_is_one_undo_step",
+      "a_clip_without_a_duration_still_draws",
+      "ruler_survives_damaged_numbers",
+      "ruler_labels_sequence_timecode",
+      "a_dropped_graph_keyframe_stays_where_it_was_dropped",
+      "scalar_graph_press_starts_at_the_pointer_origin_and_release_is_one_undo_step",
+      "position_graph_drags_one_coordinate_of_a_point_keyframe",
+      "shift_scrub_snaps_to_a_keyframe_within_reach_only",
+      "keyframe_timeline_coordinates_follow_trim_speed_and_reverse",
+      "clip_clamping_does_not_extend_the_screen_space_snap_threshold"
+    ]
+  },
+  "2483": {
+    "sha": "e593ea6fa3a5bacb1bcbdfdc3419722d20faa23e",
+    "changed_files": [
+      "crates/engine/src/clip_ops.rs",
+      "crates/engine/src/clip_ops_tests.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "audio_channels_rejects_a_channel_less_call_with_no_item_selected"
+    ],
+    "tests_existing_in_changed_files": [
+      "menus_and_shortcuts_follow_premiere",
+      "label_commands_and_select_label_group",
+      "select_all_matching_selects_every_use_of_the_source",
+      "paste_attributes_with_scaled_keyframes_and_remove_attributes",
+      "remove_unused_and_consolidate_duplicates",
+      "new_sequence_from_clip_bin_from_selection_and_offline_file",
+      "close_project_and_save_all",
+      "make_and_edit_subclips",
+      "modify_audio_channels_and_breakout_to_mono",
+      "audio_channels_rejects_a_channel_less_call_with_no_item_selected",
+      "modify_timecode_and_reset",
+      "frame_hold_options_add_frame_hold_and_hold_segment",
+      "field_options_and_time_interpolation_are_stored",
+      "frame_blending_renders_in_between_frames",
+      "fit_and_fill_frame",
+      "extract_audio_writes_a_wav_and_imports_it",
+      "replace_with_clip_from_source_match_frame_and_bin",
+      "replace_from_source_match_frame_on_a_reversed_clip",
+      "replace_from_bin_keeps_the_source_in_on_request",
+      "replace_with_clip_reports_clips_that_run_past_the_new_media"
+    ]
+  },
+  "2505": {
+    "sha": "ebbd845a90b2a08c7bb6e3d1f8eb709e2c34fdad",
+    "changed_files": [
+      "crates/gpu/src/export_renderer.rs",
+      "crates/render/src/nest_tests.rs",
+      "docs/testing/nested-transform-regressions.md"
+    ],
+    "added_test_attributes": 4,
+    "tests_added_by_diff": [
+      "transformed_nested_picture_matches_cpu",
+      "transformed_plain_nests_preserve_the_group_picture",
+      "a_transformed_nest_keeps_captions_at_its_held_source_time"
+    ],
+    "tests_existing_in_changed_files": [
+      "solid_frame_matches_cpu",
+      "transformed_frame_matches_cpu",
+      "transformed_nested_picture_matches_cpu",
+      "gpu_render_impls_frame_renderer",
+      "f16_roundtrip",
+      "a_smaller_nest_is_shown_at_its_own_size_in_the_middle",
+      "a_larger_nest_is_cropped_by_the_frame",
+      "a_nest_at_another_frame_rate_shows_its_sequence_at_the_same_moment",
+      "speed_reverse_and_frame_hold_on_a_nest_pick_the_frame_of_its_sequence",
+      "opacity_and_effects_on_a_nest_apply_to_its_whole_picture",
+      "captions_inside_a_nest_are_part_of_its_picture",
+      "a_plain_nest_is_planned_as_its_own_layers_and_looks_the_same",
+      "a_nest_that_is_not_plain_is_still_drawn_right",
+      "transformed_plain_nests_preserve_the_group_picture",
+      "a_transformed_nest_keeps_captions_at_its_held_source_time"
+    ]
+  },
+  "2513": {
+    "sha": "3e9ca2ebbdabab6d30150ce753efabc233300f4c",
+    "changed_files": [
+      "crates/ui-egui/src/panels/tools.rs",
+      "crates/ui-egui/src/state.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "tool_hints_follow_the_active_shortcut_and_hide_cleared_keys"
+    ],
+    "tests_existing_in_changed_files": [
+      "tool_hints_follow_the_active_shortcut_and_hide_cleared_keys",
+      "dragging_off_a_grouped_tool_opens_its_flyout_and_letting_go_on_a_row_picks_it",
+      "letting_go_of_a_dragged_open_flyout_elsewhere_leaves_it_open",
+      "a_right_click_on_a_grouped_tool_still_opens_its_flyout",
+      "long_press_type_selects_vertical_without_selecting_on_release"
+    ]
+  },
+  "2539": {
+    "sha": "462b24f342debcbc0de720de86bd71aa163bdf06",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/timeline_middle_pan_ui.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "a_middle_button_drag_on_a_clip_pans_and_leaves_the_clip_alone",
+      "a_middle_button_drag_pans_whatever_the_tool",
+      "a_middle_button_drag_moves_the_audio_tracks_over_the_audio_tracks"
+    ]
+  },
+  "2542": {
+    "sha": "378212a9f548fb6af844e114cfbefaa4bc678e37",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/src/widgets.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "a_clipped_letter_toggle_draws_only_inside_its_clip"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "a_clipped_letter_toggle_draws_only_inside_its_clip",
+      "clicking_a_hot_number_selects_its_whole_value",
+      "dialogs_open_centered_and_drag"
+    ]
+  },
+  "2597": {
+    "sha": "28859f69e50bb76d2fd8b7c00c802b1bedb06c2b",
+    "changed_files": [
+      "crates/engine/src/clip_ops_tests.rs",
+      "crates/engine/src/commands.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "menus_and_shortcuts_follow_premiere",
+      "label_commands_and_select_label_group",
+      "select_all_matching_selects_every_use_of_the_source",
+      "paste_attributes_with_scaled_keyframes_and_remove_attributes",
+      "remove_unused_and_consolidate_duplicates",
+      "new_sequence_from_clip_bin_from_selection_and_offline_file",
+      "close_project_and_save_all",
+      "make_and_edit_subclips",
+      "modify_audio_channels_and_breakout_to_mono",
+      "modify_timecode_and_reset",
+      "frame_hold_options_add_frame_hold_and_hold_segment",
+      "field_options_and_time_interpolation_are_stored",
+      "frame_blending_renders_in_between_frames",
+      "fit_and_fill_frame",
+      "extract_audio_writes_a_wav_and_imports_it",
+      "replace_with_clip_from_source_match_frame_and_bin",
+      "replace_from_source_match_frame_on_a_reversed_clip",
+      "replace_from_bin_keeps_the_source_in_on_request",
+      "replace_with_clip_reports_clips_that_run_past_the_new_media",
+      "audio_source_channels_pick_what_a_clip_plays"
+    ]
+  },
+  "2640": {
+    "sha": "531f665b90791b23b7c66c983f7008d39624c2a9",
+    "changed_files": [
+      "ROADMAP.md"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2653": {
+    "sha": "d1b45e960b123c6fcf2c452b0666417c404a94ee",
+    "changed_files": [
+      "crates/interchange/README.md",
+      "crates/interchange/src/fcpxml.rs",
+      "crates/interchange/tests/uncarried_clips.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "fcpxml_has_no_empty_ref_for_a_title"
+    ],
+    "tests_existing_in_changed_files": [
+      "rational_times_are_exact",
+      "every_format_names_the_title_and_the_adjustment_layer_it_cannot_carry",
+      "two_titles_are_two_report_lines",
+      "a_sequence_without_such_clips_reports_nothing_about_them",
+      "the_reports_match_what_an_import_gives_back",
+      "fcp7_import_reports_a_clip_item_whose_file_is_not_defined",
+      "fcpxml_has_no_empty_ref_for_a_title"
+    ]
+  },
+  "2658": {
+    "sha": "0c2ff743490e6a574f0b816280fba5f0e011d070",
+    "changed_files": [
+      "crates/engine/src/settings.rs",
+      "crates/ui-egui/src/menus.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "edit_label_menu_swatch_uses_current_custom_palette",
+      "ctrl_and_cmd_are_one_key_off_macos",
+      "default_menu_items_are_the_shipped_menu_bar",
+      "hovering_another_title_switches_the_open_menu"
+    ]
+  },
+  "2677": {
+    "sha": "387533cbdc2a480350707a5ac88b8664aa78e3da",
+    "changed_files": [
+      "crates/ui-egui/src/panels/timeline.rs",
+      "crates/ui-egui/tests/hand_drag_half_2536.rs",
+      "fc2677_fix.py",
+      "fc2677_test.py"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "cancelling_an_audio_drag_restores_the_audio_scroll"
+    ],
+    "tests_existing_in_changed_files": [
+      "each_audio_stream_gets_its_own_waveform_peaks",
+      "trimming_the_music_keeps_its_waveform_in_place",
+      "rolling_an_edit_keeps_both_sides_in_place_but_a_stretch_still_squeezes",
+      "home_scrolls_back_to_the_start",
+      "end_scrolls_forward_to_the_playhead",
+      "a_visible_or_hostile_playhead_leaves_the_view",
+      "normalisation_is_capped_for_near_silent_sources",
+      "zooming_keeps_the_frames_shown_before_the_zoom",
+      "continuous_thumbnails_tile_the_visible_part_of_the_clip",
+      "head_and_tail_thumbnails_need_room_for_two_frames",
+      "empty_space_past_the_tracks_adds_a_track",
+      "a_full_video_area_scrolls_to_space_for_a_new_track",
+      "labels_sit_on_evenly_spaced_ticks",
+      "a_24_fps_view_at_100_pt_a_second_labels_every_two_seconds",
+      "damaged_rates_give_usable_strides",
+      "a_middle_drag_over_the_audio_tracks_scrolls_the_audio_tracks",
+      "a_middle_drag_over_the_video_tracks_scrolls_the_video_tracks",
+      "cancelling_an_audio_drag_restores_the_audio_scroll",
+      "a_hand_tool_drag_over_the_audio_tracks_scrolls_the_audio_tracks"
+    ]
+  },
+  "2699": {
+    "sha": "8ce8c0d3bd3689fa85a6202d9f289775fda56d0b",
+    "changed_files": [
+      "crates/render/src/effects.rs",
+      "crates/ui-egui/src/panels/lumetri.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "luma_vs_sat_highlight_point_leaves_shadows_saturated",
+      "hue_curve_has_no_seam_at_red",
+      "vs_sat_curves_do_not_wrap"
+    ],
+    "tests_existing_in_changed_files": [
+      "median_radius_stays_in_the_parameter_range",
+      "every_effect_runs_and_stays_finite",
+      "gaussian_preserves_mean_and_blurs",
+      "flip_and_crop",
+      "identity_lumetri_is_identity",
+      "luma_vs_sat_highlight_point_leaves_shadows_saturated",
+      "identity_and_monotone",
+      "hue_curve_has_no_seam_at_red",
+      "vs_sat_curves_do_not_wrap",
+      "lumetri_gpu_op_matches_original_fn_lumetri_cpu",
+      "lumetri_vignette_roundness_shapes_the_vignette"
+    ]
+  },
+  "2705": {
+    "sha": "b49b184519af873a1dfd54b3891644920a0559a4",
+    "changed_files": [
+      "crates/engine/src/shortcuts.rs",
+      "crates/engine/src/shortcuts_tests.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "chords_parse_normalise_and_display_per_os",
+      "defaults_follow_the_registry_and_the_premiere_audit",
+      "assign_reassigns_conflicts_and_undoes",
+      "clear_close_sequence_also_clears_file_close",
+      "clear_new_bin_frees_cmd_b_in_the_project_panel_too",
+      "reassigning_new_bin_moves_its_project_panel_key_too",
+      "panel_shortcuts_override_application_ones_with_focus",
+      "delete_clears_timeline_clips_and_project_items",
+      "compat_presets_map_other_editors",
+      "custom_presets_persist_export_and_import",
+      "list_searches_labels_and_keys",
+      "default_keymaps_have_no_conflicts_on_any_platform"
+    ]
+  },
+  "2710": {
+    "sha": "523fbf6dc74489bb9995d7d93d9c02e65d6d70a0",
+    "changed_files": [
+      "crates/ui-egui/src/panels/lumetri.rs",
+      "crates/ui-egui/tests/color_ui.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "a_dragged_lumetri_curve_point_undoes_and_redoes"
+    ],
+    "tests_existing_in_changed_files": [
+      "lumetri_lut_menus_and_section_switches",
+      "interpret_footage_and_sequence_color_dialogs_and_hdr_scopes",
+      "apply_match_from_the_color_wheels_section",
+      "hdr_lumetri_controls_hsl_refine_and_comparison_view",
+      "lumetri_presets_in_the_effects_panel",
+      "lumetri_presets_drag_onto_a_timeline_clip",
+      "lumetri_rows_keep_their_width_when_the_clip_name_is_long",
+      "a_dragged_lumetri_curve_point_undoes_and_redoes"
+    ]
+  },
+  "2835": {
+    "sha": "6044de4455bbeb1eccfe4f5e37ca2e54c33c18c8",
+    "changed_files": [
+      "contributors/people.toml",
+      "crates/codecs/src/tests.rs",
+      "crates/ui-egui/src/i18n/mod.rs",
+      "crates/ui-egui/src/theme.rs",
+      "docs/testing.md"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "oracle_lookup_probe",
+      "oracle_lookup_honors_explicit_ffmpeg_override",
+      "oracle_lookup_rejects_invalid_ffmpeg_override"
+    ],
+    "tests_existing_in_changed_files": [
+      "oracle_lookup_probe",
+      "oracle_lookup_honors_explicit_ffmpeg_override",
+      "oracle_lookup_rejects_invalid_ffmpeg_override",
+      "mjpeg_mov_with_pcm",
+      "aac_mp4_decodes",
+      "mp3_file_decodes",
+      "aiff_file_decodes",
+      "seek_backwards_and_forwards_mjpeg",
+      "h264_mp4_decodes_and_seeks",
+      "prores_mov_decodes",
+      "dnxhd_and_dnxhr_movs_decode",
+      "matroska_h264_aac",
+      "matroska_hevc_flac",
+      "mp4_flac_audio",
+      "matroska_prores_pcm",
+      "matroska_reordered_video_without_default_duration_keeps_its_rate",
+      "mp4_av1_intra_seeks_bit_exact",
+      "mp4_av1_inter_gop_seeks_bit_exact",
+      "webm_av1_inter_gop_10bit_seeks_bit_exact",
+      "webm_av1_intra_10bit_seeks_bit_exact"
+    ]
+  },
+  "2838": {
+    "sha": "444486ee7ac6eb5ed088191b2d08225612a82e65",
+    "changed_files": [
+      "crates/h264/src/picture.rs",
+      "crates/speech/src/whisper/tokenizer.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "byte_table_covers_every_byte_once"
+    ],
+    "tests_existing_in_changed_files": [
+      "byte_table_covers_every_byte_once"
+    ]
+  },
+  "2845": {
+    "sha": "1fa5024ed5c8ce4f112496fa4c7bdbc9b87810ba",
+    "changed_files": [
+      "crates/interchange/src/aaf/tests.rs",
+      "crates/interchange/src/comp.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "the_meta_dictionary_has_its_class_and_type_definition_sets",
+      "written_files_have_the_required_structure",
+      "store_round_trips_every_stored_form",
+      "premiere_style_layers_and_nested_compositions_are_read",
+      "audio_tracks_keep_their_names"
+    ]
+  },
+  "2847": {
+    "sha": "d8fc82312647f60092cafcce7c358542d51c4421",
+    "changed_files": [
+      "crates/interchange/src/ale.rs",
+      "crates/interchange/src/common.rs",
+      "crates/interchange/tests/cyclic_subclips.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "writes_the_three_sections_and_round_trips",
+      "fps_and_formats",
+      "exports_chained_subclips_and_skips_cyclic_subclips_without_hanging",
+      "urls",
+      "paths",
+      "rates",
+      "subclip_cycle_resolution_is_bounded",
+      "cyclic_subclips_do_not_stack_overflow_on_any_interchange_export"
+    ]
+  },
+  "2888": {
+    "sha": "59c4223ae71502dbd73e1378bff6f19906cec0b0",
+    "changed_files": [
+      "crates/av1/src/header.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "film_grain_scaling_points_must_increase"
+    ],
+    "tests_existing_in_changed_files": [
+      "film_grain_scaling_points_must_increase"
+    ]
+  },
+  "2909": {
+    "sha": "5652966b1aefe750aff3f26f83cc0f551d13a211",
+    "changed_files": [
+      "crates/interchange/src/xml.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "rejects_internal_dtd_entity_expansion"
+    ],
+    "tests_existing_in_changed_files": [
+      "writer_roundtrip",
+      "rejects_internal_dtd_entity_expansion"
+    ]
+  },
+  "2924": {
+    "sha": "61184469d96353482c5dd704cba90d253b6ef372",
+    "changed_files": [
+      "crates/av1/src/decoder.rs",
+      "crates/engine/src/relink_tests.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "frames_up_to_the_level_6_3_limits_are_allowed",
+      "frames_beyond_the_limits_are_refused",
+      "abandoned_frame_job_releases_both_result_slots",
+      "abandoning_a_job_preserves_already_published_results",
+      "sequential_panicking_job_returns_errors_to_all_waiters",
+      "threaded_panicking_job_does_not_strand_waiters_or_shutdown",
+      "identity_and_remap_helpers",
+      "moved_media_opens_offline_and_relinks_others_by_folder",
+      "auto_relink_by_prefix_and_by_folder_search",
+      "fingerprint_mismatch_is_refused_unless_forced",
+      "forced_relink_takes_the_new_files_properties",
+      "make_offline_shows_the_slate_until_relinked",
+      "relink_search_does_not_follow_directory_symlinks",
+      "reimport_clears_offline_list_after_path_resolves",
+      "explicit_folder_remaps_normalize_both_prefixes_and_respect_boundaries",
+      "export_names_the_offline_media_it_rendered",
+      "jobs_list_reports_an_exports_offline_media",
+      "deleting_bin_keeps_subclip_source_but_removes_unused_media",
+      "deleting_sequence_and_its_media_does_not_keep_an_unused_source",
+      "deleting_subclip_and_source_does_not_keep_an_unused_source"
+    ]
+  },
+  "2947": {
+    "sha": "649b8ac8961232bed9abfbeb1693480057d73588",
+    "changed_files": [
+      "crates/interchange/src/fcpxml.rs",
+      "crates/interchange/tests/fcpxml.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "self_referencing_compound_media_is_ignored_without_recursing"
+    ],
+    "tests_existing_in_changed_files": [
+      "rational_times_are_exact",
+      "self_referencing_compound_media_is_ignored_without_recursing",
+      "golden_connected_clips",
+      "roundtrip_all_versions",
+      "fcpxml_roundtrip"
+    ]
+  },
+  "2951": {
+    "sha": "6d8eb1ba86aaa276687e2759b355af8788d5ec10",
+    "changed_files": [
+      "crates/matroska/src/demux.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": []
+  },
+  "2964": {
+    "sha": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
+    "changed_files": [
+      "crates/av1/src/grain.rs",
+      "crates/av1/src/header.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "equal_scaling_points_do_not_panic",
+      "film_grain_points_must_strictly_increase"
+    ],
+    "tests_existing_in_changed_files": [
+      "equal_scaling_points_do_not_panic",
+      "film_grain_points_must_strictly_increase"
+    ]
+  },
+  "2974": {
+    "sha": "ceb2d0197fa26daecb7f0a387211a47b3decf502",
+    "changed_files": [
+      "crates/captions/src/vtt.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "an_arrow_in_cue_text_survives_a_round_trip",
+      "other_entities_stay_verbatim_in_cue_text"
+    ],
+    "tests_existing_in_changed_files": [
+      "parse_sample",
+      "voices",
+      "without_signature",
+      "an_arrow_in_cue_text_survives_a_round_trip",
+      "other_entities_stay_verbatim_in_cue_text"
+    ]
+  },
+  "2975": {
+    "sha": "4f42c33e593482f35fd526192f012855fa31e515",
+    "changed_files": [
+      "crates/interchange/src/fcpxml.rs",
+      "crates/interchange/tests/fcpxml.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "a_self_referential_media_imports_instead_of_overflowing_the_stack"
+    ],
+    "tests_existing_in_changed_files": [
+      "rational_times_are_exact",
+      "golden_connected_clips",
+      "a_self_referential_media_imports_instead_of_overflowing_the_stack",
+      "roundtrip_all_versions",
+      "fcpxml_roundtrip"
+    ]
+  },
+  "2994": {
+    "sha": "494883feea48c85e1dd4cfd0ae25082e58761562",
+    "changed_files": [
+      "crates/engine/src/autosave.rs",
+      "crates/engine/src/commands.rs",
+      "docs/project-files.md"
+    ],
+    "added_test_attributes": 7,
+    "tests_added_by_diff": [
+      "worker_panic_is_contained_and_reported",
+      "worker_disconnect_dirty_reports_once",
+      "worker_disconnect_clean_reports_once",
+      "worker_disconnect_preferences_reports_once",
+      "worker_disconnect_flush_reports_once",
+      "worker_disconnect_request_reports_once",
+      "worker_remains_available_after_an_ordinary_write_error"
+    ],
+    "tests_existing_in_changed_files": [
+      "worker_panic_is_contained_and_reported",
+      "worker_disconnect_dirty_reports_once",
+      "worker_disconnect_clean_reports_once",
+      "worker_disconnect_preferences_reports_once",
+      "worker_disconnect_flush_reports_once",
+      "worker_disconnect_request_reports_once",
+      "worker_remains_available_after_an_ordinary_write_error"
+    ]
+  },
+  "3066": {
+    "sha": "53543a58394dfc93cbda7d40a9d048a60edeba23",
+    "changed_files": [
+      "crates/frame/src/lib.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "cropping_cuts_every_plane_at_the_same_place",
+      "rotation_turns_every_plane_clockwise",
+      "box_decimation_averages_blocks_per_plane",
+      "rgba8_roundtrip_through_linear",
+      "yuv_grey_is_grey",
+      "audio_mix",
+      "a_region_is_exactly_the_crop_of_the_full_conversion",
+      "a_recycled_buffer_never_leaks_its_old_contents",
+      "alpha_region_is_the_box_around_what_is_not_transparent",
+      "a_full_size_yuv8_picture_converts_exactly_pixel_by_pixel",
+      "a_yuv8_picture_with_short_planes_converts_without_panicking"
+    ]
+  },
+  "3077": {
+    "sha": "4bf7b3e8923b2cb02ff745e6a35fdcd885c5feb1",
+    "changed_files": [
+      "crates/ui-egui/src/panels/export_mode.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "location_tail_is_bounded_and_keeps_utf8_intact",
+      "preview_navigation_is_bounded_and_does_not_edit_the_project",
+      "export_keyboard_targets_sequence_and_playback_stops_at_range_end_even_with_loop_on",
+      "preview_ranges_cover_in_out_work_area_empty_and_hostile_custom_values"
+    ]
+  },
+  "3109": {
+    "sha": "62c16fcb1d8b3cec7d952009282ff66b7de1a91f",
+    "changed_files": [
+      "crates/av1/src/decoder.rs",
+      "crates/av1/tests/fuzz_hostile.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "a_panicking_frame_job_is_an_error_not_a_hang",
+      "the_decoder_recovers_at_the_next_key_frame_after_a_panic"
+    ],
+    "tests_existing_in_changed_files": [
+      "a_panicking_frame_job_is_an_error_not_a_hang",
+      "the_decoder_recovers_at_the_next_key_frame_after_a_panic",
+      "frames_up_to_the_level_6_3_limits_are_allowed",
+      "frames_beyond_the_limits_are_refused",
+      "hostile_streams_never_panic"
+    ]
+  },
+  "3117": {
+    "sha": "4f6387217f6bfa6e1b1442597b6ede1467cf571d",
+    "changed_files": [
+      "crates/av1/src/decoder.rs",
+      "crates/av1/src/frame.rs"
+    ],
+    "added_test_attributes": 0,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "frames_up_to_the_level_6_3_limits_are_allowed",
+      "frames_beyond_the_limits_are_refused",
+      "row_bands_split_whole_rows",
+      "row_bands_never_overlap_or_panic"
+    ]
+  },
+  "3120": {
+    "sha": "d2b13a5250f8d252c06469bd24e8f516df86a0c2",
+    "changed_files": [
+      "crates/av1/src/tile.rs",
+      "crates/av1/src/transform.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "dc_only_matches_full_transform"
+    ],
+    "tests_existing_in_changed_files": [
+      "dct_dc_is_flat",
+      "dc_only_matches_full_transform",
+      "dct_matches_float",
+      "adst_basis_matches_sine",
+      "adst_is_close_to_sine_transform"
+    ]
+  },
+  "3136": {
+    "sha": "968710eae4f02ed688beb2e9139aa74a13a74a53",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/eq.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "settled_eq_pairs_channels_like_original_loop"
+    ],
+    "tests_existing_in_changed_files": [
+      "default_parametric_is_flat",
+      "parametric_bands_match_analytic_response",
+      "simple_eq_gains",
+      "gain_change_glides_without_jump",
+      "flat_eq_fast_path_preserves_samples_and_filter_tails",
+      "settled_and_automated_eq_matches_original_loop",
+      "settled_eq_pairs_channels_like_original_loop"
+    ]
+  },
+  "3139": {
+    "sha": "94e2a4a9eba1c9b1289496802954b2d21f468c92",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/modulation.rs",
+      "crates/audio-dsp/src/effects/util.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "delay_read_matches_modulo_indexing",
+      "wrap_phase_matches_rem_euclid"
+    ],
+    "tests_existing_in_changed_files": [
+      "delay_line_reads_integer_and_fractional",
+      "delay_read_matches_modulo_indexing",
+      "wrap_phase_matches_rem_euclid",
+      "allpass_is_unit_magnitude"
+    ]
+  },
+  "3140": {
+    "sha": "97a9b720a9658d78968598e09ce38ea7ff7d1ff1",
+    "changed_files": [
+      "crates/audio-dsp/src/oversample.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "partial_sums_match_sequential_sum_to_rounding"
+    ],
+    "tests_existing_in_changed_files": [
+      "phases_have_unity_dc_and_interpolate_sines",
+      "partial_sums_match_sequential_sum_to_rounding"
+    ]
+  },
+  "3141": {
+    "sha": "51dae73ed2e7925d0f72a12c881876133f5cb3ba",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/reverbs.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "set_param_defers_the_impulse_rebuild_to_process",
+      "deferred_rebuild_output_is_identical"
+    ],
+    "tests_existing_in_changed_files": [
+      "set_param_defers_the_impulse_rebuild_to_process",
+      "deferred_rebuild_output_is_identical"
+    ]
+  },
+  "3142": {
+    "sha": "da655a03a3197bfc3d2f412aef75582013e129cb",
+    "changed_files": [
+      "crates/audio-dsp/src/fft.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "bit_identical_to_reference_kernel"
+    ],
+    "tests_existing_in_changed_files": [
+      "matches_naive_dft_and_round_trips",
+      "bit_identical_to_reference_kernel"
+    ]
+  },
+  "3143": {
+    "sha": "93d298eba5f0a23ebae8f41c98ab020d972615e6",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/dynamics.rs",
+      "crates/audio-dsp/src/lib.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [],
+    "tests_existing_in_changed_files": [
+      "compressor_static_curve",
+      "compressor_steady_state_matches_curve",
+      "compressor_attack_time",
+      "gate_attenuates_below_threshold_and_holds",
+      "limiter_never_exceeds_ceiling",
+      "limiter_is_transparent_below_ceiling_with_reported_latency",
+      "limiter_reduces_loud_sine_to_ceiling_smoothly"
+    ]
+  },
+  "3144": {
+    "sha": "02385e2ba2795fe5ba7686c121aea413a6d306d8",
+    "changed_files": [
+      "crates/audio-dsp/src/biquad.rs",
+      "crates/audio-dsp/src/lib.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "flush_is_unchanged_for_finite_values",
+      "one_non_finite_sample_does_not_poison_filter_state",
+      "effects_recover_after_one_nan_sample"
+    ],
+    "tests_existing_in_changed_files": [
+      "peaking_hits_gain_at_centre",
+      "lowpass_highpass_minus_3db_at_cutoff",
+      "notch_is_deep_at_centre",
+      "shelves_reach_their_gain",
+      "bandpass_and_allpass",
+      "state_flushes_to_zero_no_denormals",
+      "flush_is_unchanged_for_finite_values",
+      "one_non_finite_sample_does_not_poison_filter_state",
+      "effects_recover_after_one_nan_sample"
+    ]
+  },
+  "3146": {
+    "sha": "8f4b0e0c90c70c8694fda19c4ad483e65335bce4",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/pitch.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "matches_per_bin_reference_to_rounding"
+    ],
+    "tests_existing_in_changed_files": [
+      "octave_up_and_down",
+      "matches_per_bin_reference_to_rounding",
+      "zero_shift_is_delayed_identity"
+    ]
+  },
+  "3148": {
+    "sha": "54690756b2e75a1fff9afcd7144a04a97e793282",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/essential.rs",
+      "crates/audio-dsp/src/effects/filters.rs",
+      "crates/audio-dsp/src/effects/pitch.rs",
+      "crates/audio-dsp/src/effects/restoration.rs",
+      "crates/audio-dsp/src/effects/stft.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "paired_channels_match_separate_ones_to_rounding"
+    ],
+    "tests_existing_in_changed_files": [
+      "deesser_zero_reduction_is_identity",
+      "deesser_reduces_sibilance_keeps_voice",
+      "dereverb_suppresses_tail",
+      "dereverb_zero_amount_is_delayed_identity",
+      "speech_enhance_presence_noise_and_level",
+      "stereo_width_laws",
+      "dialogue_chain_realtime",
+      "octave_up_and_down",
+      "matches_per_bin_reference_to_rounding",
+      "zero_shift_is_delayed_identity",
+      "dehum_removes_hum_keeps_program",
+      "denoise_zero_reduction_is_delayed_identity",
+      "denoise_reduces_noise_and_keeps_bursts",
+      "paired_channels_match_separate_ones_to_rounding"
+    ]
+  },
+  "3149": {
+    "sha": "e141552a527a19adabeb3ba432e3f30e86692299",
+    "changed_files": [
+      "crates/audio-dsp/src/biquad.rs",
+      "crates/audio-dsp/src/effects/declick.rs",
+      "crates/audio-dsp/src/effects/modulation.rs",
+      "crates/audio-dsp/src/effects/special.rs"
+    ],
+    "added_test_attributes": 2,
+    "tests_added_by_diff": [
+      "every_effect_recovers_after_one_nan_sample",
+      "phaser_click_remover_binauralizer_recover_from_non_finite_input"
+    ],
+    "tests_existing_in_changed_files": [
+      "peaking_hits_gain_at_centre",
+      "lowpass_highpass_minus_3db_at_cutoff",
+      "notch_is_deep_at_centre",
+      "shelves_reach_their_gain",
+      "bandpass_and_allpass",
+      "state_flushes_to_zero_no_denormals",
+      "flush_is_unchanged_for_finite_values",
+      "one_non_finite_sample_does_not_poison_filter_state",
+      "effects_recover_after_one_nan_sample",
+      "every_effect_recovers_after_one_nan_sample",
+      "phaser_click_remover_binauralizer_recover_from_non_finite_input"
+    ]
+  },
+  "3153": {
+    "sha": "65c3dc72660b0eff13d137fba6ddf28a7554294b",
+    "changed_files": [
+      "crates/audio-dsp/src/effects/reverbs.rs"
+    ],
+    "added_test_attributes": 3,
+    "tests_added_by_diff": [
+      "impulse_change_crossfades_within_one_partition",
+      "repeated_changes_before_the_crossfade_fade_from_the_audible_impulse",
+      "unchanged_impulse_does_not_crossfade"
+    ],
+    "tests_existing_in_changed_files": [
+      "set_param_defers_the_impulse_rebuild_to_process",
+      "deferred_rebuild_output_is_identical",
+      "impulse_change_crossfades_within_one_partition",
+      "repeated_changes_before_the_crossfade_fade_from_the_audible_impulse",
+      "unchanged_impulse_does_not_crossfade"
+    ]
+  },
+  "3167": {
+    "sha": "2a2a6c0d995366bb9ed76be4c07f77539c1e582b",
+    "changed_files": [
+      "crates/h264/src/inter.rs"
+    ],
+    "added_test_attributes": 1,
+    "tests_added_by_diff": [
+      "equal_power_of_two_weights_are_the_average"
+    ],
+    "tests_existing_in_changed_files": [
+      "full_sample_copy_and_clamp",
+      "half_sample_constant_is_constant",
+      "half_sample_horizontal_ramp",
+      "fast_luma_matches_reference",
+      "weighting",
+      "equal_power_of_two_weights_are_the_average"
+    ]
+  }
+}

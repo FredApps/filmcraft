@@ -1,0 +1,175 @@
+{
+  "base": "175387febe0865dd0b34f3600db58d66fa248f6d",
+  "branch": "codex/rc-b-slice",
+  "head": "56788724",
+  "scope": "Assigned non-UI integration slice; source never run or built",
+  "receipts": [
+    {
+      "pr": 1681,
+      "head": "838170d8",
+      "commit": "e88957d8",
+      "result": "Merged",
+      "resolution": "Applied cpal 0.18 audio API changes in input/output; preserved RC `subtle` and `fmv-macos-events`. Removed 53 stale local 0.7.2 workspace package entries copied from the old PR lock; static TOML/reference checks pass, but Cargo CI must validate lock resolution."
+    },
+    {
+      "pr": 2033,
+      "head": "7186f804",
+      "commit": "409eb86a",
+      "result": "Merged with stronger existing behavior retained",
+      "resolution": "Kept RC’s owner-private tempfile directory for screenshot output instead of replacing it with a predictable process-id/counter path from the PR; no weaker temporary-file behavior introduced."
+    },
+    {
+      "pr": 2072,
+      "head": "",
+      "commit": "184f086d",
+      "result": "Merged",
+      "resolution": "Unioned native-font docs/command and test coverage with existing i18n report and test-discovery flow; `xtask ci` retains existing checks and adds release clippy/tests plus macOS native-font gate."
+    },
+    {
+      "pr": 2086,
+      "head": "",
+      "commit": "cdd7e327",
+      "result": "Merged",
+      "resolution": "Added cross-platform formatter checker and argument tests; retained i18n-report and native-font command/docs."
+    },
+    {
+      "pr": 2136,
+      "head": "",
+      "commit": "ee546a79",
+      "result": "Merged with stricter RC guard retained",
+      "resolution": "Kept video-only selection guards and schemas for video options when overlapping with the PR’s generic has-selection behavior; other non-conflicting changes merged."
+    },
+    {
+      "pr": 2282,
+      "head": "4f2c9189",
+      "commit": "678a4060",
+      "result": "Merged",
+      "resolution": "Unioned `MAX_IMPORTED_TRACKS` and `MAX_RATE` imports and kept FCP7 existing import limits."
+    },
+    {
+      "pr": 2287,
+      "head": "",
+      "commit": "2d109cdf",
+      "result": "Merged",
+      "resolution": "Kept both the existing AAF/OMF test documentation and the OTIO nested-sequence expansion bound documentation."
+    },
+    {
+      "pr": 2396,
+      "head": "",
+      "commit": "d5d6962d",
+      "result": "Merged",
+      "resolution": "Merged code/tests/docs changes; retained existing comprehensive `docs/testing.md` rather than replacing it with an older branch’s shorter overlapping test inventory."
+    },
+    {
+      "pr": 2415,
+      "head": "",
+      "commit": "a6b5faaf",
+      "result": "Merged",
+      "resolution": "Unioned the PR uncompressed QuickTime video/audio regression with RC’s DTS unsupported-audio regression."
+    },
+    {
+      "pr": 2456,
+      "head": "",
+      "commit": "c57b7d2c",
+      "result": "Merged",
+      "resolution": "Preserved RC caption clipboard state and added both workspace layout fields from the PR."
+    },
+    {
+      "pr": 2597,
+      "head": "",
+      "commit": "83a39be9",
+      "result": "Merged",
+      "resolution": "Combined source-sized default transform points with the existing applied-effect result response; retained both video-options tests and transform-centering tests."
+    },
+    {
+      "pr": 2640,
+      "head": "",
+      "commit": "f16baf97",
+      "result": "Merged",
+      "resolution": "Kept 2026-10-22 RC roadmap header and both the 2026-10-22 ProRes and 2026-10-20 menu-toggle log rows."
+    },
+    {
+      "pr": 2653,
+      "head": "",
+      "commit": "9c6f85a4",
+      "result": "Merged",
+      "resolution": "Used existing attribute-safe XML escaping and PR unsupported-item gap handling; carried the warning/roundtrip test changes."
+    },
+    {
+      "pr": 2043,
+      "head": "",
+      "commit": "1517c615",
+      "result": "Merged",
+      "resolution": "Unioned contributor entries without dropping the existing Wbunker entry."
+    },
+    {
+      "pr": 2835,
+      "head": "",
+      "commit": "9586ff46",
+      "result": "Merged",
+      "resolution": "Unioned contributor entries and Japanese/CJK ordering assertions with RC checks that filter optional system CJK/RTL faces."
+    },
+    {
+      "pr": 2845,
+      "head": "1fa5024e",
+      "commit": "7346105f (+ repair 3d04908d)",
+      "result": "Merged",
+      "resolution": "Added character-safe AAF/OMF name classification and Unicode regression test; retained safe generated embedded-audio path checks."
+    },
+    {
+      "pr": 2847,
+      "head": "d8fc8231",
+      "commit": "ff21b54e",
+      "result": "Merged",
+      "resolution": "Retained both the subclip-cycle resolution regression and RC imported-track bound regression."
+    },
+    {
+      "pr": 2909,
+      "head": "5652966b",
+      "commit": "9524d5fe",
+      "result": "Merged",
+      "resolution": "Kept internal XML DTD subset rejection and entity-expansion test along with RC attribute-whitespace roundtrip test."
+    },
+    {
+      "pr": 2951,
+      "head": "6d8eb1ba",
+      "commit": "61a124c8",
+      "result": "HOLD; current craft-media dependency lacks the cap",
+      "resolution": "Verified pinned craft-libs f0ad6c1e1d297908915f4be315b0fcfc9be7b5d4 via gh API. Active file crates/media/src/matroska/demux.rs, blob 15ca9dbd9f5fede95b4db306fba41b6ed4a73758; resync at line 256 scans unbudgeted (while pos + 4 <= limit at 258, peek at 259). Rebase #2951 as a craft-media dependency fix is required. Did not restore obsolete FilmCraft local demux source."
+    },
+    {
+      "pr": 2974,
+      "head": "",
+      "commit": "28f93339",
+      "result": "Merged",
+      "resolution": "Kept the narrow arrow-escape decoder (does not decode other cue entities) and unioned both branches’ VTT roundtrip/entity-preservation tests."
+    },
+    {
+      "pr": 2975,
+      "head": "4f42c33e",
+      "commit": "20a0aaa2",
+      "result": "Merged",
+      "resolution": "Combines recursive-resource guard with reserving and memoizing the sequence before filling it, then clears the active marker after fill."
+    },
+    {
+      "pr": 2994,
+      "head": "",
+      "commit": "f19393a9",
+      "result": "Merged",
+      "resolution": "Kept both failed-recovery-discard behavior and autosave-worker failure reporting documentation/code."
+    }
+  ],
+  "static_lock_audit": {
+    "packages": 763,
+    "local_workspace_packages": 54,
+    "duplicate_local_names": [],
+    "non_rc_local_versions": [],
+    "unresolved_dependency_references": [],
+    "cpal_versions": [
+      "0.16.0",
+      "0.18.2"
+    ],
+    "method": "Parsed Cargo.lock with Python tomllib and checked local-package uniqueness and dependency name/version references; no Cargo command/build/test was run.",
+    "cpal_reference": "filmcraft package dependency now explicitly references cpal 0.18.2; 0.16.0 remains in lock but no dependency entry points to it."
+  }
+}

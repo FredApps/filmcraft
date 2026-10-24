@@ -1,0 +1,335 @@
+{
+  "name": "FilmCraft RC candidate",
+  "on": {
+    "push": {
+      "branches": [
+        "rc/20261024"
+      ]
+    },
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "concurrency": {
+    "group": "filmcraft-rc-${{ github.ref }}",
+    "cancel-in-progress": true
+  },
+  "env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "FILMCRAFT_REQUIRE_ORACLES": "1",
+    "FILMCRAFT_BUILD_SHA": "${{ github.sha }}",
+    "FILMCRAFT_BUILD_DATE": "2026-10-24"
+  },
+  "jobs": {
+    "quality": {
+      "name": "Core quality, no optional font input (Linux)",
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 180,
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false,
+            "fetch-depth": 0
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "repository": "storytold/craft-fonts",
+            "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414",
+            "path": ".rc-fonts",
+            "persist-credentials": false
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1",
+            "components": "clippy,rustfmt",
+            "targets": "wasm32-unknown-unknown"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "shared-key": "rc-quality-linux-1.99.1",
+            "cache-on-failure": true,
+            "save-if": true
+          }
+        },
+        {
+          "name": "Install system libraries and external oracles",
+          "run": "sudo apt-get update\nsudo apt-get install -y --no-install-recommends ffmpeg pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev libxi-dev libfontconfig1-dev libfreetype6-dev libgtk-3-dev libasound2-dev libxkbcommon-x11-0 libx11-xcb1 libegl1 libgl1-mesa-dev mesa-vulkan-drivers\nffmpeg -version\nffprobe -version"
+        },
+        {
+          "name": "Run every core quality gate",
+          "run": "mkdir -p logs\nset -o pipefail\ncargo fetch --locked\ncargo run --locked -p xtask -- ci 2>&1 | tee logs/core-quality.log"
+        },
+        {
+          "name": "Record exact source, packages, checksums and acceptance kit",
+          "run": "python validation/rc-20261024/record-build.py quality",
+          "if": "always()",
+          "env": {
+            "RC_JOB_STATUS": "${{ job.status }}"
+          }
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "filmcraft-rc-quality",
+            "path": "rc-artifacts/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    },
+    "linux": {
+      "name": "Linux x64 AppImage, tar and GUI startup",
+      "runs-on": "ubuntu-22.04",
+      "timeout-minutes": 180,
+      "env": {
+        "CRAFT_FONTS_DIR": "${{ github.workspace }}/.rc-fonts"
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false,
+            "fetch-depth": 0
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "repository": "storytold/craft-fonts",
+            "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414",
+            "path": ".rc-fonts",
+            "persist-credentials": false
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1",
+            "components": "clippy,rustfmt"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "shared-key": "rc-linux-packages-1.99.1",
+            "cache-on-failure": true,
+            "save-if": true
+          }
+        },
+        {
+          "name": "Install packaging and software-display dependencies",
+          "run": "sudo apt-get update\nsudo apt-get install -y --no-install-recommends ffmpeg pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev libxi-dev libfontconfig1-dev libfreetype6-dev libgtk-3-dev libasound2-dev libxkbcommon-x11-0 libx11-xcb1 libegl1 libgl1-mesa-dev mesa-vulkan-drivers\nffmpeg -version\nffprobe -version\nsudo apt-get install -y xvfb xauth zsync squashfs-tools desktop-file-utils"
+        },
+        {
+          "name": "Build and package the RC",
+          "run": "mkdir -p logs\nset -o pipefail\nbash packaging/linux/package.sh --formats \"appimage tar\" 2>&1 | tee logs/packaging.log"
+        },
+        {
+          "name": "Inspect ELF dependencies and CLI entry point",
+          "run": "set -euo pipefail\nldd target/linux-package/root/usr/bin/filmcraft | tee logs/ldd-gui.txt\nldd target/linux-package/root/usr/bin/filmcraft-cli | tee logs/ldd-cli.txt\n! grep -q 'not found' logs/ldd-*.txt\nreadelf -h target/linux-package/root/usr/bin/filmcraft | tee logs/elf-gui.txt\nreadelf --version-info target/linux-package/root/usr/bin/filmcraft > logs/glibc-versions.txt"
+        },
+        {
+          "name": "Smoke-test the actual packaged AppImage in X11",
+          "run": "xvfb-run -a -s '-screen 0 1600x1000x24' python3 validation/rc-20261024/linux-smoke.py",
+          "env": {
+            "APPIMAGE_EXTRACT_AND_RUN": "1",
+            "WINIT_UNIX_BACKEND": "x11",
+            "WGPU_BACKEND": "vulkan",
+            "LIBGL_ALWAYS_SOFTWARE": "1"
+          }
+        },
+        {
+          "name": "Record exact source, packages, checksums and acceptance kit",
+          "run": "python validation/rc-20261024/record-build.py linux-x64",
+          "if": "always()",
+          "env": {
+            "RC_JOB_STATUS": "${{ job.status }}"
+          }
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "filmcraft-rc-linux-x64",
+            "path": "rc-artifacts/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    },
+    "windows": {
+      "name": "Windows x64 quality, MSI and portable ZIP",
+      "runs-on": "windows-2022",
+      "timeout-minutes": 240,
+      "env": {
+        "CRAFT_FONTS_DIR": "${{ github.workspace }}\\.rc-fonts"
+      },
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false,
+            "fetch-depth": 0
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "repository": "storytold/craft-fonts",
+            "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414",
+            "path": ".rc-fonts",
+            "persist-credentials": false
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1",
+            "components": "clippy,rustfmt"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "shared-key": "rc-windows-x64-1.99.1",
+            "cache-on-failure": true,
+            "save-if": true
+          }
+        },
+        {
+          "uses": "actions/setup-dotnet@v4",
+          "with": {
+            "dotnet-version": "8.0.x"
+          }
+        },
+        {
+          "name": "Install external oracles and WiX",
+          "run": "$ErrorActionPreference='Stop'\nif (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {\n  choco install ffmpeg --yes --no-progress\n  if ($LASTEXITCODE -ne 0) { throw 'FFmpeg installation failed' }\n}\ndotnet tool install --global wix --version 5.0.2\nif ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }\n\"$env:USERPROFILE\\.dotnet\\tools\" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append\nffmpeg -version\nffprobe -version"
+        },
+        {
+          "name": "Format, native Clippy, workspace tests and doctests",
+          "run": "New-Item -ItemType Directory -Force logs | Out-Null\ncargo fmt --all -- --check 2>&1 | Tee-Object logs/fmt.log\nif ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }\ncargo clippy --workspace --all-targets --locked -- -D warnings 2>&1 | Tee-Object logs/clippy.log\nif ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }\ncargo test --workspace --lib --bins --tests --locked --no-fail-fast 2>&1 | Tee-Object logs/tests.log\nif ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }\ncargo test --workspace --doc --locked 2>&1 | Tee-Object logs/doctests.log\nif ($LASTEXITCODE -ne 0) { throw 'Doctests failed' }"
+        },
+        {
+          "name": "Build and package the RC",
+          "run": "& packaging/windows/package.ps1 -Arch x64 2>&1 | Tee-Object logs/packaging.log\nif ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }"
+        },
+        {
+          "name": "Record exact source, packages, checksums and acceptance kit",
+          "run": "python validation/rc-20261024/record-build.py windows-x64",
+          "if": "always()",
+          "env": {
+            "RC_JOB_STATUS": "${{ job.status }}"
+          }
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "filmcraft-rc-windows-x64",
+            "path": "rc-artifacts/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    },
+    "macos": {
+      "name": "macOS arm64 quality, DMG and CLI ZIP",
+      "runs-on": "macos-14",
+      "timeout-minutes": 240,
+      "env": {
+        "CRAFT_FONTS_DIR": "${{ github.workspace }}/.rc-fonts",
+        "HOMEBREW_NO_AUTO_UPDATE": "1"
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "persist-credentials": false,
+            "fetch-depth": 0
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "repository": "storytold/craft-fonts",
+            "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414",
+            "path": ".rc-fonts",
+            "persist-credentials": false
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1",
+            "components": "clippy,rustfmt"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "shared-key": "rc-macos-arm64-1.99.1",
+            "cache-on-failure": true,
+            "save-if": true
+          }
+        },
+        {
+          "name": "Install external oracles and verify native architecture",
+          "run": "test \"$(uname -m)\" = arm64\nif ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi\nffmpeg -version\nffprobe -version"
+        },
+        {
+          "name": "Format, native Clippy, workspace tests and doctests",
+          "run": "mkdir -p logs\nset -o pipefail\ncargo fmt --all -- --check 2>&1 | tee logs/fmt.log\ncargo clippy --workspace --all-targets --locked -- -D warnings 2>&1 | tee logs/clippy.log\ncargo test --workspace --lib --bins --tests --locked --no-fail-fast 2>&1 | tee logs/tests.log\ncargo test --workspace --doc --locked 2>&1 | tee logs/doctests.log"
+        },
+        {
+          "name": "Verify native macOS font fallback",
+          "run": "set -o pipefail\ncargo run --locked -p xtask -- native-fonts 2>&1 | tee logs/native-fonts.log"
+        },
+        {
+          "name": "Build and package the RC",
+          "run": "set -o pipefail\nbash packaging/macos/package.sh --arch aarch64 2>&1 | tee logs/packaging.log"
+        },
+        {
+          "name": "Record exact source, packages, checksums and acceptance kit",
+          "run": "python validation/rc-20261024/record-build.py macos-arm64",
+          "if": "always()",
+          "env": {
+            "RC_JOB_STATUS": "${{ job.status }}"
+          }
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "filmcraft-rc-macos-arm64",
+            "path": "rc-artifacts/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    }
+  }
+}

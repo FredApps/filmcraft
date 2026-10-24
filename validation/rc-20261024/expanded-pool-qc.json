@@ -1,0 +1,1916 @@
+{
+  "summary": {
+    "audited_includes": 130,
+    "keep": 121,
+    "hold": 8,
+    "keep_with_validation_note": 1,
+    "concrete_holds": [
+      1400,
+      2802,
+      2826,
+      2830,
+      2979,
+      3035,
+      3145,
+      3152
+    ],
+    "scope_note": "This is a read-only QC overlay; it does not edit expanded-integration-plan.json or the source checkout. No candidate code was run or compiled. Minor/test-only observations are not blanket holds."
+  },
+  "records": [
+    {
+      "number": 1041,
+      "head": "5861dc9bd01b742cc2a44073135846437cae2bf5",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1041/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1400,
+      "head": "6dfc52eb02bb6fe3d1d13b44db98dea80dff2bf8",
+      "disposition": "HOLD",
+      "reason": "Current unresolved Major inline review says Effect Controls Backspace falls through to edit.clear when no effect/mask is selected, including a second press after removal, so the user can delete a selected clip. No later review/resolution in supplied evidence.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1400/files",
+        "https://github.com/storytold/filmcraft/pull/1400#pullrequestreview-5567936784"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "destructive functional correctness",
+      "validation_gap": "Do not include until command is consumed for the focused panel and repeated-Backspace case is tested."
+    },
+    {
+      "number": 1435,
+      "head": "1f13dcb12ff0925e22b6f7d2a1223be1301bf93c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1435/files",
+        "https://github.com/storytold/filmcraft/pull/1435#pullrequestreview-5521451130"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1560,
+      "head": "da00963a0e34fed4b65ccf7feafe42f05c8d437a",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1560/files",
+        "https://github.com/storytold/filmcraft/pull/1560#pullrequestreview-5567709598"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1598,
+      "head": "a5fcc60bb0c76562e855709ff8a5788bc73cbf76",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1598",
+        "https://github.com/storytold/filmcraft/pull/1598#pullrequestreview-5567659034"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head a5fcc60bb0c76562e855709ff8a5788bc73cbf76; current head a5fcc60bb0c76562e855709ff8a5788bc73cbf76. This is the change #1593 proposes (\"one lower bound, view width divided by `timeline_extent(sequence)`, applied where the zoom is applied\"), done in the one place all the zoom paths pass through. I found no defect. I'm leaving it as a comment only because filmcraft has no hosted CI, so I'll approve once the receipt for this exact head is in. **What I checked.** - **The floor.** `min_pps(seq_seconds, width) = (width / (seq_seconds + 600)).clamp(0.05, 24000)`, using the existing `timeline_extent`, so it is exactly the zoom at which the scroll limit's extent fills the view, and the zoom bar's thumb (which uses the s",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1602,
+      "head": "1d70c41b9d49bc3a9d6ec71e54d41d444880d914",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1602/files",
+        "https://github.com/storytold/filmcraft/pull/1602#pullrequestreview-5567638884"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1610,
+      "head": "495843465a2e94e6f2be63a37d89eab318f31207",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1610/files",
+        "https://github.com/storytold/filmcraft/pull/1610#pullrequestreview-5567624718"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1619,
+      "head": "2b798193f3caab862bf860b16d92507e3500065c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1619",
+        "https://github.com/storytold/filmcraft/pull/1619#pullrequestreview-5567599378"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 2b798193f3caab862bf860b16d92507e3500065c; current head 2b798193f3caab862bf860b16d92507e3500065c. The bug is real on main and the fix is the right shape: carried transitions are collected by the row they land on, and each row draws its own plus the ones that land on it. I found no defect. I'm leaving it as a comment only because filmcraft has no hosted CI, so I'll approve once the receipt for this exact head is in; one overlap note below. **What I checked.** - **The cause on main.** In the row loop a carried transition (`move_transition_preview` returns `Some`) whose destination is another row is skipped on its home row (`(Some(_), false) => Vec::new()`) and the destination row only looked at its own `tr.tran",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1626,
+      "head": "784bbc06e4f9691b85896ca1e9db0a7f9f31261c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1626",
+        "https://github.com/storytold/filmcraft/pull/1626#pullrequestreview-5567583159"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 784bbc06e4f9691b85896ca1e9db0a7f9f31261c; current head 784bbc06e4f9691b85896ca1e9db0a7f9f31261c. The change is small and the destination rule is in one place. I found no defect. I'm leaving it as a comment only because filmcraft has no hosted CI, so I'll approve once the receipt for this exact head is in; one behaviour note below. **What I checked.** - **One rule, four users.** `move_dest(seq, grabbed, tid, delta)` returns `shift_track(seq, tid, delta)` when `tid` is the same kind as the grabbed clip's track and `Some(tid)` otherwise. The preview, the transition preview, the locked-track check (`move_is_locked` with `Some(start_track)` while dragging) and the drop (`to` in the release handler) all call it, s",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1629,
+      "head": "5a94daf66129d0a2a673633b1d698caaa6b0db40",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1629",
+        "https://github.com/storytold/filmcraft/pull/1629#pullrequestreview-5567558554"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 5a94daf66129d0a2a673633b1d698caaa6b0db40; current head 5a94daf66129d0a2a673633b1d698caaa6b0db40. The mechanism is small and sound, and the 149 call-site edits are mechanical. I found no defect. I'm leaving it as a comment because it changes how long and how loudly every refused command is shown, which is a UX decision for the maintainers, and because filmcraft has no hosted CI, so I'll approve once that is settled and the receipt for the exact head is in. A note on a conflict risk at the end. **What I checked.** - **The mechanism.** `UiState::fail(message)` stores the text in `status_error` and in `status`; `status_is_error()` is true only while `status` still equals that stored text, so a later plain `statu",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1630,
+      "head": "96eccecd9d9f673007da02e344f545817d98d241",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1630/files",
+        "https://github.com/storytold/filmcraft/pull/1630#pullrequestreview-5567552843"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1634,
+      "head": "0c9c4df8a632ca7551f524f114438f975b23d320",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1634/files",
+        "https://github.com/storytold/filmcraft/pull/1634#pullrequestreview-5575867332"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1636,
+      "head": "459f185e3d444c52da69ebb52faaf2407c1c5a86",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1636",
+        "https://github.com/storytold/filmcraft/pull/1636#pullrequestreview-5567513983"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 459f185e3d444c52da69ebb52faaf2407c1c5a86; current head 459f185e3d444c52da69ebb52faaf2407c1c5a86. The change is two lines of logic in one shared function, drawing and hit-testing agree by construction, and I found no defect. I'm leaving it as a comment because filmcraft has no hosted CI, so I'll approve once the receipt for this exact head is in; I have one behaviour note that is not a blocker. **What I checked.** - **One function for both uses.** `transition_top(row)` is `row.min.y + 1.0` when `row.height() < 50.0` and `row.min.y + 17.0` otherwise, so for a tall track it is the old value to the point. The drawing (`tr_rect` in `timeline.rs`, from `r.rect`) and the hit test (`hit`, from `row.rect`) both take ",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1637,
+      "head": "3ee7b223674affece56441045d05b2dc861e1e33",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1637/files",
+        "https://github.com/storytold/filmcraft/pull/1637#pullrequestreview-5567510441"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1638,
+      "head": "88646ba7f0f6877cbed145644af792a4667a3958",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1638",
+        "https://github.com/storytold/filmcraft/pull/1638#pullrequestreview-5567502962"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1650,
+      "head": "084cd8292b74653d55929f47d53c2d79ff78b2af",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1650/files",
+        "https://github.com/storytold/filmcraft/pull/1650#pullrequestreview-5567449045"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1654,
+      "head": "3febc1d30dadc3e10d9e6dce43a59cd571a0029d",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1654/files",
+        "https://github.com/storytold/filmcraft/pull/1654#pullrequestreview-5567439652"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1681,
+      "head": "838170d800c89801ff83ad31f9ab9d9add42f96d",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1681/files",
+        "https://github.com/storytold/filmcraft/pull/1681#pullrequestreview-5567327775"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1693,
+      "head": "b4c4480171208d87151959c29639365d51530372",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1693",
+        "https://github.com/storytold/filmcraft/pull/1693.diff"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1718,
+      "head": "158163650dce96b26eb374ee1c53688f90cdab4c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1718",
+        "https://github.com/storytold/filmcraft/pull/1718#pullrequestreview-5567276091"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 158163650dce96b26eb374ee1c53688f90cdab4c; current head 158163650dce96b26eb374ee1c53688f90cdab4c. This matches #1716 item by item (the issue lists the NUL bug, the 32-bit hardening, the doc fix and the three cleanups, and says what is deliberately left alone, which is also what the PR leaves alone), so `Fixes #1716` is accurate. I read all of it and found no defect. My only open point is the one for the optimisation. What I checked: - **NUL.** `validate_name` now rejects `\\0`, which is the stored terminator, so `\"a\\0b\"` can no longer be written and read back as `\"a\"`. In `crates/interchange`, the only callers that pass names to `Writer::stream` / `storage` are the AAF store, and those names are fixed property",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1772,
+      "head": "d17ee28500525f7afe85562039acbac67f9630ed",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1772",
+        "https://github.com/storytold/filmcraft/pull/1772#pullrequestreview-5567153552"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1788,
+      "head": "9bea3b0552ec124b519dd796ab052cdd58d9da1c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1788/files",
+        "https://github.com/storytold/filmcraft/pull/1788#pullrequestreview-5567113228"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1841,
+      "head": "52df478479bab7b8782b35c625b6f96e9d529604",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1841/files",
+        "https://github.com/storytold/filmcraft/pull/1841#pullrequestreview-5566597515"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1869,
+      "head": "e8d20a39e74dae0e855ce050b85bcb1cbf31ded2",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1869/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1870,
+      "head": "32b857744094a6db55b7fe354c22c5a23062a5e3",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1870",
+        "https://github.com/storytold/filmcraft/pull/1870#pullrequestreview-5566475501"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1896,
+      "head": "37bf04409daf4ba9f552b7092a5e63e485f203eb",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1896",
+        "https://github.com/storytold/filmcraft/pull/1896#pullrequestreview-5566515230"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1901,
+      "head": "20bbd3d91202631f82142fe0fd17ae509418a170",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1901",
+        "https://github.com/storytold/filmcraft/pull/1901#pullrequestreview-5566510105"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1905,
+      "head": "851cf2fe52ded83e2eba928d095a66bdcfb6aa35",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1905/files",
+        "https://github.com/storytold/filmcraft/pull/1905#pullrequestreview-5566501341"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1915,
+      "head": "b474ca6ca488388eb6edc04da1db1c20c3a0217a",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1915/files",
+        "https://github.com/storytold/filmcraft/pull/1915#pullrequestreview-5566492825"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1924,
+      "head": "67e3dfa55dc10f020bbbbadd7de7379fb281c7a2",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1924",
+        "https://github.com/storytold/filmcraft/pull/1924#pullrequestreview-5566486214"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 67e3dfa55dc10f020bbbbadd7de7379fb281c7a2; current head 67e3dfa55dc10f020bbbbadd7de7379fb281c7a2. This fixes #1916 as reported, and I found nothing to change. What I checked: - **The cause is right.** Main's menu sent `effects.setInterpolation` with only the clicked keyframe's reference. The new `keyframes` list reuses the `Key` type of `effects.moveKeyframes` (`deny_unknown_fields`, optional `mask`), so the same references and the same hostile-input limits apply: 1 to 4096 keys, and unknown clip, effect, mask, parameter or time are errors, not skips. - **It is one undo step and all-or-nothing.** `interpolate_many` runs inside a single `edit_sequence`, so one bad reference leaves the project as it was. The te",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1944,
+      "head": "61ea28e538a718bc64182e8dbeebec37d7f82fee",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1944/files",
+        "https://github.com/storytold/filmcraft/pull/1944#pullrequestreview-5566447242"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1950,
+      "head": "7cb72e6d3173591e344310c8ae8b40bffa635ad9",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1950",
+        "https://github.com/storytold/filmcraft/pull/1950#pullrequestreview-5574817120"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 1993,
+      "head": "98d3241f3b56fff9809fa768398c169bc80e6559",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/1993/files",
+        "https://github.com/storytold/filmcraft/pull/1993#pullrequestreview-5566381662"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2008,
+      "head": "1a946e764b562456bdce4d8f7457ec16ba53e4d3",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2008/files",
+        "https://github.com/storytold/filmcraft/pull/2008#pullrequestreview-5566367475"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2011,
+      "head": "869e40701ce2dbbbff30834664a5f57946881834",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2011/files",
+        "https://github.com/storytold/filmcraft/pull/2011#pullrequestreview-5566357862"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2030,
+      "head": "3753833e0a75b4f5d07f6bfbe01a7b91e37fb7b0",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2030/files",
+        "https://github.com/storytold/filmcraft/pull/2030#pullrequestreview-5566339999"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2033,
+      "head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2033",
+        "https://github.com/storytold/filmcraft/pull/2033/files"
+      ],
+      "review_basis": "Actual current GitHub diff inspected: atomic process-local counter makes screenshot temp paths unique; focused 100-path uniqueness test; narrow race fix.",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2034,
+      "head": "06068a8a1cbc34b36463cec4c21203ac6bbf8161",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2034/files",
+        "https://github.com/storytold/filmcraft/pull/2034#pullrequestreview-5566331999"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2035,
+      "head": "3a9b43d804ce58ff4455cd408597a661fcaef347",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2035",
+        "https://github.com/storytold/filmcraft/pull/2035#pullrequestreview-5566331843"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2041,
+      "head": "0a51fa39a96dde8bb0741a40a9a81956a1b7e7da",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2041/files",
+        "https://github.com/storytold/filmcraft/pull/2041#pullrequestreview-5566324822"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2043,
+      "head": "2cb6abdeec54e94bd935f2129855a485c8cdecb1",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2043",
+        "https://github.com/storytold/filmcraft/pull/2043#pullrequestreview-5566320080"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2050,
+      "head": "1be269889f3a13a312d0d2baa7816b14df648825",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2050/files",
+        "https://github.com/storytold/filmcraft/pull/2050#pullrequestreview-5566306582"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2051,
+      "head": "e4adbd339f4afb93cf20410e2b770b437bf520e1",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2051",
+        "https://github.com/storytold/filmcraft/pull/2051#pullrequestreview-5566292091"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2072,
+      "head": "ae76a26d66cbd8299b80a65a026a3b47bafa4d6e",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2072/files",
+        "https://github.com/storytold/filmcraft/pull/2072#pullrequestreview-5566276925"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2086,
+      "head": "ec35dd36855e05923d3c191b8f67b7f5bac413bb",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2086/files",
+        "https://github.com/storytold/filmcraft/pull/2086#pullrequestreview-5566267306"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2091,
+      "head": "8252d46aca57d04c9c08e16fa0f2186d0272186a",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2091/files",
+        "https://github.com/storytold/filmcraft/pull/2091#pullrequestreview-5566259441"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2116,
+      "head": "e9127e0890e7aad1ae0056b1040bf2eaf0838ed3",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2116",
+        "https://github.com/storytold/filmcraft/pull/2116#pullrequestreview-5566233358"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head e9127e0890e7aad1ae0056b1040bf2eaf0838ed3; current head e9127e0890e7aad1ae0056b1040bf2eaf0838ed3. This is one contained change, and I found no defect. I checked the parser against the Photoshop file format layout: - Header offsets (`psd.rs`: channels at 12, height 14, width 18, depth 22, mode 24) and the colour-mode numbers (1 gray, 3 RGB, 0/2/4/7/8/9 refused) are right. - The compressed row-length table has one entry per row of *all* channels (`ht * channels * 2`), and only the used channels are read after it. - Resource 1057 is read as a 4-byte version then the \"has real merged data\" byte, and the tagged blocks pad to 4 bytes. - The unblend from white, `(v + a - max) * max / a`, inverts `stored = colour * a",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2123,
+      "head": "e63cf15165e8dce3b47897a4dd3040f4b54a413a",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2123/files",
+        "https://github.com/storytold/filmcraft/pull/2123#pullrequestreview-5598480132"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2132,
+      "head": "9702efcfe7fe8a7e7a049644577957d51e168c45",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2132/files",
+        "https://github.com/storytold/filmcraft/pull/2132#pullrequestreview-5566210166"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2136,
+      "head": "967c73f4792f1ac6883ee21daa1ccde4c4a93d1f",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2136/files",
+        "https://github.com/storytold/filmcraft/pull/2136#pullrequestreview-5566200845"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2138,
+      "head": "54cb4589f09c809db6e34c857bb313e52edc1506",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2138",
+        "https://github.com/storytold/filmcraft/pull/2138#pullrequestreview-5599071616"
+      ],
+      "review_basis": "FredApps latest review: APPROVED, reviewed head 54cb4589f09c809db6e34c857bb313e52edc1506; current head 54cb4589f09c809db6e34c857bb313e52edc1506. Read through the change and its tests; nothing to change. The vector form of the unsharp mask does the same per-channel test and update as the old loop (the threshold still scales with alpha, alpha is kept), and the new FXC test exercises the effect stage the way the Windows builds compile it. Windows workspace clippy (`-D warnings`) and `cargo test --workspace`, including the new FXC test, passed on this exact head in a fork run: https://github.com/FredApps/filmcraft/actions/runs/39584649514 CI for this exact head (54cb458) ran in a fork because the upstream workflows await approval: - Review platforms: success ",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2140,
+      "head": "ae8d39fe5eb3530ca994147276136e21a709fe93",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2140",
+        "https://github.com/storytold/filmcraft/pull/2140#pullrequestreview-5598284191"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2151,
+      "head": "060c71aceecd22dedd98f9e0797afbdb55e62a38",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2151/files",
+        "https://github.com/storytold/filmcraft/pull/2151#pullrequestreview-5566173408"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2153,
+      "head": "4ff5c22f78a0a6473b82a218c4413781714e316f",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2153",
+        "https://github.com/storytold/filmcraft/pull/2153#pullrequestreview-5595173641"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 4ff5c22f78a0a6473b82a218c4413781714e316f; current head 4ff5c22f78a0a6473b82a218c4413781714e316f. Read the whole diff; I found no defect. `lift_scale` is the old `nl / l` exactly at and above the 0.02 floor (the cap `1 + (nl - l) / 0.02` is never the smaller term there, and a negative lift keeps `nl / l`), it is continuous at the floor, and below it the luma still lands on `nl`. The CPU path, the `FxOp` path in `gpufx.rs` and the `fx.wgsl` copy all use the same constant and formula. This changes the look of Lumetri's Shadows/Highlights and touches a GPU shader, and no hosted job here runs it. Before merge, please attach evidence from real hardware: the near-black chroma-bleed frame from #2094 before and after",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2169,
+      "head": "2e3ced88557ed5e333ca8d1d47be373a3a5b497b",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2169/files",
+        "https://github.com/storytold/filmcraft/pull/2169#pullrequestreview-5566142545"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2197,
+      "head": "acf861a5363689ddbef67b97323a83b2efe2f375",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2197/files",
+        "https://github.com/storytold/filmcraft/pull/2197#pullrequestreview-5566108084"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2232,
+      "head": "a6c5555e1534d0f554601ab2609c7bd5da26b02e",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2232",
+        "https://github.com/storytold/filmcraft/pull/2232#pullrequestreview-5566081734"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2242,
+      "head": "b4652c7552c733afb15122b77fd8b959371dee49",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2242/files",
+        "https://github.com/storytold/filmcraft/pull/2242#pullrequestreview-5566067609"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2247,
+      "head": "95eff789062b47a8a30017676ba8c1eb70c17261",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2247/files",
+        "https://github.com/storytold/filmcraft/pull/2247#pullrequestreview-5571601892"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2248,
+      "head": "217511e9388575e2b1943e343cf652cfc1020ff5",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2248",
+        "https://github.com/storytold/filmcraft/pull/2248#pullrequestreview-5571598091"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2252,
+      "head": "9717f7e2a61caba14657631441058d833451e952",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2252/files",
+        "https://github.com/storytold/filmcraft/pull/2252#pullrequestreview-5571593897"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2282,
+      "head": "4f2c9189fee6f5a285b9e11623d3f7fa521d316d",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2282/files",
+        "https://github.com/storytold/filmcraft/pull/2282#pullrequestreview-5566045950"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2287,
+      "head": "6cb14e7c441018d8be5429a49da1823cef4295db",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2287",
+        "https://github.com/storytold/filmcraft/pull/2287#pullrequestreview-5566043990"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 6cb14e7c441018d8be5429a49da1823cef4295db; current head 6cb14e7c441018d8be5429a49da1823cef4295db. I found no defect, and I'm holding the approval only for a build and test run of this head. What I checked on the PR head: - The counter is incremented for every item written while `self.stack.len() > 1`, so only clips inside nested sequences count (`otio.rs:260-262`). The sequence you export is never truncated. - The cap is checked before a nested sequence is expanded (`otio.rs:285`), so a copy is replaced by a gap and not cut in half. The warning is written once through the `usize::MAX` sentinel, and later items stay at `usize::MAX` through `saturating_add`. - The limit is a struct field, so the test lowers it ",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2359,
+      "head": "a58515aa0b45db35c9c97ad9225cf57beb35c0ea",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2359/files",
+        "https://github.com/storytold/filmcraft/pull/2359#pullrequestreview-5571500688"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2364,
+      "head": "66f71177e2c8c34932c49cf8146f5ce50272579a",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2364/files",
+        "https://github.com/storytold/filmcraft/pull/2364#pullrequestreview-5565943464"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2365,
+      "head": "263579c644fe869683c825d6be36010f4c56b343",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2365",
+        "https://github.com/storytold/filmcraft/pull/2365#pullrequestreview-5563710747"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2381,
+      "head": "6e62760f8ba633b091015889847fee545550decf",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2381/files",
+        "https://github.com/storytold/filmcraft/pull/2381#pullrequestreview-5565788343"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2386,
+      "head": "3413825016e599ee46e053fcb8594f7ee25e4736",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2386",
+        "https://github.com/storytold/filmcraft/pull/2386#pullrequestreview-5565982109"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [
+        "#2375"
+      ],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2387,
+      "head": "b1df3b2ef96175466f16845fcdaeca10275ff718",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2387",
+        "https://github.com/storytold/filmcraft/pull/2387#pullrequestreview-5565979858"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head b1df3b2ef96175466f16845fcdaeca10275ff718; current head b1df3b2ef96175466f16845fcdaeca10275ff718. The fix is right, and I checked the part that could go wrong: whether anything still assumes the folder exists after a save. The two writers, `render` and `render_audio`, call `create_dir_all` themselves before writing (`previews.rs:630` and `:740`). The readers cope with a missing folder: `set_dir` ignores a failed `read_dir` (`:205`), the file read at `:540` returns `None` on an error, and `delete_files` only touches names it has indexed. The new `files` snapshot is taken once, so the loop no longer holds the read lock while it renames, which is a small improvement. For a project that already has previews, the ",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2391,
+      "head": "32fde18874a4636e4cda2cdf91567e4436aa6f51",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2391",
+        "https://github.com/storytold/filmcraft/pull/2391#pullrequestreview-5565976545"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2393,
+      "head": "1fb198b5beb5634f5efb631ec83fcec8a92dea7e",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2393/files",
+        "https://github.com/storytold/filmcraft/pull/2393#pullrequestreview-5571424120"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2394,
+      "head": "a073371bc67ff014301cbdd47eac7b4f66c455f5",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2394",
+        "https://github.com/storytold/filmcraft/pull/2394#pullrequestreview-5571416356"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2396,
+      "head": "3ccfe477e9e63733e214fac69bfa7484d5cabcc8",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2396",
+        "https://github.com/storytold/filmcraft/pull/2396#pullrequestreview-5565974259"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 3ccfe477e9e63733e214fac69bfa7484d5cabcc8; current head 3ccfe477e9e63733e214fac69bfa7484d5cabcc8. The pan logic is sound. The start offset is saved from the previous frame (`offset_key`, `project_views.rs:1137`), the pan is computed from where the middle button went down, so there is no drift, and the press must start inside the view. Card moves, the Escape cancel and the drag-out-to-Timeline path all use `dragged_by(Primary)` and `drag_stopped_by(Primary)`, so a middle drag cannot move or start dragging a card. The test checks both the pan distance and that the card position and project selection are unchanged. Two docs still say the opposite of what this adds: - `docs/ui-parity.md:25` lists \"Freeform bins a",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2410,
+      "head": "24ee5c0ab780e5f9200883998967330b01f17e55",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2410",
+        "https://github.com/storytold/filmcraft/pull/2410#pullrequestreview-5565966096"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2412,
+      "head": "5734770918709a417fd7bdd086abe61baf7e94e3",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2412",
+        "https://github.com/storytold/filmcraft/pull/2412#pullrequestreview-5565963616"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 5734770918709a417fd7bdd086abe61baf7e94e3; current head 5734770918709a417fd7bdd086abe61baf7e94e3. The layout is a plain new entry in `workspace()` that reuses `tabs` and `bottom_editing()`, so no new panel logic is added. \"Vertical\" is translated in the full catalogs (fr, ja and zh-cn all have it; de, ru and uk are short catalogs in this repo). It is also safe for people who already saved a workspace called \"Vertical\": `names` (`dock.rs:243`) skips duplicates and `saved_layout` still prefers their saved version. - One side effect to know about: that user's workspace now counts as built-in, so it can no longer be renamed, and Delete restores the new default instead of removing it (`is_builtin`, `dock.rs:236`).",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2415,
+      "head": "dd2d3111d68855ef4262d32b5e5f66724f48a622",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2415",
+        "https://github.com/storytold/filmcraft/pull/2415#pullrequestreview-5565956830"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head dd2d3111d68855ef4262d32b5e5f66724f48a622; current head dd2d3111d68855ef4262d32b5e5f66724f48a622. This matches issue #2340: `raw ` at depth 24 is unpadded 8-bit RGB, and `v210` is 10-bit 4:2:2. I checked the code against both. - `v210` stride is `ceil(w/48) * 128` (`video.rs`, new `RawFormat::V210` arm), and the sample order Cb Y Cr Y Cb Y Cr Y matches the packing of three 10-bit values per little-endian word. For the reporter's 7680-wide frames the stride is 20480, which is also 1280 groups of 16 bytes, so there is no padding to get wrong. The 64-wide test file does exercise padding (176 bytes of data in a 256-byte row). - `from_mov` returns `None` for any other `raw ` depth, so those files stay unreadable a",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2427,
+      "head": "7cd5acfcf9a34246d1e6891f8a0267a74cac91a6",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2427",
+        "https://github.com/storytold/filmcraft/pull/2427#pullrequestreview-5565948937"
+      ],
+      "review_basis": "FredApps latest review: COMMENTED, reviewed head 7cd5acfcf9a34246d1e6891f8a0267a74cac91a6; current head 7cd5acfcf9a34246d1e6891f8a0267a74cac91a6. The fix is right. `to_cube` writes `TITLE \"{}\"` with inner quotes already turned into `'` (`lut.rs:312`), so reading up to the first closing quote loses nothing on a round trip. The fallback for an unquoted or unterminated title is the old comment-stripped path, so those inputs parse as before. The `raw.trim_start()[5..]` slice is safe because `key == \"TITLE\"` was taken from the same line with no `#` before it. One edge to be aware of, not a blocker: a `.cube` written by another tool as `TITLE \"a\"b\"` now reads as `a`, where it used to read `a\"b`. That form is not what the Cube spec describes, so I am not asking f",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2446,
+      "head": "59ea04d6e5d9536620b4f8fc539e9ae13a54e657",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2446",
+        "https://github.com/storytold/filmcraft/pull/2446#pullrequestreview-5571154216"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2456,
+      "head": "f0dd617590099df16d1374687800cff1fb28e0af",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2456/files",
+        "https://github.com/storytold/filmcraft/pull/2456#pullrequestreview-5571063091"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2463,
+      "head": "f307409636e4608cda538f850a1c57ca6da8d273",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2463/files",
+        "https://github.com/storytold/filmcraft/pull/2463#pullrequestreview-5570983911"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2483,
+      "head": "e593ea6fa3a5bacb1bcbdfdc3419722d20faa23e",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2483",
+        "https://github.com/storytold/filmcraft/pull/2483#pullrequestreview-5574191679"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2505,
+      "head": "ebbd845a90b2a08c7bb6e3d1f8eb709e2c34fdad",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2505/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2513,
+      "head": "3e9ca2ebbdabab6d30150ce753efabc233300f4c",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2513/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2539,
+      "head": "462b24f342debcbc0de720de86bd71aa163bdf06",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2539",
+        "https://github.com/storytold/filmcraft/pull/2539#pullrequestreview-5579836353"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2542,
+      "head": "378212a9f548fb6af844e114cfbefaa4bc678e37",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2542/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2597,
+      "head": "28859f69e50bb76d2fd8b7c00c802b1bedb06c2b",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2597/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2640,
+      "head": "531f665b90791b23b7c66c983f7008d39624c2a9",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2640/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2653,
+      "head": "d1b45e960b123c6fcf2c452b0666417c404a94ee",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2653",
+        "https://github.com/storytold/filmcraft/pull/2653.diff"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2658,
+      "head": "0c2ff743490e6a574f0b816280fba5f0e011d070",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2658/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2677,
+      "head": "387533cbdc2a480350707a5ac88b8664aa78e3da",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2677/files",
+        "https://github.com/storytold/filmcraft/pull/2677#pullrequestreview-5600848341"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2699,
+      "head": "8ce8c0d3bd3689fa85a6202d9f289775fda56d0b",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2699/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2705,
+      "head": "b49b184519af873a1dfd54b3891644920a0559a4",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2705/files",
+        "https://github.com/storytold/filmcraft/pull/2705#pullrequestreview-5605735454"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2710,
+      "head": "523fbf6dc74489bb9995d7d93d9c02e65d6d70a0",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2710/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2802,
+      "head": "deae2c7f0a4e9cfc87b5c77cb691ee3dae36c583",
+      "disposition": "HOLD",
+      "reason": "Current reviewDecision remains CHANGES_REQUESTED. Unresolved Major inline review identifies FCP7 overlap placement calling Builder::place without enforcing MAX_TRACKS; an overlap at XML track index 998 can create track 1000 despite the 999 cap. Separate unresolved link-bookkeeping data-integrity concern also remains.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2802",
+        "https://github.com/storytold/filmcraft/pull/2802/files"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "import data integrity / explicit review hold",
+      "validation_gap": "Fix both track-bound and link bookkeeping findings, add boundary tests, then re-review."
+    },
+    {
+      "number": 2826,
+      "head": "07f71acb41e880360844acecd9daceef117f5d0e",
+      "disposition": "HOLD",
+      "reason": "Unresolved Major inline review identifies IME hold expiration on a delayed key-up: if release arrives after the hold interval, the interval is already elapsed and IME is disabled immediately, defeating the intended release grace period.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2826/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "functional correctness",
+      "validation_gap": "Track the held-to-released transition and cover delayed key release."
+    },
+    {
+      "number": 2830,
+      "head": "0491bc315a9299b7874b5f337d89c14fa5c9df6b",
+      "disposition": "HOLD",
+      "reason": "Current reviewDecision remains CHANGES_REQUESTED. Two unresolved TTML parser findings: `>` inside a quoted attribute can terminate a tag early and lose markup; trimming whitespace after `<` can parse literal `< b >` as markup and drop user text.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2830/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "caption data integrity / explicit review hold",
+      "validation_gap": "Preserve valid quoted attributes and literal text; add round-trip/parser tests and re-review."
+    },
+    {
+      "number": 2835,
+      "head": "6044de4455bbeb1eccfe4f5e37ca2e54c33c18c8",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2835/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2838,
+      "head": "444486ee7ac6eb5ed088191b2d08225612a82e65",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2838",
+        "https://github.com/storytold/filmcraft/pull/2838.diff"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2845,
+      "head": "1fa5024ed5c8ce4f112496fa4c7bdbc9b87810ba",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2845/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2847,
+      "head": "d8fc82312647f60092cafcce7c358542d51c4421",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2847",
+        "https://github.com/storytold/filmcraft/pull/2847.diff"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2888,
+      "head": "59c4223ae71502dbd73e1378bff6f19906cec0b0",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2888",
+        "https://github.com/storytold/filmcraft/pull/2888/files"
+      ],
+      "review_basis": "Actual current diff inspected: AV1 film-grain y/cb/cr points are strictly increasing before use; bounded validation and focused test, no dependency/policy change.",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2909,
+      "head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2909/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2924,
+      "head": "61184469d96353482c5dd704cba90d253b6ef372",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2924/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2947,
+      "head": "649b8ac8961232bed9abfbeb1693480057d73588",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2947",
+        "https://github.com/storytold/filmcraft/pull/2947/files"
+      ],
+      "review_basis": "Actual diff inspected: per-import active-resource HashSet breaks recursive FCPXML resource cycles and warns; focused self-reference test.",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2951,
+      "head": "6d8eb1ba86aaa276687e2759b355af8788d5ec10",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2951/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2964,
+      "head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2964/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2974,
+      "head": "ceb2d0197fa26daecb7f0a387211a47b3decf502",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2974",
+        "https://github.com/storytold/filmcraft/pull/2974/files"
+      ],
+      "review_basis": "Actual diff inspected: reverses only writer-emitted `--&gt;` cue-text escape; round-trip and entity-preservation tests.",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2975,
+      "head": "4f42c33e593482f35fd526192f012855fa31e515",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2975/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 2979,
+      "head": "6e5447cedff34d2daae89da72b8b7e4af352f23b",
+      "disposition": "HOLD",
+      "reason": "Unresolved current-head review says selected-gap Ripple Delete closes the gap but bypasses the playhead update, leaving the playhead inside the deleted interval. This misses the named behavior of the PR.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2979",
+        "https://github.com/storytold/filmcraft/pull/2979/files"
+      ],
+      "review_basis": "Actual diff inspected: records earliest removed span start and moves playhead there after ripple delete; focused resulting-cut test.",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "functional correctness",
+      "validation_gap": "Update playhead to deleted gap start on successful close and test the selected-gap path."
+    },
+    {
+      "number": 2994,
+      "head": "494883feea48c85e1dd4cfd0ae25082e58761562",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2994/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3035,
+      "head": "12bb6670aba28c7d88f68dd3cc0fbb247ce34ee4",
+      "disposition": "HOLD",
+      "reason": "Unresolved Critical inline review says the scrub callback is wrapped in Arc<Mutex<_>> before platform cfg branching and wrapped again in the non-macOS worker path, yielding Arc<Mutex<Arc<Mutex<Fill>>>> where output.open requires Arc<Mutex<Fill>>. This is a cross-platform compile blocker.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3035/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "build / functional correctness",
+      "validation_gap": "Make the first wrapper macOS-only or otherwise preserve the expected non-macOS callback type; validate Windows/Linux hosted builds."
+    },
+    {
+      "number": 3066,
+      "head": "53543a58394dfc93cbda7d40a9d048a60edeba23",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3066/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3077,
+      "head": "4bf7b3e8923b2cb02ff745e6a35fdcd885c5feb1",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3077/files",
+        "https://github.com/storytold/filmcraft/pull/3077#pullrequestreview-5637516214"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": true,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3109,
+      "head": "62c16fcb1d8b3cec7d952009282ff66b7de1a91f",
+      "disposition": "KEEP_WITH_VALIDATION_NOTE",
+      "reason": "Two unresolved inline findings concern test reliability/coverage rather than a demonstrated production path defect: the panic-recovery test may accept the error from decode instead of flush_result, and the hostile-input fixture may not verify that FFmpeg produced the requested pixel format.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3109/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "test assurance only",
+      "validation_gap": "Incorporate the fixes if practical or ensure hosted AV1 tests independently prove the target format and error path; these findings alone do not warrant exclusion from the broad pool."
+    },
+    {
+      "number": 3117,
+      "head": "4f6387217f6bfa6e1b1442597b6ede1467cf571d",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3117/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3120,
+      "head": "d2b13a5250f8d252c06469bd24e8f516df86a0c2",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3120/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3136,
+      "head": "968710eae4f02ed688beb2e9139aa74a13a74a53",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3136/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3139,
+      "head": "94e2a4a9eba1c9b1289496802954b2d21f468c92",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3139/files",
+        "https://github.com/storytold/filmcraft/pull/3139#pullrequestreview-5638806559"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3140,
+      "head": "97a9b720a9658d78968598e09ce38ea7ff7d1ff1",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3140",
+        "https://github.com/storytold/filmcraft/pull/3140#pullrequestreview-5638806313"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3141,
+      "head": "51dae73ed2e7925d0f72a12c881876133f5cb3ba",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3141",
+        "https://github.com/storytold/filmcraft/pull/3141#pullrequestreview-5638806081"
+      ],
+      "review_basis": "FredApps latest review: APPROVED, reviewed head 51dae73ed2e7925d0f72a12c881876133f5cb3ba; current head 51dae73ed2e7925d0f72a12c881876133f5cb3ba. Read the full diff. ConvolutionReverb::set_param (apply_params without snap) now only marks the impulse dirty and process rebuilds it once at the start of the next block, so several parameter changes between blocks cost one rebuild; snap still rebuilds immediately. The tests check that set_param does not rebuild and that eager and deferred instances produce bit-identical output over 24 blocks of mixed parameter changes. The gate and SonarCloud pass at this head. ",
+      "stale_review": false,
+      "dependencies": [
+        3142,
+        3153
+      ],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3142,
+      "head": "da655a03a3197bfc3d2f412aef75582013e129cb",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3142/files",
+        "https://github.com/storytold/filmcraft/pull/3142#pullrequestreview-5638850485"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3143,
+      "head": "93d298eba5f0a23ebae8f41c98ab020d972615e6",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3143",
+        "https://github.com/storytold/filmcraft/pull/3143#pullrequestreview-5638805818"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3144,
+      "head": "02385e2ba2795fe5ba7686c121aea413a6d306d8",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3144",
+        "https://github.com/storytold/filmcraft/pull/3144#pullrequestreview-5638807494"
+      ],
+      "review_basis": "FredApps latest review: APPROVED, reviewed head 02385e2ba2795fe5ba7686c121aea413a6d306d8; current head 02385e2ba2795fe5ba7686c121aea413a6d306d8. Read the full diff. flush and flush32 now keep a value only when its magnitude is between the denormal threshold and the largest finite value, so NaN and infinities are zeroed with the tiny values and one bad input sample cannot poison recursive filter state until reset. The first test proves the finite behaviour is bit-identical to the old comparisons (edges, next_up/next_down and 100000 random magnitudes) and that NaN and infinities flush to 0; the others check the biquad, one-pole, all-pass and DC blocker and four EQ effects recover after a single bad sample. The gate and SonarCloud pass at this head. ",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3145,
+      "head": "ca17eb8f1593c8a06839020977cf28b69b627375",
+      "disposition": "HOLD",
+      "reason": "Although FredApps approved this exact head after the bot note, the unresolved TTML parser thread identifies round-trip loss: `clean` trims leading/trailing XML whitespace represented by `<br/>`, and `str::lines()` drops a final break. This is a caption content fidelity defect in the PR’s touched parser.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3145/files",
+        "https://github.com/storytold/filmcraft/pull/3145#pullrequestreview-5638785243"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "caption data integrity",
+      "validation_gap": "Preserve leading/trailing line breaks and cover both `<p><br/>text</p>` and `<p>text<br/></p>` round trips."
+    },
+    {
+      "number": 3146,
+      "head": "8f4b0e0c90c70c8694fda19c4ad483e65335bce4",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3146",
+        "https://github.com/storytold/filmcraft/pull/3146#pullrequestreview-5638838985"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3148,
+      "head": "54690756b2e75a1fff9afcd7144a04a97e793282",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3148/files",
+        "https://github.com/storytold/filmcraft/pull/3148#pullrequestreview-5638839562"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [
+        "#3141",
+        "#3144",
+        "#3146",
+        "#3149"
+      ],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3149,
+      "head": "e141552a527a19adabeb3ba432e3f30e86692299",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3149",
+        "https://github.com/storytold/filmcraft/pull/3149#pullrequestreview-5638810309"
+      ],
+      "review_basis": "priorreview",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3152,
+      "head": "f3544a40bd8f34d7a9b6be848b53e045d83b4c87",
+      "disposition": "HOLD",
+      "reason": "Although FredApps approved this exact head after the bot note, the unresolved STFT thread identifies cross-channel contamination: a non-finite input in either channel enters the packed complex FFT and spreads NaN/Inf into both split spectra, poisoning the clean neighboring channel. This contradicts the PR’s stated single-sample recovery behavior and regresses prior per-channel isolation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3152",
+        "https://github.com/storytold/filmcraft/pull/3152#pullrequestreview-5638859146",
+        "https://github.com/storytold/filmcraft/pull/3152/files"
+      ],
+      "review_basis": "FredApps latest review: APPROVED, reviewed head f3544a40bd8f34d7a9b6be848b53e045d83b4c87; current head f3544a40bd8f34d7a9b6be848b53e045d83b4c87. Read the non-test diff across audio-dsp. flush and flush32 now keep a value only inside [threshold, MAX] of its magnitude, so NaN and both infinities fail the range test and become 0, and finite values are unchanged (the first test compares bits against the old rule). The same range test replaces the less-than-threshold checks on the envelope states in the compressor, tube compressor, multiband smoothing, envelope follower, guitar suite and vocal enhancer; the gate, phaser feedback, mastering limiter envelope and declick LPC energy get explicit finiteness guards; the pitch shifter now clears a non-finite accumula",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit",
+      "qc_type": "audio correctness / isolation",
+      "validation_gap": "Fall back to separate-channel processing for affected frames (or another isolated approach) and test bad-left/clean-right and vice versa."
+    },
+    {
+      "number": 3153,
+      "head": "65c3dc72660b0eff13d137fba6ddf28a7554294b",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3153/files",
+        "https://github.com/storytold/filmcraft/pull/3153#pullrequestreview-5638858916"
+      ],
+      "review_basis": "priorreview/currentdiff",
+      "stale_review": false,
+      "dependencies": [
+        "#3141",
+        "#3144",
+        "#3146",
+        "#3148",
+        "#3149"
+      ],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    },
+    {
+      "number": 3167,
+      "head": "2a2a6c0d995366bb9ed76be4c07f77539c1e582b",
+      "disposition": "KEEP",
+      "reason": "No concrete unresolved hard correctness, safety, dependency, or compatibility blocker found in this crosscheck; continue with planned RC integration and hosted validation.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/3167/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": [],
+      "qc_basis": "plan and supplied exact-head discussions; targeted unresolved-thread audit"
+    }
+  ],
+  "nonblocking_notes": [
+    {
+      "number": 2463,
+      "disposition": "KEEP_WITH_NOTE",
+      "reason": "Open minor bot thread questions whether shift-scrub keyframe snapping uses the same time mapping as the timeline; no evidence here establishes a hard blocker.",
+      "evidence_url": "https://github.com/storytold/filmcraft/pull/2463/files"
+    },
+    {
+      "number": 2505,
+      "disposition": "KEEP_WITH_NOTE",
+      "reason": "Open minor bot thread asks the GPU parity test to assert it actually selects the GPU frame plan; this weakens test assurance but does not by itself establish production breakage.",
+      "evidence_url": "https://github.com/storytold/filmcraft/pull/2505/files"
+    },
+    {
+      "number": 2653,
+      "disposition": "KEEP_WITH_NOTE",
+      "reason": "Open minor bot thread requests more identifying detail in unsupported-generator warnings; report quality only.",
+      "evidence_url": "https://github.com/storytold/filmcraft/pull/2653/files"
+    },
+    {
+      "number": 2677,
+      "disposition": "KEEP_WITH_NOTE",
+      "reason": "Open bot comments concern rerunning one-time patch/test helper scripts on an already-patched tree; script idempotence, not shipped runtime behavior.",
+      "evidence_url": "https://github.com/storytold/filmcraft/pull/2677/files"
+    },
+    {
+      "number": 3109,
+      "disposition": "KEEP_WITH_NOTE",
+      "reason": "Listed above as validation-only; test quality concerns do not establish a candidate-code defect.",
+      "evidence_url": "https://github.com/storytold/filmcraft/pull/3109/files"
+    }
+  ],
+  "integration_stack_notes": [
+    {
+      "prs": [
+        3141,
+        3153
+      ],
+      "note": "#3153 states it is stacked on #3141 and its diff against main includes #3141; only the last commit belongs to #3153. Avoid importing the shared commit twice."
+    },
+    {
+      "prs": [
+        3146,
+        3148
+      ],
+      "note": "#3148 states it is stacked on #3146; only its last commit is new. Keep ancestry/commit de-duplication when integrating."
+    },
+    {
+      "prs": [
+        3141,
+        3142,
+        3144,
+        3146,
+        3148,
+        3149,
+        3152,
+        3153
+      ],
+      "note": "Audio-DSP candidates form an interacting patch family. The plan includes related candidates, so integrate in dependency order and resolve repeated commits once; this is sequencing, not an independent rejection."
+    },
+    {
+      "prs": [
+        2386
+      ],
+      "note": "#2386 refers to issue #2375 and says the SDR BT.709 colr behavior was added by #2142; the issue reference is not itself a missing PR dependency."
+    }
+  ]
+}

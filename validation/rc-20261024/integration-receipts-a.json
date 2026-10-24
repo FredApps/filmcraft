@@ -1,0 +1,56 @@
+[
+  {
+    "pr": 1905,
+    "head": "851cf2fe52ded83e2eba928d095a66bdcfb6aa35",
+    "status": "SELECTIVE",
+    "commit": "724c6daff1f",
+    "detail": "Applied only unique graphics selection-color top commit; excluded ancestry carried unrelated held #1749/#1725/#1163 content."
+  },
+  {
+    "pr": 2197,
+    "head": "acf861a5363689ddbef67b97323a83b2efe2f375",
+    "status": "FULL",
+    "commit": "43dd4632",
+    "detail": "Resolved caption timeline conflict by keeping current Razor caption path and adopting snapped move/trim interaction; kept PR tests and current API behavior."
+  },
+  {
+    "pr": 2242,
+    "head": "b4652c7552c733afb15122b77fd8b959371dee49",
+    "status": "SELECTIVE",
+    "commit": "0e72cffb",
+    "detail": "Kept current compact command-macro layout and fixed the missing closing brace in documented keyframes JSON."
+  },
+  {
+    "pr": 2539,
+    "head": "462b24f342debcbc0de720de86bd71aa163bdf06",
+    "status": "SELECTIVE",
+    "commit": "a603f229",
+    "detail": "Cherry-picked documentation comments only. The underlying per-half pan feature is not in the selected candidate tree."
+  },
+  {
+    "pr": 2677,
+    "head": "387533cbdc2a480350707a5ac88b8664aa78e3da",
+    "status": "HOLD",
+    "detail": "Specific missing dependency: this cancellation fix expects #2536's audio/video half-aware Drag::Pan model, while current RC has shared v_scroll and no audio discriminator. Applying it alone cannot work safely; parent informed."
+  },
+  {
+    "pr": 3077,
+    "head": "4bf7b3e8923b2cb02ff745e6a35fdcd885c5feb1",
+    "status": "COVERED",
+    "detail": "Current lib.rs playback tests already clear textures_delta after every headless run_ui that advances playback; no need to import the stale export_mode preview test module."
+  },
+  {
+    "pr": 3148,
+    "head": "54690756b2e75a1fff9afcd7144a04a97e793282",
+    "status": "FULL",
+    "correction_commit": "3abac2c6",
+    "detail": "Pinned candidate head is already a full ancestor. Added paired STFT per-channel nonfinite isolation as an integration correction to avoid cross-channel contamination, with a zero-replacement comparison regression."
+  },
+  {
+    "pr": 2153,
+    "head": "4ff5c22f78a0a6473b82a218c4413781714e316f",
+    "status": "SELECTIVE",
+    "commit": "5254c5c8",
+    "detail": "Replaced current max-gain Lumetri lift with the reviewed 0.02 soft floor in shared CPU/GPU lift_scale and mirrored WGSL formula; retained existing regression tests and added above-floor/continuity and near-black-neighbor tests."
+  }
+]

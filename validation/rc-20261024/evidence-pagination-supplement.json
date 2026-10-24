@@ -1,0 +1,153 @@
+{
+  "repo": "storytold/filmcraft",
+  "pr": 3017,
+  "title": "AMD VA-API GPU-resident export (strict, fail-closed)",
+  "url": "https://github.com/storytold/filmcraft/pull/3017",
+  "headRefOid": "1eb86c4589e34342c504e045c5f41620adcfd3b5",
+  "fetched_at_utc": "2026-10-24T16:46:23Z",
+  "source": "GitHub GraphQL pullRequest.reviewThreads page after cursor from pr-review-evidence.json; read only",
+  "initial_page": {
+    "node_count": 30,
+    "hasNextPage": true,
+    "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0yM1QyMToyNjoxOFrOr8dYoQ=="
+  },
+  "supplement_page": {
+    "node_count": 10,
+    "hasNextPage": false,
+    "endCursor": "Y3Vyc29yOnYyOpK0MjAyNi0xMC0yNFQwMjoxODoyOVrOr9M9WQ==",
+    "all_thread_comment_connections_haveNextPage": false,
+    "unresolved_count": 0,
+    "outdated_count": 2,
+    "threads": [
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SN4",
+        "path": "apps/filmcraft-cli/src/main.rs",
+        "line": null,
+        "isResolved": true,
+        "isOutdated": true,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SN9",
+        "path": "apps/filmcraft-web/src/lib.rs",
+        "line": 214,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SOD",
+        "path": "crates/engine/src/export_tools.rs",
+        "line": 284,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SOS",
+        "path": "crates/gpu/src/transition_blur_stage.rs",
+        "line": null,
+        "isResolved": true,
+        "isOutdated": true,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SOU",
+        "path": "crates/platform/src/lib.rs",
+        "line": 413,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SOa",
+        "path": "crates/render/src/plan.rs",
+        "line": 707,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0SOd",
+        "path": "docs/performance.md",
+        "line": 143,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0ggQ",
+        "path": "apps/filmcraft-cli/src/main.rs",
+        "line": 381,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0ggR",
+        "path": "crates/platform/tests/vaapi_gpu_nv12.rs",
+        "line": 50,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      },
+      {
+        "id": "PRRT_kwDOU1UwWc6v0z1Z",
+        "path": "crates/gpu/src/transition_blur_stage.rs",
+        "line": 328,
+        "isResolved": true,
+        "isOutdated": false,
+        "commentCount": 1,
+        "comments_page_has_next": false,
+        "authors": [
+          "coderabbitai"
+        ]
+      }
+    ]
+  },
+  "evidence_audit": {
+    "review_evidence_records": 754,
+    "truncated_connections": [
+      "PR #3017 reviewThreads only"
+    ],
+    "truncated_reviews_comments_thread_comments": [],
+    "check_contexts": "Not part of pr-review-evidence.json; this file contains PR reviews, issue comments, review threads, and commits. Use the separate pinned check/CI inventory for status results."
+  },
+  "effect_on_rc_pool": "No change: PR #3017 is HOLD in expanded-integration-plan.json and is not one of the remaining included candidates. The supplemental 10 threads are all resolved and outdated."
+}

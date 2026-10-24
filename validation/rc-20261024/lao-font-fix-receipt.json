@@ -1,0 +1,20 @@
+{
+  "task": "Lao system-font fallback and language guard",
+  "branch": "codex/luna-c-lao-font-support",
+  "base": "d3cd834e074bb306941d20ecd2393b5a1ed1dbf7",
+  "changed_files": [
+    "crates/ui-egui/src/cjk.rs",
+    "crates/ui-egui/src/i18n/mod.rs",
+    "crates/ui-egui/src/menus.rs",
+    "crates/ui-egui/src/lib.rs"
+  ],
+  "added_tests": [
+    "lao_sample_covers_every_lao_character_in_the_catalog",
+    "lao_language_requires_a_system_font"
+  ],
+  "validation": {
+    "diff_check": "passed",
+    "build_or_tests": "not run by instruction",
+    "rustfmt": "unavailable (not on PATH)"
+  }
+}
