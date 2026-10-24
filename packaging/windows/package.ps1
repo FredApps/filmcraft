@@ -103,6 +103,12 @@ New-Item -ItemType Directory -Force -Path $LicenceStage | Out-Null
 foreach ($notice in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') {
   Copy-Item -LiteralPath (Join-Path $Root $notice) -Destination $LicenceStage
 }
+foreach ($lic in Get-ChildItem -LiteralPath (Join-Path $Root 'assets\fonts') -Filter 'OFL-*.txt' -File) {
+  Copy-Item -LiteralPath $lic.FullName -Destination $LicenceStage
+}
+# The packaged NOTICE sits next to these licence texts, rather than in the source checkout.
+$noticeText = [IO.File]::ReadAllText((Join-Path $LicenceStage 'NOTICE')).Replace('See assets/fonts/OFL-', 'See OFL-')
+[IO.File]::WriteAllText((Join-Path $LicenceStage 'NOTICE'), $noticeText)
 if ($env:CRAFT_FONTS_DIR) {
   foreach ($lic in Get-ChildItem -Path (Join-Path $env:CRAFT_FONTS_DIR 'fonts\*\OFL.txt') -ErrorAction SilentlyContinue) {
     Copy-Item -LiteralPath $lic.FullName -Destination (Join-Path $LicenceStage "OFL-$($lic.Directory.Name).txt")
@@ -132,15 +138,13 @@ Set-Content -Encoding ascii -Path (Join-Path $Portable 'portable.txt') -Value @(
   'FilmCraft portable: preferences, presets, logs and crash recovery are kept in the data folder',
   'next to filmcraft.exe. Delete this file to use %APPDATA%\FilmCraft instead.'
 )
-foreach ($f in 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') {
+foreach ($f in 'README.md', 'LICENSE') {
   $p = Join-Path $Root $f
   if (Test-Path $p) { Copy-Item $p $Portable }
 }
-# Licences of the embedded craft-fonts fonts (builds with CRAFT_FONTS_DIR) as OFL-<family>.txt.
-if ($env:CRAFT_FONTS_DIR) {
-  foreach ($lic in Get-ChildItem -Path (Join-Path $env:CRAFT_FONTS_DIR 'fonts\*\OFL.txt') -ErrorAction SilentlyContinue) {
-    Copy-Item $lic.FullName (Join-Path $Portable "OFL-$($lic.Directory.Name).txt")
-  }
+# Use the same complete notice set as the MSI, including the three bundled UI font families.
+foreach ($notice in Get-ChildItem -LiteralPath $LicenceStage -File) {
+  Copy-Item -LiteralPath $notice.FullName -Destination $Portable
 }
 $Zip = Join-Path $Dist "filmcraft-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
