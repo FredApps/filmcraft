@@ -1,0 +1,61 @@
+{
+  "at_utc": "2026-10-24T17:20:26.203250+00:00",
+  "results": [
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/FredApps/filmcraft/actions/permissions"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"enabled\":true,\"allowed_actions\":\"all\",\"sha_pinning_required\":false}",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "api",
+        "repos/FredApps/filmcraft/actions/workflows/395281842"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"id\":395281842,\"node_id\":\"W_kwDOVEDnmc4Xj4Wy\",\"name\":\"FilmCraft RC candidate\",\"path\":\".github/workflows/rc-candidate.yml\",\"state\":\"active\",\"created_at\":\"2026-10-24T19:16:03.000+02:00\",\"updated_at\":\"2026-10-24T19:17:16.000+02:00\",\"url\":\"https://api.github.com/repos/FredApps/filmcraft/actions/workflows/395281842\",\"html_url\":\"https://github.com/FredApps/filmcraft/blob/main/.github/workflows/rc-candidate.yml\",\"badge_url\":\"https://github.com/FredApps/filmcraft/workflows/FilmCraft%20RC%20candidate/badge.svg\"}",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "workflow",
+        "run",
+        "rc-candidate.yml",
+        "-R",
+        "FredApps/filmcraft",
+        "--ref",
+        "rc/20261024"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "could not create workflow dispatch event: HTTP 422: Actions has been disabled for this repository. (https://api.github.com/repos/FredApps/filmcraft/actions/workflows/395281842/dispatches)\n"
+    },
+    {
+      "command": [
+        "gh",
+        "run",
+        "list",
+        "-R",
+        "FredApps/filmcraft",
+        "--branch",
+        "rc/20261024",
+        "--json",
+        "databaseId,status,conclusion,headSha",
+        "--limit",
+        "5"
+      ],
+      "exit_code": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    }
+  ],
+  "diagnosis": "Repository permissions report enabled, dedicated workflow active, but dispatch returns HTTP422 Actions has been disabled for this repository; no run created. Consistent with a GitHub-controlled disabled state. Reason not established.",
+  "official_documentation": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository",
+  "status": "BLOCKED_EXTERNAL_GITHUB_ACTIONS"
+}

@@ -16,5 +16,9 @@
     "diff_check": "passed",
     "build_or_tests": "not run by instruction",
     "rustfmt": "unavailable (not on PATH)"
-  }
+  },
+  "integration_followup": "Merged and source-formatted by root. Removed a boolean/message mirror test; retained catalog-character coverage test and manual missing-font acceptance case.",
+  "active_added_tests": [
+    "lao_sample_covers_every_lao_character_in_the_catalog"
+  ]
 }

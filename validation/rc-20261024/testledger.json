@@ -2,7 +2,7 @@
   "schema_version": 1,
   "rc_version": "0.12.0-rc.20261024.1",
   "candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-  "eligibility": "120 integrated PR changes, including five selective adaptations. Final SHA supplied by build receipt. All manual acceptance NOT_RUN.",
+  "eligibility": "116 integrated changes and ten covered PRs; five selective adaptations; all manual lanes NOT_RUN.",
   "entries": [
     {
       "id": "PR-1041",
@@ -421,18 +421,6 @@
       "premiere_parity": "NOT_RUN",
       "attempts": [],
       "reviewed_pr_head": "3753833e0a75b4f5d07f6bfbe01a7b91e37fb7b0",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2033",
-      "pr": 2033,
-      "integration": "VERIFY",
-      "hosted_smoke": "NOT_RUN",
-      "native_visual": "NOT_RUN",
-      "premiere_parity": "NOT_RUN",
-      "attempts": [],
-      "reviewed_pr_head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
       "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
@@ -1170,18 +1158,6 @@
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
     {
-      "id": "PR-2909",
-      "pr": 2909,
-      "integration": "VERIFY",
-      "hosted_smoke": "NOT_RUN",
-      "native_visual": "NOT_RUN",
-      "premiere_parity": "NOT_RUN",
-      "attempts": [],
-      "reviewed_pr_head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
       "id": "PR-2924",
       "pr": 2924,
       "integration": "VERIFY",
@@ -1190,30 +1166,6 @@
       "premiere_parity": "NOT_RUN",
       "attempts": [],
       "reviewed_pr_head": "61184469d96353482c5dd704cba90d253b6ef372",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2947",
-      "pr": 2947,
-      "integration": "VERIFY",
-      "hosted_smoke": "NOT_RUN",
-      "native_visual": "NOT_RUN",
-      "premiere_parity": "NOT_RUN",
-      "attempts": [],
-      "reviewed_pr_head": "649b8ac8961232bed9abfbeb1693480057d73588",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2964",
-      "pr": 2964,
-      "integration": "VERIFY",
-      "hosted_smoke": "NOT_RUN",
-      "native_visual": "NOT_RUN",
-      "premiere_parity": "NOT_RUN",
-      "attempts": [],
-      "reviewed_pr_head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
       "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
@@ -1458,5 +1410,23 @@
       "reason": "Current playback UI tests already clear textures_delta after headless frames. No stale test module imported."
     }
   ],
-  "included_count": 120
+  "included_count": 116,
+  "covered_no_op_integrations": [
+    {
+      "pr": 2033,
+      "reason": "Current private tempfile directory already supplies stronger screenshot isolation; the integration merge made no tree change."
+    },
+    {
+      "pr": 2909,
+      "reason": "The combined tree already preserves plain DOCTYPE support and rejects internal DTD subsets; integration made no tree change."
+    },
+    {
+      "pr": 2947,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    },
+    {
+      "pr": 2964,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    }
+  ]
 }

@@ -1,3 +1,5 @@
+Historical 122-candidate checkpoint; final disposition is 116 integrated / 628 held / 10 covered, recorded in integration-receipts-expanded.json.
+
 FilmCraft maintainer decisions and pagination audit
 Snapshot: source files were reviewed on 2026-10-24; supplemental GitHub GraphQL page fetched 2026-10-24 16:46:23 UTC. No GitHub writes.
 

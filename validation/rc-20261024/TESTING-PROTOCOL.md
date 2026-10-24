@@ -6,7 +6,7 @@ RC version: `0.12.0-rc.20261024.1`; candidate SHA comes from the exact artifact 
 
 Premiere Pro 2026 v26.5.2 is the behavioral/export reference. Use only original synthetic fixtures. Adobe interaction is manual and local; keep notes in ignored `plan/premiere/`. Do not collect Adobe screenshots, logs, proprietary projects/media, inspect bundles, or put reference data in repo/CI. Never enable or recommend unsigned CEP extensions.
 
-The final 120-case manifest is `case-index.json`. Each `reviewed_pr_head` is the inspected PR tip, not the final build SHA. Fill `integrated_candidate_sha` from the exact artifact `source-commit.txt` or build receipt after integration. Detailed triggers, expected observables, controls, tolerances, relevant added/changed tests, hosted commands and undo/reopen instructions are in `results-template.json`. Tests added by a diff are kept distinct from source-existing tests. `testledger.json` tracks integration verification and separate `hosted_smoke`, `native_visual`, `premiere_parity` statuses. Eight QC holds and 11 earlier cases outside the active set are documented as excluded.
+The final 116-case manifest is `case-index.json`. Each `reviewed_pr_head` is the inspected PR tip, not the final build SHA. Fill `integrated_candidate_sha` from the exact artifact `source-commit.txt` or build receipt after integration. Detailed triggers, expected observables, controls, tolerances, relevant added/changed tests, hosted commands and undo/reopen instructions are in `results-template.json`. Tests added by a diff are kept distinct from source-existing tests. `testledger.json` tracks integration verification and separate `hosted_smoke`, `native_visual`, `premiere_parity` statuses. Eight QC holds and 11 earlier cases outside the active set are documented as excluded.
 
 ## Provenance and run record
 
@@ -34,7 +34,7 @@ For DSP optimization and recovery cases, pair deterministic finite-input numeric
 
 ## Acceptance cases
 
-There are 120 integrated PR cases, each bound to `reviewed_pr_head`; integration dependencies may reduce the pool. Use the corresponding `results-template.json` record for concrete trigger, observable, controls, test commands, tolerance and undo/reopen. Bind `integrated_candidate_sha` from the exact final artifact receipt. The records are intentionally NOT_RUN; this protocol makes no claim that any PR has been tested.
+There are 116 integrated PR cases, each bound to `reviewed_pr_head`; integration dependencies may reduce the pool. Use the corresponding `results-template.json` record for concrete trigger, observable, controls, test commands, tolerance and undo/reopen. Bind `integrated_candidate_sha` from the exact final artifact receipt. The records are intentionally NOT_RUN; this protocol makes no claim that any PR has been tested.
 
 ## Results and excluded earlier cases
 
@@ -42,4 +42,6 @@ There are 120 integrated PR cases, each bound to `reviewed_pr_head`; integration
 
 ## Final integration scope
 
-120 selected PR changes ship, including five selective adaptations recorded in integration-receipts-expanded.json. #2951 is excluded because its security fix targets a replaced Matroska implementation; #3077 is covered by current playback cleanup. The #3148 paired FFT and #2123 Lao interface have additional RC integration corrections and regressions. All native visual, Premiere and hardware results remain NOT_RUN until executed.
+116 selected PR changes ship, including five selective adaptations recorded in integration-receipts-expanded.json. #2951 is excluded because its security fix targets a replaced Matroska implementation; #3077 is covered by current playback cleanup. The #3148 paired FFT and #2123 Lao interface have additional RC integration corrections and regressions. All native visual, Premiere and hardware results remain NOT_RUN until executed.
+
+Four no-op integrations (#2033, #2909, #2947, #2964) are covered controls, not new changes. The final accounting is 116 integrated / 628 held / 10 covered. GitHub rejected dispatch before creating a run; every hosted and manual result remains NOT_RUN.

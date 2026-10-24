@@ -13,7 +13,7 @@
     "candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
     "base_sha": "RECORD_EXACT_BASE_SHA",
     "warning": "All results NOT_RUN; do not execute candidate code on analyst workstation.",
-    "eligibility_note": "Final scope 120 integrated changes; #2951 held and #3077 covered. Selective changes and RC corrections are enumerated in integration-receipts-expanded.json.",
+    "eligibility_note": "116 integrated changes, ten covered and 628 holds; see exact integration manifest. Hosted build blocked by GitHub before a run was created.",
     "head_note": "reviewed_pr_head is the reviewed PR tip, not the RC binary SHA. Bind integrated_candidate_sha from the exact candidate artifact source-commit.txt/build receipt; do not write a self-referential SHA into committed source."
   },
   "tracks": {
@@ -155,7 +155,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine csv_preserves_exact_custom_color_and_author",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/marker_export.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "custom_marker_properties_survive_undo_and_project_reopen",
@@ -165,7 +169,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine custom_marker_properties_survive_undo_and_project_reopen",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "invalid_marker_properties_leave_project_and_undo_unchanged",
@@ -175,7 +183,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine invalid_marker_properties_leave_project_and_undo_unchanged",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "all_marker_creation_commands_accept_hex_and_author",
@@ -185,7 +197,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine all_marker_creation_commands_accept_hex_and_author",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "custom_palette_is_project_local_bounded_and_undoable",
@@ -195,7 +211,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine custom_palette_is_project_local_bounded_and_undoable",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "custom_clip_colors_share_palette_and_survive_save_preset_switch_and_undo",
@@ -205,7 +225,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine custom_clip_colors_share_palette_and_survive_save_preset_switch_and_undo",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "metadata_label_edits_use_the_effective_color_and_clear_custom_overrides",
@@ -215,7 +239,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine metadata_label_edits_use_the_effective_color_and_clear_custom_overrides",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "marker_and_clip_aliases_resolve_to_the_same_unchanged_presets",
@@ -225,7 +253,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine marker_and_clip_aliases_resolve_to_the_same_unchanged_presets",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "marker_time_edits_are_sorted_exact_and_reject_hostile_ranges_atomically",
@@ -235,7 +267,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine marker_time_edits_are_sorted_exact_and_reject_hostile_ranges_atomically",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "bulk_marker_changes_are_owner_scoped_atomic_and_one_undo",
@@ -245,7 +281,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine bulk_marker_changes_are_owner_scoped_atomic_and_one_undo",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/tests/marker_properties.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -303,7 +343,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-gpu -- --list",
           "filter_command": "cargo test --locked -p filmcraft-gpu mixed_axis_yuv_detail_matches_cpu",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/gpu/src/blend_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -360,7 +404,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui zooming_out_stops_where_the_whole_timeline_is_in_view",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_scroll_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -417,7 +465,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui an_option_drag_keeps_the_copy_pointer",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_tool_pointer_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -473,7 +525,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_text_of_a_search_field_is_centred_vertically_in_it",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/widgets.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -530,7 +586,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui dragging_a_clip_to_another_track_carries_its_fade_in_the_preview",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_transition_move_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -589,7 +649,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui moving_a_linked_video_clip_up_a_track_leaves_its_audio_on_its_track",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_linked_move_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "moving_a_linked_audio_clip_down_a_track_leaves_its_video_on_its_track",
@@ -599,7 +663,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui moving_a_linked_audio_clip_down_a_track_leaves_its_video_on_its_track",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_linked_move_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -668,7 +736,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui an_error_is_marked_and_a_note_is_not",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/status_error_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "a_click_on_the_status_bar_dismisses_an_error",
@@ -678,7 +750,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_click_on_the_status_bar_dismisses_an_error",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/status_error_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -778,7 +854,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine the_progress_window_preference_is_wired",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/settings_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -836,7 +916,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_transition_fills_a_compact_track_and_sits_below_the_name_on_a_tall_one",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_transition_size_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -893,7 +977,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_timeline_panel_menu_has_the_name_toggles",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_show_names_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -949,7 +1037,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_compact_clip_has_its_whole_height_for_the_waveform_and_a_tall_one_the_lower_part",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/panels/timeline.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1010,7 +1102,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_timeline_settings_menu_stays_open_while_options_are_toggled",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/settings_menus_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "the_monitor_wrench_stays_open_for_toggles_and_closes_on_a_display_choice",
@@ -1020,7 +1116,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_monitor_wrench_stays_open_for_toggles_and_closes_on_a_display_choice",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/settings_menus_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1076,7 +1176,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui remix_drag_keeps_the_waveform_anchored",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/panels/timeline.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1179,7 +1283,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft -- --list",
           "filter_command": "cargo test --locked -p filmcraft all_files_filter_admits_every_file",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "apps/filmcraft/src/file_filters.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1241,7 +1349,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-cfb -- --list",
           "filter_command": "cargo test --locked -p filmcraft-cfb nul_in_a_name_is_rejected",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/cfb/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "span_is_checked",
@@ -1251,7 +1363,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-cfb -- --list",
           "filter_command": "cargo test --locked -p filmcraft-cfb span_is_checked",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/cfb/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "compare_names_matches_the_allocating_version",
@@ -1261,7 +1377,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-cfb -- --list",
           "filter_command": "cargo test --locked -p filmcraft-cfb compare_names_matches_the_allocating_version",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/cfb/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1369,7 +1489,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_trim_cursor_stays_while_an_edge_is_dragged",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_trim_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "the_trim_cursor_stays_while_a_transition_end_is_dragged",
@@ -1379,7 +1503,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_trim_cursor_stays_while_a_transition_end_is_dragged",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_trim_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1436,7 +1564,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine new_project_answers_with_its_name_and_revision",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/file_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1493,7 +1625,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-export png_stills_keep_their_alpha_channel",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/export/src/settings_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1560,7 +1696,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine max_threads_reaches_the_export_settings",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/export_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "max_threads_caps_the_threads_an_export_runs_on",
@@ -1570,7 +1710,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-export max_threads_caps_the_threads_an_export_runs_on",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/export/src/determinism_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "max_threads_never_adds_threads",
@@ -1580,7 +1724,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-export max_threads_never_adds_threads",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/export/src/determinism_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "max_threads_does_not_change_the_file",
@@ -1590,7 +1738,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-export max_threads_does_not_change_the_file",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/export/src/determinism_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "max_threads_is_a_setting_of_the_json_interface",
@@ -1600,7 +1752,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-export max_threads_is_a_setting_of_the_json_interface",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/export/src/determinism_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1659,7 +1815,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui moved_to_another_track_a_clip_keeps_its_time_over_a_nearby_cut",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_move_snap_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "dragged_along_its_track_a_clip_still_snaps_to_a_nearby_cut",
@@ -1669,7 +1829,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui dragged_along_its_track_a_clip_still_snaps_to_a_nearby_cut",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/timeline_move_snap_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1836,7 +2000,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-edit -- --list",
           "filter_command": "cargo test --locked -p filmcraft-edit move_rejects_repeated_clip_ids_without_mutation",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/edit/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_selection_inputs_keep_first_occurrence_and_toggle_once",
@@ -1846,7 +2014,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_selection_inputs_keep_first_occurrence_and_toggle_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_selection_expansion_is_unique_without_an_active_sequence",
@@ -1856,7 +2028,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_selection_expansion_is_unique_without_an_active_sequence",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_selection_public_admission_keeps_nudges_equivalent_to_unique_selection",
@@ -1866,7 +2042,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_selection_public_admission_keeps_nudges_equivalent_to_unique_selection",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_selection_already_in_session_keeps_nudges_equivalent_to_unique_selection",
@@ -1876,7 +2056,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_selection_already_in_session_keeps_nudges_equivalent_to_unique_selection",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_selection_delete_matches_unique_selection_with_and_without_links",
@@ -1886,7 +2070,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_selection_delete_matches_unique_selection_with_and_without_links",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_move_targets_are_rejected_and_retry_is_undoable",
@@ -1896,7 +2084,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_move_targets_are_rejected_and_retry_is_undoable",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_new_track_move_preserves_redo_and_retry_is_undoable",
@@ -1906,7 +2098,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_new_track_move_preserves_redo_and_retry_is_undoable",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "duplicate_new_track_move_preserves_full_undo_history",
@@ -1916,7 +2112,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine duplicate_new_track_move_preserves_full_undo_history",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "unique_new_track_moves_keep_linked_partner_behavior",
@@ -1926,7 +2126,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine unique_new_track_moves_keep_linked_partner_behavior",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/timeline_move_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -1987,7 +2191,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine interpolation_of_listed_keys_across_lanes_is_one_undo_step",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/keyframe_move.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "keyframe_menu_interpolation_applies_to_every_selected_keyframe",
@@ -1997,7 +2205,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui keyframe_menu_interpolation_applies_to_every_selected_keyframe",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/keyframes_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2151,7 +2363,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui media_the_os_opens_is_imported_into_the_project",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/lib.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "a_project_the_os_opens_replaces_the_current_one",
@@ -2161,7 +2377,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_project_the_os_opens_replaces_the_current_one",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/lib.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "the_first_project_opens_and_the_rest_is_media",
@@ -2171,7 +2391,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_first_project_opens_and_the_rest_is_media",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/lib.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "quit_and_empty_requests_do_not_panic",
@@ -2181,7 +2405,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui quit_and_empty_requests_do_not_panic",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/lib.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2243,7 +2471,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine close_gap_without_a_selected_gap_closes_every_gap_in_one_undo_step",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/gap_selection_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "close_gap_without_a_selected_gap_only_closes_gaps_between_in_and_out",
@@ -2253,7 +2485,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine close_gap_without_a_selected_gap_only_closes_gaps_between_in_and_out",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/gap_selection_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "close_gap_without_a_selected_gap_refuses_without_editing",
@@ -2263,7 +2499,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine close_gap_without_a_selected_gap_refuses_without_editing",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/gap_selection_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2320,7 +2560,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine unlink_with_an_unlinked_clip_in_the_selection_still_unlinks",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/explicit_targets_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2380,7 +2624,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine nest_is_bindable_without_a_default_key",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/shortcuts_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "nest_can_be_assigned_a_key_that_asks_for_the_name",
@@ -2390,63 +2638,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui nest_can_be_assigned_a_key_that_asks_for_the_name",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
-        }
-      ],
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2033",
-      "pr": 2033,
-      "title": "fix(mcp): give each screenshot its own temp file",
-      "status": "NOT_RUN",
-      "track": "hosted_smoke + native_visual; Premiere parity where applicable",
-      "focus": "Pinned behavior: fix(mcp): give each screenshot its own temp file",
-      "steps": [
-        "Call automation screenshot endpoint twice concurrently; verify generated files are distinct, each response points to its own file, and temporary artifacts are cleaned according to server contract.",
-        "Run the named focused hosted regression test below (or the affected module check if no specific test was added); capture assertion output and exact workflow URL.",
-        "In the FilmCraft UI, perform the closest user-visible operation that reaches the changed path; inspect the affected output and verify adjacent unaffected control behavior.",
-        "Save/reopen if project state is changed and compare candidate result to base SHA with identical fixture and settings."
-      ],
-      "expected_observable": "Call automation screenshot endpoint twice concurrently. Valid neighboring control remains unchanged; malformed/out-of-range input is bounded.",
-      "tolerance": "Use assertion/tolerance explicitly present in a test added by this diff or source-existing test; if neither defines it, record base and candidate measurements first and obtain acceptance limit before pass/fail.",
-      "negative_and_control": "Use a neighboring valid case and a boundary/invalid case matching the changed branch; verify documented fallback/error and no unrelated state change.",
-      "oracle": "Same fixture/settings/base SHA comparison; Premiere Pro 2026 v26.5.2 local behavioral/export oracle only when relevant. No Adobe screenshots/logs/projects/media collected.",
-      "test_gate": "Each filter is bound to its defining file and package in test_command_map. First run test discovery, then the filter; require named result and executed count > 0. A zero-match filter is not a pass.",
-      "evidence_artifacts": [
-        "Exact full SHA + artifact SHA-256",
-        "Named hosted check URL/log where available",
-        "Fixture recipe/version/hash",
-        "Sanitized app log and FilmCraft-only capture/video",
-        "Base/candidate measurements and settings"
-      ],
-      "undo_reopen": "One undo/redo; verify object positions; save/reopen.",
-      "result": "NOT_RUN",
-      "notes": "",
-      "source_files": [
-        "crates/automation/src/server.rs"
-      ],
-      "source_commit_subject": "fix(mcp): give each screenshot its own temp file",
-      "reviewed_pr_head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "tests_added_by_diff": [
-        "screenshot_paths_are_unique"
-      ],
-      "crate_package": "filmcraft-automation",
-      "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-automation screenshot_paths_are_unique"
-      ],
-      "tests_changed_in_diff": [],
-      "test_command_map": [
-        {
-          "test": "screenshot_paths_are_unique",
-          "defining_file": "crates/automation/src/server.rs",
-          "crate_root": "crates/automation",
-          "package": "filmcraft-automation",
-          "mapping_verified": true,
-          "discovery_command": "cargo test --locked -p filmcraft-automation -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-automation screenshot_paths_are_unique",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/sequence_tabs_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2503,7 +2699,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui icon_view_cuts_long_names_and_shows_them_on_hover",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/project_panel_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2610,7 +2810,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui vertical_workspace_preset_registration_and_switching",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/vertical_workspace_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "vertical_workspace_with_portrait_sequence",
@@ -2620,7 +2824,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui vertical_workspace_with_portrait_sequence",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/vertical_workspace_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "responsive_vertical_layout_at_standard_resolutions",
@@ -2630,7 +2838,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui responsive_vertical_layout_at_standard_resolutions",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/vertical_workspace_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2727,7 +2939,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-project -- --list",
           "filter_command": "cargo test --locked -p filmcraft-project auto_point_default_only_matches_unset_points",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/project/src/lib.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2787,7 +3003,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions stored_arrow_entity_decodes_to_bare_arrow",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/src/vtt.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "other_entities_are_preserved_verbatim",
@@ -2797,7 +3017,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions other_entities_are_preserved_verbatim",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/src/vtt.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "arrow_spellings_converge_on_write_parse_loop",
@@ -2807,7 +3031,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions arrow_spellings_converge_on_write_parse_loop",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/src/vtt.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2856,8 +3084,10 @@
       ],
       "crate_package": "filmcraft-text",
       "hosted_test_commands": [
+        "cargo test --locked -p xtask require_native_font_test",
         "cargo test --locked -p filmcraft-text directory_source_discovers_and_lazily_loads_inter_bold",
-        "cargo test --locked -p filmcraft-text macos_system_fonts_resolve_and_layout"
+        "cargo test --locked -p filmcraft-text macos_system_fonts_resolve_and_layout",
+        "cargo test --locked -p xtask native_font_discovery_rejects_a_successful_zero_test_listing"
       ],
       "tests_changed_in_diff": [],
       "test_command_map": [
@@ -2869,7 +3099,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p xtask -- --list",
           "filter_command": "cargo test --locked -p xtask require_native_font_test",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "xtask/src/main.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "directory_source_discovers_and_lazily_loads_inter_bold",
@@ -2879,7 +3113,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-text -- --list",
           "filter_command": "cargo test --locked -p filmcraft-text directory_source_discovers_and_lazily_loads_inter_bold",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/text/src/fonts.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "macos_system_fonts_resolve_and_layout",
@@ -2889,7 +3127,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-text -- --list",
           "filter_command": "cargo test --locked -p filmcraft-text macos_system_fonts_resolve_and_layout",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/text/src/fonts.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "native_font_discovery_rejects_a_successful_zero_test_listing",
@@ -2899,7 +3141,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p xtask -- --list",
           "filter_command": "cargo test --locked -p xtask native_font_discovery_rejects_a_successful_zero_test_listing",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "xtask/src/main.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -2998,7 +3244,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine video_options_are_enabled_only_with_a_video_clip_selected",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/clip_ops_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3142,7 +3392,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine move_refuses_a_clip_listed_twice",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/locked_clip_edits_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3244,7 +3498,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-gpu -- --list",
           "filter_command": "cargo test --locked -p filmcraft-gpu gpu_effects_match_cpu_exactly_with_fxc",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/gpu/src/fx_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3302,7 +3560,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render lumetri_shadows_do_not_saturate_near_black_pixels",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/effects.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3358,7 +3620,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_sequence_dropped_unnested_on_v2_previews_the_tracks_its_clips_land_on",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/drop_preview_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3404,19 +3670,23 @@
       ],
       "crate_package": "filmcraft-gpu",
       "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-render lumetri_shadow_lift_is_unchanged_at_and_above_the_luma_floor"
+        "cargo test --locked -p filmcraft-render lumetri_shadow_lift_is_unchanged_above_floor_and_continuous_at_floor"
       ],
       "tests_changed_in_diff": [],
       "test_command_map": [
         {
-          "test": "lumetri_shadow_lift_is_unchanged_at_and_above_the_luma_floor",
+          "test": "lumetri_shadow_lift_is_unchanged_above_floor_and_continuous_at_floor",
           "defining_file": "crates/render/src/effects.rs",
           "crate_root": "crates/render",
           "package": "filmcraft-render",
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-render lumetri_shadow_lift_is_unchanged_at_and_above_the_luma_floor",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "filter_command": "cargo test --locked -p filmcraft-render lumetri_shadow_lift_is_unchanged_above_floor_and_continuous_at_floor",
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/effects.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "SELECTIVE"
@@ -3473,7 +3743,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft -- --list",
           "filter_command": "cargo test --locked -p filmcraft eframe_does_not_persist_egui_memory",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "apps/filmcraft/src/main.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3535,7 +3809,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_trimmed_caption_edge_snaps_to_a_cut",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_trim_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "a_moved_caption_snaps_to_another_caption",
@@ -3545,7 +3823,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_moved_caption_snaps_to_another_caption",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_trim_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "a_moved_caption_does_not_snap_to_itself",
@@ -3555,7 +3837,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_moved_caption_does_not_snap_to_itself",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_trim_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3612,7 +3898,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui track_select_forward_skips_a_locked_music_track_and_still_moves_the_rest",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/track_select_drag_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3711,7 +4001,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-tts-text -- --list",
           "filter_command": "cargo test --locked -p filmcraft-tts-text numbers_longer_than_twenty_digits_are_read_fully_digit_by_digit",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/tts-text/src/normalize.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3767,7 +4061,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange aud_line_out_of_range_channel_is_ignored",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/src/edl.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3823,7 +4121,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange zero_frame_duration_falls_back_to_the_default_rate",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/src/fcpxml.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3882,7 +4184,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange aaf_and_omf_start_timecodes_are_bounded",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/tests/it/rates.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -3941,7 +4247,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange nested_copies_stop_at_the_limit",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/src/otio.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "ordinary_nesting_is_not_capped",
@@ -3951,7 +4261,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange ordinary_nesting_is_not_capped",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/src/otio.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4008,7 +4322,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui the_eyedropper_stores_the_colour_it_samples",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/panels/monitor.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4148,7 +4466,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-tts-text -- --list",
           "filter_command": "cargo test --locked -p filmcraft-tts-text currency_followed_by_scale_word_reads_scale_before_unit",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/tts-text/src/normalize.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4203,7 +4525,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-platform --test nvenc_hevc_hdr_export -- --list",
           "filter_command": "cargo test --locked -p filmcraft-platform --test nvenc_hevc_hdr_export the_factory_rejects_mismatched_pictures_and_clamps_hostile_floats",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/platform/tests/nvenc_hevc_hdr_export.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "hardware_lane_status": "NOT_RUN",
@@ -4262,7 +4588,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine saving_without_previews_creates_no_previews_folder",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/previews_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4319,7 +4649,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-codecs -- --list",
           "filter_command": "cargo test --locked -p filmcraft-codecs matroska_undecodable_audio_is_labelled_unsupported",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/codecs/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4376,7 +4710,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui effect_controls_lut_browse_imports_and_sets_in_one_undo_step",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/color_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4433,7 +4771,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions ttml_and_dfxp_write_survive_tick_max",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/tests/ttml_clock_overflow.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4532,7 +4874,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-tts-text -- --list",
           "filter_command": "cargo test --locked -p filmcraft-tts-text money_run_past_the_cap_is_read_digit_by_digit",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/tts-text/src/normalize.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4588,7 +4934,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui vertical_workspace_gives_program_the_full_height",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/dock.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4647,7 +4997,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-codecs -- --list",
           "filter_command": "cargo test --locked -p filmcraft-codecs quicktime_uncompressed_video",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/codecs/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4703,7 +5057,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-color -- --list",
           "filter_command": "cargo test --locked -p filmcraft-color cube_title_with_hash_roundtrips",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/color/src/lut.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4790,7 +5148,9 @@
         "effects_are_indented_under_their_folders"
       ],
       "crate_package": "filmcraft-ui-egui",
-      "hosted_test_commands": [],
+      "hosted_test_commands": [
+        "cargo test --locked -p filmcraft-ui-egui effects_are_indented_under_their_folders"
+      ],
       "tests_changed_in_diff": [],
       "test_command_map": [
         {
@@ -4801,7 +5161,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui effects_are_indented_under_their_folders",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/panels_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4858,7 +5222,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui shift_scrub_snaps_to_a_keyframe_within_reach_only",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/panels/effect_controls_selection.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4915,7 +5283,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine audio_channels_rejects_a_channel_less_call_with_no_item_selected",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/clip_ops_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -4977,7 +5349,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-gpu -- --list",
           "filter_command": "cargo test --locked -p filmcraft-gpu transformed_nested_picture_matches_cpu",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/gpu/src/export_renderer.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "transformed_plain_nests_preserve_the_group_picture",
@@ -4987,7 +5363,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render transformed_plain_nests_preserve_the_group_picture",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/nest_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "a_transformed_nest_keeps_captions_at_its_held_source_time",
@@ -4997,7 +5377,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render a_transformed_nest_keeps_captions_at_its_held_source_time",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/nest_tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5054,7 +5438,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui tool_hints_follow_the_active_shortcut_and_hide_cleared_keys",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/panels/tools.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5155,7 +5543,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_clipped_letter_toggle_draws_only_inside_its_clip",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/src/widgets.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5298,7 +5690,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange fcpxml_has_no_empty_ref_for_a_title",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/tests/it/uncarried_clips.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5388,19 +5784,23 @@
       ],
       "crate_package": "filmcraft-ui-egui",
       "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-ui-egui cancelling_an_audio_drag_restores_the_audio_scroll"
+        "cargo test --locked -p filmcraft-ui-egui cancelling_an_audio_pan_restores_its_own_scroll_for_middle_and_hand"
       ],
       "tests_changed_in_diff": [],
       "test_command_map": [
         {
-          "test": "cancelling_an_audio_drag_restores_the_audio_scroll",
-          "defining_file": "crates/ui-egui/tests/hand_drag_half_2536.rs",
+          "test": "cancelling_an_audio_pan_restores_its_own_scroll_for_middle_and_hand",
+          "defining_file": "crates/ui-egui/tests/it/timeline_middle_pan_ui.rs",
           "crate_root": "crates/ui-egui",
           "package": "filmcraft-ui-egui",
-          "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-ui-egui cancelling_an_audio_drag_restores_the_audio_scroll",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "filter_command": "cargo test --locked -p filmcraft-ui-egui cancelling_an_audio_pan_restores_its_own_scroll_for_middle_and_hand",
+          "mapping_verified": true,
+          "acceptance": "Require named executed test >0; zero match is not a pass.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/timeline_middle_pan_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "SELECTIVE"
@@ -5461,7 +5861,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render luma_vs_sat_highlight_point_leaves_shadows_saturated",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/effects.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "hue_curve_has_no_seam_at_red",
@@ -5471,7 +5875,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render hue_curve_has_no_seam_at_red",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/effects.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "vs_sat_curves_do_not_wrap",
@@ -5481,7 +5889,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-render -- --list",
           "filter_command": "cargo test --locked -p filmcraft-render vs_sat_curves_do_not_wrap",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/render/src/effects.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5582,7 +5994,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-ui-egui -- --list",
           "filter_command": "cargo test --locked -p filmcraft-ui-egui a_dragged_lumetri_curve_point_undoes_and_redoes",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/ui-egui/tests/it/color_ui.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5646,7 +6062,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-codecs -- --list",
           "filter_command": "cargo test --locked -p filmcraft-codecs oracle_lookup_probe",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/codecs/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "oracle_lookup_honors_explicit_ffmpeg_override",
@@ -5656,7 +6076,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-codecs -- --list",
           "filter_command": "cargo test --locked -p filmcraft-codecs oracle_lookup_honors_explicit_ffmpeg_override",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/codecs/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "oracle_lookup_rejects_invalid_ffmpeg_override",
@@ -5666,7 +6090,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-codecs -- --list",
           "filter_command": "cargo test --locked -p filmcraft-codecs oracle_lookup_rejects_invalid_ffmpeg_override",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/codecs/src/tests.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5723,7 +6151,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-speech -- --list",
           "filter_command": "cargo test --locked -p filmcraft-speech byte_table_covers_every_byte_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/speech/src/whisper/tokenizer.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5868,63 +6300,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
           "filter_command": "cargo test --locked -p filmcraft-av1 film_grain_scaling_points_must_increase",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
-        }
-      ],
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2909",
-      "pr": 2909,
-      "title": "security(interchange): reject internal XML DTD subsets",
-      "status": "NOT_RUN",
-      "track": "hosted_smoke + native_visual; Premiere parity where applicable",
-      "focus": "Interchange/codec behavior from commit: security(interchange): reject internal XML DTD subsets",
-      "steps": [
-        "Use a minimal original generated fixture that reaches the affected format/codec path described by “security(interchange): reject internal XML DTD subsets”; record exact input dimensions, timebase, channels, alpha/color metadata and fixture hash.",
-        "Run the named hosted unit/integration test below for the affected parser/encoder, then exercise the same format through FilmCraft import/export UI; inspect output using ffprobe or a small format-aware metadata dump.",
-        "Re-import into a new disposable project and verify the specific field/value/boundary identified by the commit subject, plus duration/frame count and visible playback.",
-        "Compare against a base-SHA output and keep all test logs, exported artifact hash and metadata report."
-      ],
-      "expected_observable": "The format-specific property named by the commit subject is correct on output and survives round-trip where applicable; malformed/out-of-range input is rejected or ignored as specified without crash or unrelated data loss.",
-      "tolerance": "Use assertion/tolerance explicitly present in a test added by this diff or source-existing test; if neither defines it, record base and candidate measurements first and obtain acceptance limit before pass/fail.",
-      "negative_and_control": "Control: known-good fixture in same format. Negative: minimal malformed or boundary fixture matching the changed parser/encoder branch; expect bounded error/fallback and unchanged valid neighboring entries.",
-      "oracle": "Same fixture/settings/base SHA comparison; Premiere Pro 2026 v26.5.2 local behavioral/export oracle only when relevant. No Adobe screenshots/logs/projects/media collected.",
-      "test_gate": "Each filter is bound to its defining file and package in test_command_map. First run test discovery, then the filter; require named result and executed count > 0. A zero-match filter is not a pass.",
-      "evidence_artifacts": [
-        "Exact full SHA + artifact SHA-256",
-        "Named hosted check URL/log where available",
-        "Fixture recipe/version/hash",
-        "Sanitized app log and FilmCraft-only capture/video",
-        "Base/candidate measurements and settings"
-      ],
-      "undo_reopen": "Save/reopen and verify imported references/settings; undo import/edit and confirm timeline restoration.",
-      "result": "NOT_RUN",
-      "notes": "",
-      "source_files": [
-        "crates/interchange/src/xml.rs"
-      ],
-      "source_commit_subject": "security(interchange): reject internal XML DTD subsets",
-      "reviewed_pr_head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "tests_added_by_diff": [
-        "rejects_internal_dtd_entity_expansion"
-      ],
-      "crate_package": "filmcraft-interchange",
-      "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-interchange rejects_internal_dtd_entity_expansion"
-      ],
-      "tests_changed_in_diff": [],
-      "test_command_map": [
-        {
-          "test": "rejects_internal_dtd_entity_expansion",
-          "defining_file": "crates/interchange/src/xml.rs",
-          "crate_root": "crates/interchange",
-          "package": "filmcraft-interchange",
-          "mapping_verified": true,
-          "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-interchange rejects_internal_dtd_entity_expansion",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/av1/src/header.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -5971,132 +6351,6 @@
       ],
       "tests_changed_in_diff": [],
       "test_command_map": [],
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2947",
-      "pr": 2947,
-      "title": "security(fcpxml): stop recursive media resources",
-      "status": "NOT_RUN",
-      "track": "hosted_smoke + native_visual; Premiere parity where applicable",
-      "focus": "Interchange/codec behavior from commit: security(fcpxml): stop recursive media resources",
-      "steps": [
-        "Use a minimal original generated fixture that reaches the affected format/codec path described by “security(fcpxml): stop recursive media resources”; record exact input dimensions, timebase, channels, alpha/color metadata and fixture hash.",
-        "Run the named hosted unit/integration test below for the affected parser/encoder, then exercise the same format through FilmCraft import/export UI; inspect output using ffprobe or a small format-aware metadata dump.",
-        "Re-import into a new disposable project and verify the specific field/value/boundary identified by the commit subject, plus duration/frame count and visible playback.",
-        "Compare against a base-SHA output and keep all test logs, exported artifact hash and metadata report."
-      ],
-      "expected_observable": "The format-specific property named by the commit subject is correct on output and survives round-trip where applicable; malformed/out-of-range input is rejected or ignored as specified without crash or unrelated data loss.",
-      "tolerance": "Use assertion/tolerance explicitly present in a test added by this diff or source-existing test; if neither defines it, record base and candidate measurements first and obtain acceptance limit before pass/fail.",
-      "negative_and_control": "Control: known-good fixture in same format. Negative: minimal malformed or boundary fixture matching the changed parser/encoder branch; expect bounded error/fallback and unchanged valid neighboring entries.",
-      "oracle": "Same fixture/settings/base SHA comparison; Premiere Pro 2026 v26.5.2 local behavioral/export oracle only when relevant. No Adobe screenshots/logs/projects/media collected.",
-      "test_gate": "Each filter is bound to its defining file and package in test_command_map. First run test discovery, then the filter; require named result and executed count > 0. A zero-match filter is not a pass.",
-      "evidence_artifacts": [
-        "Exact full SHA + artifact SHA-256",
-        "Named hosted check URL/log where available",
-        "Fixture recipe/version/hash",
-        "Sanitized app log and FilmCraft-only capture/video",
-        "Base/candidate measurements and settings"
-      ],
-      "undo_reopen": "Save/reopen and verify imported references/settings; undo import/edit and confirm timeline restoration.",
-      "result": "NOT_RUN",
-      "notes": "",
-      "source_files": [
-        "crates/interchange/src/fcpxml.rs",
-        "crates/interchange/tests/fcpxml.rs"
-      ],
-      "source_commit_subject": "security(fcpxml): stop recursive media resources",
-      "reviewed_pr_head": "649b8ac8961232bed9abfbeb1693480057d73588",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "tests_added_by_diff": [
-        "self_referencing_compound_media_is_ignored_without_recursing"
-      ],
-      "crate_package": "filmcraft-interchange",
-      "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-interchange self_referencing_compound_media_is_ignored_without_recursing"
-      ],
-      "tests_changed_in_diff": [],
-      "test_command_map": [
-        {
-          "test": "self_referencing_compound_media_is_ignored_without_recursing",
-          "defining_file": "crates/interchange/tests/fcpxml.rs",
-          "crate_root": "crates/interchange",
-          "package": "filmcraft-interchange",
-          "mapping_verified": true,
-          "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-interchange self_referencing_compound_media_is_ignored_without_recursing",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
-        }
-      ],
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2964",
-      "pr": 2964,
-      "title": "Reject non-increasing AV1 film grain scaling points",
-      "status": "NOT_RUN",
-      "track": "hosted_smoke + native_visual; Premiere parity where applicable",
-      "focus": "Interchange/codec behavior from commit: Reject non-increasing AV1 film grain scaling points",
-      "steps": [
-        "Use a minimal original generated fixture that reaches the affected format/codec path described by “Reject non-increasing AV1 film grain scaling points”; record exact input dimensions, timebase, channels, alpha/color metadata and fixture hash.",
-        "Run the named hosted unit/integration test below for the affected parser/encoder, then exercise the same format through FilmCraft import/export UI; inspect output using ffprobe or a small format-aware metadata dump.",
-        "Re-import into a new disposable project and verify the specific field/value/boundary identified by the commit subject, plus duration/frame count and visible playback.",
-        "Compare against a base-SHA output and keep all test logs, exported artifact hash and metadata report."
-      ],
-      "expected_observable": "The format-specific property named by the commit subject is correct on output and survives round-trip where applicable; malformed/out-of-range input is rejected or ignored as specified without crash or unrelated data loss.",
-      "tolerance": "Use assertion/tolerance explicitly present in a test added by this diff or source-existing test; if neither defines it, record base and candidate measurements first and obtain acceptance limit before pass/fail.",
-      "negative_and_control": "Control: known-good fixture in same format. Negative: minimal malformed or boundary fixture matching the changed parser/encoder branch; expect bounded error/fallback and unchanged valid neighboring entries.",
-      "oracle": "Same fixture/settings/base SHA comparison; Premiere Pro 2026 v26.5.2 local behavioral/export oracle only when relevant. No Adobe screenshots/logs/projects/media collected.",
-      "test_gate": "Each filter is bound to its defining file and package in test_command_map. First run test discovery, then the filter; require named result and executed count > 0. A zero-match filter is not a pass.",
-      "evidence_artifacts": [
-        "Exact full SHA + artifact SHA-256",
-        "Named hosted check URL/log where available",
-        "Fixture recipe/version/hash",
-        "Sanitized app log and FilmCraft-only capture/video",
-        "Base/candidate measurements and settings"
-      ],
-      "undo_reopen": "Save/reopen and verify imported references/settings; undo import/edit and confirm timeline restoration.",
-      "result": "NOT_RUN",
-      "notes": "",
-      "source_files": [
-        "crates/av1/src/grain.rs",
-        "crates/av1/src/header.rs"
-      ],
-      "source_commit_subject": "Reject non-increasing AV1 film grain scaling points",
-      "reviewed_pr_head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "tests_added_by_diff": [
-        "equal_scaling_points_do_not_panic",
-        "film_grain_points_must_strictly_increase"
-      ],
-      "crate_package": "filmcraft-av1",
-      "hosted_test_commands": [
-        "cargo test --locked -p filmcraft-av1 equal_scaling_points_do_not_panic",
-        "cargo test --locked -p filmcraft-av1 film_grain_points_must_strictly_increase"
-      ],
-      "tests_changed_in_diff": [],
-      "test_command_map": [
-        {
-          "test": "equal_scaling_points_do_not_panic",
-          "defining_file": "crates/av1/src/grain.rs",
-          "crate_root": "crates/av1",
-          "package": "filmcraft-av1",
-          "mapping_verified": true,
-          "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-av1 equal_scaling_points_do_not_panic",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
-        },
-        {
-          "test": "film_grain_points_must_strictly_increase",
-          "defining_file": "crates/av1/src/header.rs",
-          "crate_root": "crates/av1",
-          "package": "filmcraft-av1",
-          "mapping_verified": true,
-          "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
-          "filter_command": "cargo test --locked -p filmcraft-av1 film_grain_points_must_strictly_increase",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
-        }
-      ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
     {
@@ -6152,7 +6406,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions an_arrow_in_cue_text_survives_a_round_trip",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/src/vtt.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "other_entities_stay_verbatim_in_cue_text",
@@ -6162,7 +6420,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-captions -- --list",
           "filter_command": "cargo test --locked -p filmcraft-captions other_entities_stay_verbatim_in_cue_text",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/captions/src/vtt.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6219,7 +6481,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-interchange -- --list",
           "filter_command": "cargo test --locked -p filmcraft-interchange a_self_referential_media_imports_instead_of_overflowing_the_stack",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/interchange/tests/it/fcpxml.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6289,7 +6555,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_panic_is_contained_and_reported",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_disconnect_dirty_reports_once",
@@ -6299,7 +6569,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_disconnect_dirty_reports_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_disconnect_clean_reports_once",
@@ -6309,7 +6583,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_disconnect_clean_reports_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_disconnect_preferences_reports_once",
@@ -6319,7 +6597,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_disconnect_preferences_reports_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_disconnect_flush_reports_once",
@@ -6329,7 +6611,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_disconnect_flush_reports_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_disconnect_request_reports_once",
@@ -6339,7 +6625,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_disconnect_request_reports_once",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "worker_remains_available_after_an_ordinary_write_error",
@@ -6349,7 +6639,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-engine -- --list",
           "filter_command": "cargo test --locked -p filmcraft-engine worker_remains_available_after_an_ordinary_write_error",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/engine/src/autosave.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6451,7 +6745,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
           "filter_command": "cargo test --locked -p filmcraft-av1 a_panicking_frame_job_is_an_error_not_a_hang",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/av1/src/decoder.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "the_decoder_recovers_at_the_next_key_frame_after_a_panic",
@@ -6461,7 +6759,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
           "filter_command": "cargo test --locked -p filmcraft-av1 the_decoder_recovers_at_the_next_key_frame_after_a_panic",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/av1/src/decoder.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6562,7 +6864,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-av1 -- --list",
           "filter_command": "cargo test --locked -p filmcraft-av1 dc_only_matches_full_transform",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/av1/src/transform.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6618,7 +6924,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp settled_eq_pairs_channels_like_original_loop",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/eq.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6675,7 +6985,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp delay_read_matches_modulo_indexing",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/util.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "wrap_phase_matches_rem_euclid",
@@ -6685,7 +6999,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp wrap_phase_matches_rem_euclid",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/util.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6739,7 +7057,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp partial_sums_match_sequential_sum_to_rounding",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/oversample.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6795,7 +7117,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp set_param_defers_the_impulse_rebuild_to_process",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/reverbs.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "deferred_rebuild_output_is_identical",
@@ -6805,7 +7131,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp deferred_rebuild_output_is_identical",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/reverbs.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6859,7 +7189,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp bit_identical_to_reference_kernel",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/fft.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -6960,7 +7294,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp flush_is_unchanged_for_finite_values",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/biquad.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "one_non_finite_sample_does_not_poison_filter_state",
@@ -6970,7 +7308,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp one_non_finite_sample_does_not_poison_filter_state",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/biquad.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "effects_recover_after_one_nan_sample",
@@ -6980,7 +7322,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp effects_recover_after_one_nan_sample",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/biquad.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -7034,7 +7380,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp matches_per_bin_reference_to_rounding",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/pitch.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -7093,7 +7443,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp paired_channels_match_separate_ones_to_rounding",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/stft.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_correction": {
@@ -7156,7 +7510,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp every_effect_recovers_after_one_nan_sample",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/biquad.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "phaser_click_remover_binauralizer_recover_from_non_finite_input",
@@ -7166,7 +7524,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp phaser_click_remover_binauralizer_recover_from_non_finite_input",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/biquad.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -7224,7 +7586,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp impulse_change_crossfades_within_one_partition",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/reverbs.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "repeated_changes_before_the_crossfade_fade_from_the_audible_impulse",
@@ -7234,7 +7600,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp repeated_changes_before_the_crossfade_fade_from_the_audible_impulse",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/reverbs.rs"
+          ],
+          "integrated_source_presence_verified": true
         },
         {
           "test": "unchanged_impulse_does_not_crossfade",
@@ -7244,7 +7614,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-audio-dsp -- --list",
           "filter_command": "cargo test --locked -p filmcraft-audio-dsp unchanged_impulse_does_not_crossfade",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/audio-dsp/src/effects/reverbs.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -7300,7 +7674,11 @@
           "mapping_verified": true,
           "discovery_command": "cargo test --locked -p filmcraft-h264 -- --list",
           "filter_command": "cargo test --locked -p filmcraft-h264 equal_power_of_two_weights_are_the_average",
-          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS."
+          "acceptance": "Require named test result and executed count > 0; zero match is NOT_PASS.",
+          "integrated_source_defining_files": [
+            "crates/h264/src/inter.rs"
+          ],
+          "integrated_source_presence_verified": true
         }
       ],
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
@@ -7314,77 +7692,77 @@
       "title": "Chinese localization wrapper coverage",
       "candidate_sha": "9662e2c03219e440a16dc530c86f94a8f7d72158",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 880,
       "title": "AMD AMF hardware encoding",
       "candidate_sha": "b4b948f2a319049a51b762a6da6b561e616ab6af",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1019,
       "title": "Fallible CPU frame access",
       "candidate_sha": "7b1f446400b0c3217f8fb974df32622a6138c096",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1021,
       "title": "Windows shared decoded frames with DX12 compositor",
       "candidate_sha": "7344ff1b0db36499c63b592deb8888c5e81dec49",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1652,
       "title": "Premiere project import behavior reference",
       "candidate_sha": "9b09dfce15cc75549875e89a6792bd1fabfc7083",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2146,
       "title": "macOS wide-gamut window color",
       "candidate_sha": "e3c71865d826ea8af74648c8e3b8ef5923a7aae8",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2308,
       "title": "Tabler icon replacement",
       "candidate_sha": "d3f0ba48dd008fd6baac5d1b879f5931adcae59c",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2344,
       "title": "Turkish interface catalog",
       "candidate_sha": "b1bc3deceaca88655526a1747eb449ba72290342",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2632,
       "title": "Project media folder drag-and-drop",
       "candidate_sha": "f3d5ab664391854223be6b7702bef19a79ce2206",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 3080,
       "title": "Media generator frame, audio-dimension and render-image bounds",
       "candidate_sha": "67831141ec8adbf69b061203b4f025dc8d9b7195",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 3147,
       "title": "Audio DSP public API compatibility",
       "candidate_sha": "6fc5740ec995fb54844e2d3be255b79c61768f76",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     }
   ],
   "excluded_qc_holds": [
@@ -7457,5 +7835,24 @@
       "reason": "Current playback UI tests already clear textures_delta after headless frames. No stale test module imported."
     }
   ],
-  "included_count": 120
+  "included_count": 116,
+  "covered_no_op_integrations": [
+    {
+      "pr": 2033,
+      "reason": "Current private tempfile directory already supplies stronger screenshot isolation; the integration merge made no tree change."
+    },
+    {
+      "pr": 2909,
+      "reason": "The combined tree already preserves plain DOCTYPE support and rejects internal DTD subsets; integration made no tree change."
+    },
+    {
+      "pr": 2947,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    },
+    {
+      "pr": 2964,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    }
+  ],
+  "source_mapping_validation": "All current mapped function names found in the integrated source in the stated package; discovery/execution NOT_RUN due hosted block."
 }

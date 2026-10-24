@@ -68,6 +68,7 @@ with tempfile.TemporaryDirectory(prefix='filmcraft-rc-') as private:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-    # Source logging should not print credentials; redact defensively before uploading.
-    path = out / 'gui.log'
-    path.write_text(path.read_text(errors='replace').replace(token, '[redacted]'))
+            # Redact on failure as well as success, after the child has closed its output.
+            log.flush()
+            path = out / 'gui.log'
+            path.write_text(path.read_text(errors='replace').replace(token, '[redacted]'))

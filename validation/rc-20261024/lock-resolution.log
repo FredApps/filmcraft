@@ -1,0 +1,24 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/storytold/craft-libs`
+     Locking 6 packages to highest Rust 1.95 compatible versions
+    Updating alsa v0.9.1 -> v0.11.0
+    Updating alsa-sys v0.3.1 -> v0.4.0
+    Removing cesu8 v1.1.0
+    Updating coreaudio-rs v0.13.0 -> v0.14.2
+    Updating cpal v0.16.0 -> v0.18.2
+    Removing jni v0.21.1
+    Updating mach2 v0.4.3 -> v0.6.0
+      Adding objc2-avf-audio v0.3.2
+    Removing windows v0.54.0
+    Removing windows-core v0.54.0
+    Removing windows-result v0.1.2
+    Removing windows-sys v0.45.0
+    Removing windows-targets v0.42.2
+    Removing windows_aarch64_gnullvm v0.42.2
+    Removing windows_aarch64_msvc v0.42.2
+    Removing windows_i686_gnu v0.42.2
+    Removing windows_i686_msvc v0.42.2
+    Removing windows_x86_64_gnu v0.42.2
+    Removing windows_x86_64_gnullvm v0.42.2
+    Removing windows_x86_64_msvc v0.42.2
+note: pass `--verbose` to see 74 unchanged dependencies behind latest

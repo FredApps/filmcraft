@@ -1,8 +1,8 @@
 {
   "rc_version": "0.12.0-rc.20261024.1",
   "candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-  "included_count": 120,
-  "eligibility": "120 integrated PR changes, including five selective adaptations. Final SHA supplied by build receipt. All manual acceptance NOT_RUN.",
+  "included_count": 116,
+  "eligibility": "116 integrated changes and ten covered PRs; five selective adaptations; all manual lanes NOT_RUN.",
   "cases": [
     {
       "id": "PR-1041",
@@ -489,20 +489,6 @@
         "https://github.com/storytold/filmcraft/pull/2030#pullrequestreview-5566339999"
       ],
       "reviewed_pr_head": "3753833e0a75b4f5d07f6bfbe01a7b91e37fb7b0",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2033",
-      "pr": 2033,
-      "title": "fix(mcp): give each screenshot its own temp file",
-      "status": "NOT_RUN",
-      "links": [
-        "https://github.com/storytold/filmcraft/pull/2033",
-        "https://github.com/storytold/filmcraft/pull/2033",
-        "https://github.com/storytold/filmcraft/pull/2033/files"
-      ],
-      "reviewed_pr_head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
       "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
@@ -1351,19 +1337,6 @@
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
     {
-      "id": "PR-2909",
-      "pr": 2909,
-      "title": "security(interchange): reject internal XML DTD subsets",
-      "status": "NOT_RUN",
-      "links": [
-        "https://github.com/storytold/filmcraft/pull/2909",
-        "https://github.com/storytold/filmcraft/pull/2909/files"
-      ],
-      "reviewed_pr_head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
       "id": "PR-2924",
       "pr": 2924,
       "title": "AV1: prevent frame-job panics from stranding decoder workers",
@@ -1373,33 +1346,6 @@
         "https://github.com/storytold/filmcraft/pull/2924/files"
       ],
       "reviewed_pr_head": "61184469d96353482c5dd704cba90d253b6ef372",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2947",
-      "pr": 2947,
-      "title": "security(fcpxml): stop recursive media resources",
-      "status": "NOT_RUN",
-      "links": [
-        "https://github.com/storytold/filmcraft/pull/2947",
-        "https://github.com/storytold/filmcraft/pull/2947",
-        "https://github.com/storytold/filmcraft/pull/2947/files"
-      ],
-      "reviewed_pr_head": "649b8ac8961232bed9abfbeb1693480057d73588",
-      "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
-      "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
-    },
-    {
-      "id": "PR-2964",
-      "pr": 2964,
-      "title": "Reject non-increasing AV1 film grain scaling points",
-      "status": "NOT_RUN",
-      "links": [
-        "https://github.com/storytold/filmcraft/pull/2964",
-        "https://github.com/storytold/filmcraft/pull/2964/files"
-      ],
-      "reviewed_pr_head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
       "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
       "integration_disposition": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS"
     },
@@ -1726,77 +1672,77 @@
       "title": "Chinese localization wrapper coverage",
       "candidate_sha": "9662e2c03219e440a16dc530c86f94a8f7d72158",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 880,
       "title": "AMD AMF hardware encoding",
       "candidate_sha": "b4b948f2a319049a51b762a6da6b561e616ab6af",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1019,
       "title": "Fallible CPU frame access",
       "candidate_sha": "7b1f446400b0c3217f8fb974df32622a6138c096",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1021,
       "title": "Windows shared decoded frames with DX12 compositor",
       "candidate_sha": "7344ff1b0db36499c63b592deb8888c5e81dec49",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 1652,
       "title": "Premiere project import behavior reference",
       "candidate_sha": "9b09dfce15cc75549875e89a6792bd1fabfc7083",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2146,
       "title": "macOS wide-gamut window color",
       "candidate_sha": "e3c71865d826ea8af74648c8e3b8ef5923a7aae8",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2308,
       "title": "Tabler icon replacement",
       "candidate_sha": "d3f0ba48dd008fd6baac5d1b879f5931adcae59c",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2344,
       "title": "Turkish interface catalog",
       "candidate_sha": "b1bc3deceaca88655526a1747eb449ba72290342",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 2632,
       "title": "Project media folder drag-and-drop",
       "candidate_sha": "f3d5ab664391854223be6b7702bef19a79ce2206",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 3080,
       "title": "Media generator frame, audio-dimension and render-image bounds",
       "candidate_sha": "67831141ec8adbf69b061203b4f025dc8d9b7195",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     },
     {
       "pr": 3147,
       "title": "Audio DSP public API compatibility",
       "candidate_sha": "6fc5740ec995fb54844e2d3be255b79c61768f76",
       "status": "EXCLUDED_FROM_ACTIVE_RC_ACCEPTANCE",
-      "reason": "Not in finalized 130-PR manifest; consult expanded-integration-plan.json for current disposition."
+      "reason": "Not in final 116-change manifest; consult expanded-integration-plan.json for current disposition."
     }
   ],
   "final_integration_dispositions": [
@@ -1809,6 +1755,24 @@
       "pr": 3077,
       "status": "COVERED",
       "reason": "Current playback UI tests already clear textures_delta after headless frames. No stale test module imported."
+    }
+  ],
+  "covered_no_op_integrations": [
+    {
+      "pr": 2033,
+      "reason": "Current private tempfile directory already supplies stronger screenshot isolation; the integration merge made no tree change."
+    },
+    {
+      "pr": 2909,
+      "reason": "The combined tree already preserves plain DOCTYPE support and rejects internal DTD subsets; integration made no tree change."
+    },
+    {
+      "pr": 2947,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    },
+    {
+      "pr": 2964,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
     }
   ]
 }

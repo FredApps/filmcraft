@@ -4,9 +4,9 @@
   "integrated_candidate_sha": "FROM_FINAL_ARTIFACT_SOURCE_COMMIT_TXT",
   "counts": {
     "screened": 754,
-    "integrated": 120,
+    "integrated": 116,
     "held": 628,
-    "covered": 6
+    "covered": 10
   },
   "included": [
     {
@@ -223,14 +223,6 @@
       "reviewed_pr_head": "3753833e0a75b4f5d07f6bfbe01a7b91e37fb7b0",
       "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
       "notes": []
-    },
-    {
-      "pr": 2033,
-      "reviewed_pr_head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
-      "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
-      "notes": [
-        "Kept RC’s owner-private tempfile directory for screenshot output instead of replacing it with a predictable process-id/counter path from the PR; no weaker temporary-file behavior introduced."
-      ]
     },
     {
       "pr": 2034,
@@ -644,28 +636,8 @@
       "notes": []
     },
     {
-      "pr": 2909,
-      "reviewed_pr_head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
-      "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
-      "notes": [
-        "Kept internal XML DTD subset rejection and entity-expansion test along with RC attribute-whitespace roundtrip test."
-      ]
-    },
-    {
       "pr": 2924,
       "reviewed_pr_head": "61184469d96353482c5dd704cba90d253b6ef372",
-      "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
-      "notes": []
-    },
-    {
-      "pr": 2947,
-      "reviewed_pr_head": "649b8ac8961232bed9abfbeb1693480057d73588",
-      "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
-      "notes": []
-    },
-    {
-      "pr": 2964,
-      "reviewed_pr_head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
       "status": "FULL_ANCESTRY_WITH_INTEGRATION_RESOLUTIONS",
       "notes": []
     },
@@ -9308,7 +9280,77 @@
       "review_basis": "priorreview/currentdiff",
       "stale_review": true,
       "dependencies": []
+    },
+    {
+      "number": 2033,
+      "title": "fix(mcp): give each screenshot its own temp file",
+      "head": "7186f80463d9f6e63f94ed44cbab84c6d8a98339",
+      "decision": "COVERED",
+      "reason": "Current private tempfile directory already supplies stronger screenshot isolation; the integration merge made no tree change.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2033",
+        "https://github.com/storytold/filmcraft/pull/2033/files"
+      ],
+      "review_basis": "Actual current GitHub diff inspected: atomic process-local counter makes screenshot temp paths unique; focused 100-path uniqueness test; narrow race fix.",
+      "stale_review": true,
+      "dependencies": []
+    },
+    {
+      "number": 2909,
+      "head": "5652966b1aefe750aff3f26f83cc0f551d13a211",
+      "decision": "COVERED",
+      "reason": "The combined tree already preserves plain DOCTYPE support and rejects internal DTD subsets; integration made no tree change.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2909/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": []
+    },
+    {
+      "number": 2947,
+      "title": "security(fcpxml): stop recursive media resources",
+      "head": "649b8ac8961232bed9abfbeb1693480057d73588",
+      "decision": "COVERED",
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2947",
+        "https://github.com/storytold/filmcraft/pull/2947/files"
+      ],
+      "review_basis": "Actual diff inspected: per-import active-resource HashSet breaks recursive FCPXML resource cycles and warns; focused self-reference test.",
+      "stale_review": true,
+      "dependencies": []
+    },
+    {
+      "number": 2964,
+      "head": "f9bf9908247ff8a19c3a6fe898a44e99038733f0",
+      "decision": "COVERED",
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change.",
+      "evidence_urls": [
+        "https://github.com/storytold/filmcraft/pull/2964/files"
+      ],
+      "review_basis": "currentdiff",
+      "stale_review": false,
+      "dependencies": []
     }
   ],
-  "history_note": "Held heads #1400/#2826/#2830/#3145/#3152 remain in Git history with targeted reversals. #2951 was a no-op integration; its obsolete demux was not restored. Head ancestry alone is not proof a held change ships."
+  "history_note": "Held heads #1400/#2826/#2830/#3145/#3152 remain in Git history with targeted reversals. #2951 was a no-op integration; its obsolete demux was not restored. Head ancestry alone is not proof a held change ships.",
+  "no_op_audit": [
+    {
+      "pr": 2033,
+      "reason": "Current private tempfile directory already supplies stronger screenshot isolation; the integration merge made no tree change."
+    },
+    {
+      "pr": 2909,
+      "reason": "The combined tree already preserves plain DOCTYPE support and rejects internal DTD subsets; integration made no tree change."
+    },
+    {
+      "pr": 2947,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    },
+    {
+      "pr": 2964,
+      "reason": "This reviewed change is already present in the combined tree through earlier integration; its merge made no tree change."
+    }
+  ]
 }
