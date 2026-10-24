@@ -44,6 +44,12 @@ for path in (out / 'validation').rglob('*'):
         contents = contents.replace('PENDING_ROOT_FINAL_SHA', sha)
         contents = contents.replace('RECORD_EXACT_BASE_SHA', 'bfc23840b603e69c782302c6ed04d4a9f6ec26a8')
         path.write_text(contents, encoding='utf8')
+# Keep the source report historical while binding the artifact's report to this attempt.
+with (out / 'validation' / 'RC-REPORT.md').open('a', encoding='utf8') as report:
+    report.write('\n## Exact hosted build attempt\n\n')
+    report.write(f"Source: `{sha}`. Windows run: https://github.com/FredApps/filmcraft/actions/runs/{receipt['workflow_run']}.\n\n")
+    report.write(f"Job status before receipt/upload: `{receipt['job_status_before_receipt']}`. The entire workflow must finish successfully before this artifact qualifies as the RC.\n\n")
+    report.write('Native graphical, hardware and Premiere parity cases remain NOT_RUN. See build-receipt.json, logs and SHA256SUMS.txt for exact evidence.\n')
 for name in ['LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE']:
     shutil.copy2(root / name, out / name)
 (out / 'source-commit.txt').write_text(sha + '\n')
@@ -52,8 +58,7 @@ for name in ['LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE']:
 (out / 'README-RC.txt').write_text(
     'FilmCraft community release candidate. Not an official release.\n'
     'Only artifacts from an entirely successful run qualify as the RC build.\n'
-    'Windows packages are unsigned; macOS packages are ad-hoc signed, not notarized.\n'
-    'Linux AppImage/tar require glibc 2.35+ and system graphics/windowing libraries.\n'
+    'This build produces Windows x64 packages only. Windows packages are unsigned.\n'
     'Exact source, build evidence, package hashes and acceptance protocol are included.\n'
     'Native graphical and Premiere parity acceptance has not been executed by this build.\n')
 lines = []

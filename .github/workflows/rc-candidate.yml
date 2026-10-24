@@ -55,6 +55,25 @@
           "cache-workspace-crates": true
           "save-if": true
       -
+        "name": "Install pinned WARP for hosted GPU tests"
+        "run": |
+          # wgpu CI also installs WARP beside test executables on windows-2022.
+          # This runtime is for hosted tests only; release packages contain no WARP DLL.
+          New-Item -ItemType Directory -Force logs | Out-Null
+          $warpArchive = Join-Path $env:RUNNER_TEMP 'warp-1.0.20.zip'
+          Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.warp/1.0.20/microsoft.direct3d.warp.1.0.20.nupkg' -OutFile $warpArchive
+          $warpHash = 'e5fe5de661ce98b58ef9cfb736e73c0a7a2623d3bbf5f14839b2d55566d87e40'
+          if ((Get-FileHash -LiteralPath $warpArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $warpHash) { throw 'WARP archive checksum mismatch' }
+          $warpRoot = Join-Path $env:RUNNER_TEMP 'warp-1.0.20'
+          Expand-Archive -LiteralPath $warpArchive -DestinationPath $warpRoot
+          $warpDll = Join-Path $warpRoot 'build/native/bin/x64/d3d10warp.dll'
+          foreach ($destination in @('target/debug', 'target/debug/deps')) {
+            New-Item -ItemType Directory -Force $destination | Out-Null
+            Copy-Item -LiteralPath $warpDll -Destination $destination
+          }
+          "$warpHash  microsoft.direct3d.warp.1.0.20.nupkg" | Set-Content logs/warp-sha256.log
+          (Get-Item -LiteralPath $warpDll).VersionInfo | Format-List FileVersion,ProductVersion | Out-File logs/warp-version.log
+      -
         "uses": "actions/setup-dotnet@v4"
         "with":
           "dotnet-version": "8.0.x"
@@ -105,12 +124,13 @@
           if ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }
       -
         "name": "GPU readback diagnostics"
-        "continue-on-error": true
         "run": |
           cargo test --locked -p filmcraft-gpu --lib -- --nocapture 2>&1 | Tee-Object logs/gpu-diagnostic.log
-          if ($LASTEXITCODE -ne 0) { throw 'GPU diagnostics failed; full suite remains required' }
+          if ($LASTEXITCODE -ne 0) { throw 'GPU readback and parity tests failed' }
+          if (Select-String -Path logs/gpu-diagnostic.log -Pattern 'SKIPPED|no (GPU|DX12) adapter; skipping' -Quiet) { throw 'Required hosted GPU coverage was skipped' }
       -
         "name": "Publish GPU diagnostics"
+        "if": "always()"
         "uses": "actions/upload-artifact@v4"
         "with":
           "name": "filmcraft-rc-gpu-diagnostics"
