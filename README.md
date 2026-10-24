@@ -1,9 +1,9 @@
+> **Community release candidate — 0.12.0-rc.20261024.1**
+> This is a validation build of a fork, based on FilmCraft by the ArtCraft team. It is not an official release or a claim of Premiere parity. Restricted ArtCraft brand artwork is omitted from this distribution; original copyright and license notices are retained. See `validation/rc-20261024/` for the exact included/excluded PR manifest and acceptance protocol.
+
 <p align="center">
   <a href="https://getartcraft.com/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/artcraft-logo-white.svg">
-      <img alt="ArtCraft" src="docs/brand/artcraft-logo.svg" width="200">
-    </picture>
+    <strong>FilmCraft community RC</strong>
   </a>
 </p>
 
@@ -472,7 +472,7 @@ Forks and modified versions must remove them.
 <br>
 
 <p align="center">
-  <a href="https://getartcraft.com/"><img alt="ArtCraft" src="docs/brand/artcraft-mark.svg" width="28"></a><br>
+  Based on FilmCraft<br>
   <sub>Made by the <a href="https://getartcraft.com/">ArtCraft</a> team and community.</sub>
 </p>
 
