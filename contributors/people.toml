@@ -93,3 +93,6 @@ display_name = "Jason Brashear"
 real_name = "Will Bunker"
 display_name = "Will Bunker"
 sync_github_name = false
+
+[people.aloysiocg]
+sync_github_name = true
