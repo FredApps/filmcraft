@@ -621,6 +621,17 @@ fn within_unit(v: [f32; 3], hdr: bool, f: impl Fn([f32; 3]) -> [f32; 3]) -> [f32
     o.map(|q| q * m)
 }
 
+/// Encoded luma below which Lumetri's shadow/highlight lift holds chroma gain and adds the
+/// remaining lift equally to the channels, avoiding amplification of near-black color casts.
+pub(crate) const LIFT_LUMA_FLOOR: f32 = 0.02;
+
+/// Return the per-channel gain and neutral addition that move luma `l` to `nl`.
+#[inline]
+pub(crate) fn lift_scale(l: f32, nl: f32) -> (f32, f32) {
+    let k = if l > 1e-5 { (nl / l).min(1.0 + (nl - l).max(0.0) / LIFT_LUMA_FLOOR) } else { 1.0 };
+    (k, nl - l.max(0.0) * k)
+}
+
 fn lumetri(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
     let (basic_on, creative_on, vignette_on) = (on(e, "basic_on"), on(e, "creative_on"), on(e, "vignette_on"));
     let input_lut = if basic_on { crate::luts::resolve(cx.project, text(e, "input_lut")) } else { None };
@@ -667,12 +678,8 @@ fn lumetri(img: &mut Image, e: &EffectInstance, cx: &FxCtx) {
         let ws = (1.0 - l).clamp(0.0, 1.0).powi(3);
         let whl = l.clamp(0.0, 1.0).powi(3);
         let nl = (l + sh * 0.35 * ws + hl * 0.35 * whl).max(0.0);
-        if l > 1e-5 {
-            // cap the gain near black and add the rest as a neutral lift, so a slight colour cast
-            // in an almost black pixel is not multiplied into saturated colour (#2094)
-            let k = (nl / l).min(crate::gpufx::LUMETRI_TONE_MAX_GAIN);
-            v = v.map(|q| q * k + (nl - l * k));
-        }
+        let (k, add) = lift_scale(l, nl);
+        v = v.map(|q| q * k + add);
         // contrast: smooth S-curve around mid grey (HDR: over 0 … HDR White; speculars above it
         // keep their distance from white)
         if contrast.abs() > 1e-4 {
@@ -1023,6 +1030,44 @@ mod tests {
         for (a, b) in img.px.iter().zip(&before.px) {
             assert!((a - b).abs() < 2e-3, "{a} {b}");
         }
+    }
+
+    #[test]
+    fn lumetri_shadow_lift_is_unchanged_above_floor_and_continuous_at_floor() {
+        let mut e = find_effect("lumetri").unwrap().instance();
+        e.params.get_mut("shadows").unwrap().value = ParamValue::Float(50.0);
+        let lit = dec([0.12, 0.09, 0.055]);
+        let mut img = Image::new(1, 1);
+        img.px[0..4].copy_from_slice(&[lit[0], lit[1], lit[2], 1.0]);
+        apply(&mut img, &e, &cx());
+        let out = img.get(0, 0);
+        let v = enc(lit);
+        let l = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+        let nl = l + 0.5 * 0.35 * (1.0 - l).powi(3);
+        let (k, add) = lift_scale(l, nl);
+        assert!((k - nl / l).abs() < 1e-6 && add.abs() < 1e-6);
+        let expected = dec([v[0] * k, v[1] * k, v[2] * k]);
+        for c in 0..3 {
+            assert!((out[c] - expected[c]).abs() < 2e-3, "channel {c}: {out:?} vs {expected:?}");
+        }
+        let (k_at, add_at) = lift_scale(LIFT_LUMA_FLOOR, LIFT_LUMA_FLOOR + 0.1);
+        let (k_under, add_under) = lift_scale(LIFT_LUMA_FLOOR - 1e-4, LIFT_LUMA_FLOOR - 1e-4 + 0.1);
+        assert!((k_at - k_under).abs() < 0.05 && (add_at - add_under).abs() < 1e-3);
+    }
+
+    #[test]
+    fn lumetri_near_black_chroma_bleed_lifts_without_a_blue_speck_or_black_step() {
+        let mut e = find_effect("lumetri").unwrap().instance();
+        e.params.get_mut("shadows").unwrap().value = ParamValue::Float(8.0);
+        let mut img = Image::new(3, 1);
+        img.px[0..4].copy_from_slice(&[-0.001, 0.0006, 0.0018, 1.0]);
+        img.px[4..8].copy_from_slice(&[0.0, 0.0, 0.0, 1.0]);
+        img.px[8..12].copy_from_slice(&[0.001, 0.001, 0.001, 1.0]);
+        apply(&mut img, &e, &cx());
+        let (bleed, black, near) = (img.get(0, 0), img.get(1, 0), img.get(2, 0));
+        assert!(bleed[2] - bleed[0].max(bleed[1]) < 0.01, "blue speck: {bleed:?}");
+        assert!(black[0] > 0.001 && (black[0] - black[1]).abs() < 1e-5, "black not lifted neutrally: {black:?}");
+        assert!((near[0] - black[0]).abs() < 0.002, "step between black {black:?} and near-black {near:?}");
     }
 
     /// Luma vs Sat pulling the highlights to grey leaves a saturated dark colour alone: the

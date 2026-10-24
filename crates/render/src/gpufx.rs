@@ -14,7 +14,7 @@ use filmcraft_geom::Affine;
 use filmcraft_project::EffectInstance;
 use rayon::prelude::*;
 
-use crate::effects::{FxCtx, b, choice, color, dec, enc, f, gaussian_boxes, grade_space, on, point, text};
+use crate::effects::{FxCtx, b, choice, color, dec, enc, f, gaussian_boxes, grade_space, lift_scale, on, point, text};
 use crate::image::Image;
 
 /// A bilinear resample of the working image through an affine map (`Image::transformed` at a
@@ -198,10 +198,6 @@ pub enum FxOp {
         gpu_capable: bool,
     },
 }
-
-/// Largest per-channel gain of the Lumetri Highlights / Shadows luma lift; the part of the lift
-/// beyond it is added neutrally so near-black colour casts are not amplified (`fx.wgsl` uses 4.0).
-pub const LUMETRI_TONE_MAX_GAIN: f32 = 4.0;
 
 /// Effect ids [`FxOp::eval`] understands (the GPU-capable standard effects).
 pub const GPU_EFFECTS: &[&str] = &[
@@ -966,11 +962,8 @@ impl FxOp {
                     let ws = (1.0 - l).clamp(0.0, 1.0).powi(3);
                     let whl = l.clamp(0.0, 1.0).powi(3);
                     let nl = (l + sh * 0.35 * ws + hl * 0.35 * whl).max(0.0);
-                    if l > 1e-5 {
-                        // cap the gain near black, the rest is a neutral lift (#2094)
-                        let k = (nl / l).min(LUMETRI_TONE_MAX_GAIN);
-                        v = v.map(|q| q * k + (nl - l * k));
-                    }
+                    let (k, add) = lift_scale(l, nl);
+                    v = v.map(|q| q * k + add);
                     // contrast: smooth S-curve around mid grey
                     if contrast.abs() > 1e-4 {
                         let k = 1.0 + contrast;
