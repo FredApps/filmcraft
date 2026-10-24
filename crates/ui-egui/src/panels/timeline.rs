@@ -2973,8 +2973,10 @@ fn interact(app: &mut FilmcraftApp, ui: &mut egui::Ui, seq: &Sequence, layout: &
                     // #1104: dropped past the last track, the clips go onto a new one; moved between
                     // tracks, a linked partner of the other kind stays on its own track (#1484)
                     let to = |tid| new_track.map_or_else(|| json!(move_dest(seq, start_track, tid, track_delta).unwrap_or(tid).0), |_| json!("new"));
+                    let mut seen = std::collections::HashSet::new();
                     let moves: Vec<Value> = clips
                         .iter()
+                        .filter(|c| seen.insert(**c))
                         .filter_map(|c| seq.find_item(*c).map(|(tid, it)| json!({"clip": c.0, "track": to(tid), "time": (it.start + offset).max(Tick::ZERO).0})))
                         .collect();
                     // Option held while dropping copies (Premiere: Option-drag duplicates)
