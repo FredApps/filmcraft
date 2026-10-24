@@ -1025,18 +1025,6 @@ pub(crate) fn ticks_to_units(t: Tick, num: i64, den: i64) -> (i64, bool) {
     (n.clamp(i64::MIN as i128, i64::MAX as i128) as i64, r == 0)
 }
 
-<<<<<<< HEAD
-#[cfg(test)]
-mod path_tests {
-    use super::safe_path_component;
-
-    #[test]
-    fn generated_embedded_audio_folder_is_one_safe_component() {
-        for (input, expected) in [(r"..\escape", ".._escape"), ("../escape", ".._escape"), ("..", "Imported"), ("", "Imported")] {
-            assert_eq!(safe_path_component(input), expected, "{input:?}");
-        }
-    }
-=======
 /// The name an exported audio track gets: the track's own name (what an editor called it, e.g.
 /// a role such as `Dialogue.Dialogue-1`, which is what a sound editor's DAW shows), else `A<n>`;
 /// a track broken out to mono gets its channel after it (`L` / `R`, the 5.1 names, or a number).
@@ -1050,5 +1038,17 @@ fn audio_track_name(name: &str, n: u32, channels: u32, channel: Option<u32>) -> 
         (_, k) => (k + 1).to_string(),
     };
     format!("{base} {label}")
->>>>>>> refs/codex/rc/2845
 }
+
+#[cfg(test)]
+mod path_tests {
+    use super::safe_path_component;
+
+    #[test]
+    fn generated_embedded_audio_folder_is_one_safe_component() {
+        for (input, expected) in [(r"..\escape", ".._escape"), ("../escape", ".._escape"), ("..", "Imported"), ("", "Imported")] {
+            assert_eq!(safe_path_component(input), expected, "{input:?}");
+        }
+    }
+}
+
