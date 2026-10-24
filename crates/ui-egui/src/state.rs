@@ -484,6 +484,10 @@ pub struct UiState {
     /// The status text that is an error, while `status` still holds it: shown more prominently
     /// and kept longer (see [`UiState::fail`]).
     pub status_error: Option<String>,
+    /// The job whose progress window was closed: it stays closed until another job runs.
+    pub progress_window_hidden: Option<u64>,
+    /// A job whose progress window was asked for from the status bar, whatever the preference.
+    pub progress_window_asked: Option<u64>,
     /// A link the web browser couldn't open, shown with its address until closed
     /// ([`crate::links::show_failed`]).
     #[serde(default)]
@@ -1015,6 +1019,8 @@ impl Default for UiState {
             show_scopes: false,
             status: String::new(),
             status_error: None,
+            progress_window_hidden: None,
+            progress_window_asked: None,
             failed_link: None,
             eyedropper: None,
             keyframe_selection: Vec::new(),

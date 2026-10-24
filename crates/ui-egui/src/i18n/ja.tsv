@@ -3626,3 +3626,4 @@
 	AV1 needs a hardware encoder; none was found on this machine, and FilmCraft has no software AV1 encoder yet.	AV1 にはハードウェアエンコーダーが必要です。このマシンには見つからず、FilmCraft にはまだソフトウェアの AV1 エンコーダーがありません。
 	Add Track	トラックを追加
 	Delete Track	トラックを削除
+	Show a progress window while exporting or rendering	書き出しまたはレンダリング中に進行状況ウィンドウを表示
