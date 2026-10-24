@@ -344,9 +344,26 @@ pub fn korean_font_available() -> bool {
     crate::cjk::korean_available()
 }
 
+/// Whether the interface can show Lao: `theme::install` adds an installed system Lao face
+/// (Noto Sans Lao, Lao UI, Phetsarath OT, etc., see `cjk.rs`) when there is one; none is bundled.
+pub fn lao_font_available() -> bool {
+    crate::cjk::lao_available()
+}
+
+/// Explain why a saved or requested Lao interface language cannot be used.
+pub(crate) fn lao_font_missing_message(available: bool) -> Option<&'static str> {
+    (!available).then_some("no Lao font is installed on this system (for example Noto Sans Lao or Phetsarath OT); the interface stays in English")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lao_language_requires_a_system_font() {
+        assert!(lao_font_missing_message(false).is_some());
+        assert!(lao_font_missing_message(true).is_none());
+    }
 
     /// The catalog file of a language (none for English, the source language).
     fn catalog_text(l: Language) -> Option<&'static str> {

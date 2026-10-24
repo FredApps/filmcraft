@@ -583,10 +583,17 @@ impl FilmcraftApp {
         let frames = Arc::new(FrameServer::new(session.media.clone(), session.services.clone(), session.previews.clone(), FrameServer::default_workers()));
         let workspaces =
             session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| dock::WorkspacePrefs::load(&d.join(dock::WORKSPACES_FILE))).unwrap_or_default();
-        let language = i18n::Language::parse(&session.prefs.general.interface_language).unwrap_or_default();
+        let saved_language = i18n::Language::parse(&session.prefs.general.interface_language).unwrap_or_default();
+        let lao_missing = saved_language == i18n::Language::Lo
+            && i18n::lao_font_missing_message(i18n::lao_font_available()).is_some();
+        let language = if lao_missing { i18n::Language::En } else { saved_language };
         Self {
             session,
-            ui: UiState { language, ..UiState::default() },
+            ui: UiState {
+                language,
+                status: if lao_missing { i18n::lao_font_missing_message(false).unwrap_or_default().into() } else { String::new() },
+                ..UiState::default()
+            },
             tokens: Tokens::for_kind(ThemeKind::Dark),
             frames,
             playback: Playback { speed: 1.0, ..Default::default() },
@@ -787,6 +794,9 @@ impl FilmcraftApp {
             } else if language == i18n::Language::Ko && !i18n::korean_font_available() {
                 self.ui.language = i18n::Language::En;
                 self.ui.status = tl!("no Korean font is installed on this system; the interface stays in English").into();
+            } else if language == i18n::Language::Lo && !i18n::lao_font_available() {
+                self.ui.language = i18n::Language::En;
+                self.ui.status = tl!("no Lao font is installed on this system; the interface stays in English").into();
             } else {
                 self.ui.language = language;
             }
@@ -2306,13 +2316,19 @@ impl eframe::App for FilmcraftApp {
             theme::install(ctx, &self.tokens);
             // theme::install replaces the fonts: add the system Japanese font back (or fall back to
             // English when a saved Japanese setting meets a system without one)
-            // (likewise Chinese without a Chinese face, Korean without a Hangul one)
+            // (likewise Chinese, Korean, and Lao when their system fallback face is unavailable)
             let japanese_missing = self.ui.language == i18n::Language::Ja && !i18n::install_japanese_font(ctx);
+            let lao_missing = self.ui.language == i18n::Language::Lo && !i18n::lao_font_available();
             if japanese_missing
                 || (self.ui.language == i18n::Language::ZhCn && !i18n::chinese_font_available())
                 || (self.ui.language == i18n::Language::Ko && !i18n::korean_font_available())
+                || lao_missing
             {
                 self.ui.language = i18n::Language::En;
+                if lao_missing {
+                    let message = i18n::lao_font_missing_message(false).unwrap_or_default();
+                    self.ui.status = message.into();
+                }
             }
             self.styled = true;
             ctx.request_repaint();
