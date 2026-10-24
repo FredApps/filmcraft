@@ -3607,3 +3607,7 @@
 	Show Audio Names	显示音频名称
 	Video Names	视频名称
 	Audio Names	音频名称
+	Group Clips into Cameras	按摄像机分组剪辑
+	Camera Label	摄像机标签
+	Leave out clips without timecode	排除没有时间码的剪辑
+	No timecode: {names}	无时间码：{names}

@@ -3589,3 +3589,7 @@
 	Show Audio Names	Tampilkan Nama Audio
 	Video Names	Nama Video
 	Audio Names	Nama Audio
+	Group Clips into Cameras	Kelompokkan Klip ke Kamera
+	Camera Label	Label Kamera
+	Leave out clips without timecode	Lewati klip tanpa kode waktu
+	No timecode: {names}	Tanpa kode waktu: {names}

@@ -3614,3 +3614,7 @@
 	Show Audio Names	Mostra nomi audio
 	Video Names	Nomi video
 	Audio Names	Nomi audio
+	Group Clips into Cameras	Raggruppa clip per videocamera
+	Camera Label	Etichetta videocamera
+	Leave out clips without timecode	Escludi le clip senza timecode
+	No timecode: {names}	Senza timecode: {names}

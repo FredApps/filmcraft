@@ -3609,3 +3609,7 @@
 	Show Audio Names	오디오 이름 표시
 	Video Names	비디오 이름
 	Audio Names	오디오 이름
+	Group Clips into Cameras	클립을 카메라별로 묶기
+	Camera Label	카메라 레이블
+	Leave out clips without timecode	타임코드가 없는 클립 제외
+	No timecode: {names}	타임코드 없음: {names}

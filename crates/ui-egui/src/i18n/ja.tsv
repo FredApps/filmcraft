@@ -3631,3 +3631,7 @@
 	Show Audio Names	オーディオ名を表示
 	Video Names	ビデオ名
 	Audio Names	オーディオ名
+	Group Clips into Cameras	クリップをカメラごとにまとめる
+	Camera Label	カメララベル
+	Leave out clips without timecode	タイムコードのないクリップを除外
+	No timecode: {names}	タイムコードなし: {names}
