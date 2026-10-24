@@ -406,6 +406,13 @@ pub struct EditorState {
     /// places whichever was copied last.
     #[serde(skip)]
     pub caption_clipboard: Vec<(usize, filmcraft_project::Caption)>,
+    /// The frontend's panel layout, stored in the project file's view when the project is saved
+    /// (#2258). The frontend keeps it up to date; the engine only carries it.
+    #[serde(skip)]
+    pub workspace_layout: Option<serde_json::Value>,
+    /// The layout the opened project file was saved with, for the frontend to take (#2258).
+    #[serde(skip)]
+    pub opened_workspace_layout: Option<serde_json::Value>,
     /// The last Edit ▸ Find… (Find Next continues it).
     #[serde(default)]
     pub find: Option<project_tools::FindState>,
@@ -843,6 +850,7 @@ impl Session {
             active_sequence: self.state.active_sequence.filter(is_seq),
             sequences: self.state.timeline_views.iter().filter(|(id, _)| is_seq(id)).map(|(id, v)| (*id, *v)).collect(),
             playheads: self.state.playheads.iter().filter(|(id, _)| is_seq(id)).map(|(id, t)| (*id, *t)).collect(),
+            workspace: self.state.workspace_layout.clone(),
         }
     }
 
