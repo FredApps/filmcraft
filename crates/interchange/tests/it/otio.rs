@@ -340,6 +340,71 @@ fn review_generator_preset_labels_survive_otio_round_trip() {
 }
 
 #[test]
+fn review_distinct_identical_generators_keep_identity_and_shared_references() {
+    let mut p = Project::new("Generator identity");
+    let s = sequence(&mut p, "Main", FrameRate::FPS_25, false);
+    let mut pairs = Vec::new();
+    for (index, kind) in [Generator::BlackVideo, Generator::BarsAndTone, Generator::ColorMatte { color: [0.2, 0.4, 0.6, 1.0] }].into_iter().enumerate() {
+        let first = generator(&mut p, &format!("First {index}"), kind.clone());
+        let second = generator(&mut p, &format!("Second {index}"), kind);
+        p.item_mut(first).unwrap().label = Label::Teal;
+        let item = p.item_mut(second).unwrap();
+        item.label = Label::Mango;
+        item.custom_label_color = filmcraft_project::HexColor::parse("#123456");
+        for (offset, id) in [first, second, first].into_iter().enumerate() {
+            clip(&mut p, s, TrackKind::Video, 0, id, (index * 3 + offset) as i64 * 25, 25, 0);
+        }
+        pairs.push((first, second));
+    }
+    let (imp, _, _) = roundtrip(&p, s, Format::Otio, &ExportOptions::default());
+    let clips = &imp.project.sequence(only_seq(&imp)).unwrap().video_tracks[0].items;
+    assert_eq!(clips.len(), 9);
+    assert_eq!(imp.project.items.values().filter(|i| i.as_media().is_some()).count(), 6);
+    for ((first, second), group) in pairs.into_iter().zip(clips.as_chunks::<3>().0) {
+        assert_ne!(group[0].item, group[1].item, "distinct source items must remain distinct");
+        assert_eq!(group[0].item, group[2].item, "repeated source references must remain shared");
+        for (original_id, clip) in [(first, &group[0]), (second, &group[1])] {
+            let original = p.item(original_id).unwrap();
+            let restored = imp.project.item(clip.item).unwrap();
+            assert_eq!(restored.name, original.name);
+            assert_eq!(restored.label, original.label);
+            assert_eq!(restored.custom_label_color, original.custom_label_color);
+            assert_eq!(restored.as_media().unwrap().media, original.as_media().unwrap().media);
+        }
+    }
+}
+
+#[test]
+fn review_generators_without_valid_item_ids_keep_legacy_sharing() {
+    use serde_json::json;
+    let mut p = Project::new("Legacy generators");
+    let s = sequence(&mut p, "Main", FrameRate::FPS_25, false);
+    let first = generator(&mut p, "Black", Generator::BlackVideo);
+    let second = generator(&mut p, "Other Black", Generator::BlackVideo);
+    let bars = generator(&mut p, "Bars", Generator::BarsAndTone);
+    for (offset, id) in [first, second, first, bars].into_iter().enumerate() {
+        clip(&mut p, s, TrackKind::Video, 0, id, offset as i64 * 25, 25, 0);
+    }
+    let (bytes, _) = filmcraft_interchange::export(&p, s, Format::Otio, &ExportOptions::default()).unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    for identity in [None, Some(json!(null)), Some(json!(-1)), Some(json!("invalid")), Some(json!({})), Some(json!([]))] {
+        let mut doc = doc.clone();
+        for clip in doc["tracks"]["children"][0]["children"].as_array_mut().unwrap() {
+            let meta = clip["media_references"]["DEFAULT_MEDIA"]["metadata"]["filmcraft"].as_object_mut().unwrap();
+            meta.remove("item");
+            if let Some(ref identity) = identity {
+                meta.insert("item".into(), identity.clone());
+            }
+        }
+        let (imp, _) = import(&serde_json::to_vec(&doc).unwrap(), Format::Otio, None).unwrap();
+        let clips = &imp.project.sequence(only_seq(&imp)).unwrap().video_tracks[0].items;
+        assert_eq!(clips[0].item, clips[1].item);
+        assert_eq!(clips[0].item, clips[2].item);
+        assert_ne!(clips[0].item, clips[3].item);
+    }
+}
+
+#[test]
 fn review_collection_palettes_union_distinct_colors_and_preserve_first_names() {
     use filmcraft_project::HexColor;
     use serde_json::json;

@@ -759,7 +759,11 @@ impl Imp<'_, '_> {
                         }
                     }
                 });
-                let key = format!("gen:{}", serde_json::to_string(&g).unwrap_or_default());
+                // Equal generator content can belong to distinct project items; repeated item IDs share media.
+                let key = match meta.and_then(|m| m.get("item")).and_then(Value::as_u64) {
+                    Some(item) => format!("gen:item:{item}"),
+                    None => format!("gen:{}", serde_json::to_string(&g).unwrap_or_default()),
+                };
                 let existed = self.b.find_media(&key);
                 let id = self.b.generator_media(&key, if name.is_empty() { "Generator" } else { &name }, g, &spec, None);
                 if existed.is_none() {
