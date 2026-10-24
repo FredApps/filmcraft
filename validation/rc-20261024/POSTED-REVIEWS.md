@@ -43,7 +43,7 @@ GitHub API verification confirmed **27 newly posted substantive reviews** agains
 
 ## #2348 correction
 
-Review [5639437220](https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639437220) is a mistaken `REQUEST_CHANGES` recommendation and is **excluded from the valid tally**. It remains displayed as CHANGES_REQUESTED: the review author reports that GitHub returned 404 for both edit and dismissal attempts. The public withdrawal [comment/review 5639454066](https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639454066) explicitly retracts the blocker and explains that untranslated strings may use the English fallback. A maintainer still needs to clear the displayed review state.
+Review [5639437220](https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639437220) is a mistaken `REQUEST_CHANGES` recommendation and is **excluded from the valid tally**. It remains displayed as CHANGES_REQUESTED: the review author reports that GitHub returned 404 for both edit and dismissal attempts. The public withdrawal [comment/review 5639454066](https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639454066) explicitly retracts the blocker and explains that untranslated strings may use the English fallback. At the user’s request, a later [APPROVED review 5639537972](https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639537972), bound to the same current head, explicitly superseded the mistaken change request. The old review remains in the historical record; the latest substantive recommendation is approval.
 
 The full per-PR dispositions, review bodies, source finding inventory, API verification, and correction receipt are in `post-reviews-audit.json`.
 

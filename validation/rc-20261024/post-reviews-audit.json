@@ -2325,5 +2325,47 @@
     "The translation-only findings on #2060 and #2347 were skipped under the English-fallback policy; #1664 was rechecked and its alleged mojibake finding was invalid.",
     "The only outstanding review-state cleanup is #2348: withdrawn review 5639437220 remains displayed despite the public correction because the author-side edit/dismissal calls returned 404."
   ],
-  "review_finding_linkage": "Review dispositions are joined to original finding records by PR number where available; that is bookkeeping only and does not assert a posted review body addresses every distinct finding recorded for the PR."
+  "review_finding_linkage": "Review dispositions are joined to original finding records by PR number where available; that is bookkeeping only and does not assert a posted review body addresses every distinct finding recorded for the PR.",
+  "subsequent_2348_approval": {
+    "id": 5639537972,
+    "node_id": "PRR_kwDOU1UwWc8AAAABUCSFNA",
+    "user": {
+      "login": "FredApps",
+      "id": 153173854,
+      "node_id": "U_kgDOCSE_Xg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/153173854?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/FredApps",
+      "html_url": "https://github.com/FredApps",
+      "followers_url": "https://api.github.com/users/FredApps/followers",
+      "following_url": "https://api.github.com/users/FredApps/following{/other_user}",
+      "gists_url": "https://api.github.com/users/FredApps/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/FredApps/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/FredApps/subscriptions",
+      "organizations_url": "https://api.github.com/users/FredApps/orgs",
+      "repos_url": "https://api.github.com/users/FredApps/repos",
+      "events_url": "https://api.github.com/users/FredApps/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/FredApps/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "Approved. This approval supersedes my mistaken REQUEST_CHANGES review #5639437220. The caption-style labels may use the permitted English fallback; completing their translations is optional follow-up, not a merge blocker. I found no failing catalog-coverage assertion for that concern. This is a source-review approval, not a claim that I executed this PR or its tests.",
+    "state": "APPROVED",
+    "html_url": "https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639537972",
+    "pull_request_url": "https://api.github.com/repos/storytold/filmcraft/pulls/2348",
+    "author_association": "CONTRIBUTOR",
+    "_links": {
+      "html": {
+        "href": "https://github.com/storytold/filmcraft/pull/2348#pullrequestreview-5639537972"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/storytold/filmcraft/pulls/2348"
+      }
+    },
+    "is_copilot_code_review": false,
+    "copilot_code_review_effort": null,
+    "submitted_at": "2026-10-24T19:04:04Z",
+    "commit_id": "5925c56f375b046401a1182fbe4667e3af662ea9"
+  }
 }
