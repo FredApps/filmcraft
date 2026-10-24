@@ -1051,4 +1051,3 @@ mod path_tests {
         }
     }
 }
-
