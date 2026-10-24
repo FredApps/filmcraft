@@ -30,6 +30,7 @@ pub struct Draft {
     pub preset: Label,
     pub color_editor: Option<ColorDraft>,
     pub error: String,
+    focus_name: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -100,7 +101,15 @@ pub fn open_owned(app: &mut FilmcraftApp, marker: &Marker, owner: Owner) {
         preset: marker.color,
         color_editor: None,
         error: String::new(),
+        focus_name: true,
     });
+}
+
+enum Action {
+    Done,
+    Cancel,
+    Delete,
+    Navigate(Marker),
 }
 
 pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
@@ -108,10 +117,15 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if !Arc::ptr_eq(&draft.project, &app.session.project_instance) {
         return;
     }
+    let Some((title, _, _, mut markers)) = draft.owner.details(app) else {
+        app.ui.status = tl!("Marker owner is unavailable").into();
+        return;
+    };
     // Commands can edit or remove this marker while its dialog (or native picker) is open.
-    // Check the marker itself, not unrelated project history, before allowing stale writes.
-    let current = draft.owner.details(app).and_then(|(_, _, _, markers)| markers.into_iter().find(|marker| marker.id.0 == draft.marker));
-    if current.as_ref() != Some(&draft.original) {
+    // Unrelated edits do not invalidate the draft. Ties use IDs so coincident markers remain reachable.
+    markers.sort_by_key(|m| (m.start, m.id.0));
+    let index = markers.iter().position(|m| m.id.0 == draft.marker);
+    if index.and_then(|i| markers.get(i)) != Some(&draft.original) {
         app.ui.status = tl!("Marker changed or was removed. Reopen it to continue.").into();
         return;
     }
@@ -120,149 +134,266 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         app.ui.marker_properties = Some(draft);
         return;
     }
-    let mut apply = false;
-    let mut cancel = false;
-    let mut delete = false;
+    let previous = index.and_then(|i| i.checked_sub(1)).and_then(|i| markers.get(i));
+    let next = index.and_then(|i| i.checked_add(1)).and_then(|i| markers.get(i));
+    let mut action = None;
     let modal = egui::Modal::new(egui::Id::new("marker-properties")).show(ctx, |ui| {
-        ui.set_width(440.0);
-        ui.heading(tl!("Edit Marker"));
-        if let Some((title, _, _, _)) = draft.owner.details(app) {
-            ui.label(title);
-        }
-        ui.horizontal(|ui| {
-            ui.label(tl!("Time"));
-            let response = ui.add(egui::TextEdit::singleline(&mut draft.time).desired_width(100.0));
-            app.auto.add_response("markerProperties.time", &response, tl!("Time"));
-            let response = ui.checkbox(&mut draft.range, tl!("Range"));
-            app.auto.add_response("markerProperties.range", &response, tl!("Range marker"));
-            if draft.range && draft.original_duration == filmcraft_time::Tick::ZERO && draft.duration == draft.initial_duration {
-                draft.duration = "00:00:00:01".into();
-            }
-            ui.label(tl!("Duration"));
-            let response = ui.add_enabled(draft.range, egui::TextEdit::singleline(&mut draft.duration).desired_width(100.0));
-            app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
-        });
+        let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 880.0);
+        let max_height = (ctx.content_rect().height() - 110.0).max(100.0);
+        ui.set_width(width);
+        ui.heading(format!("{} @ {}", tl!("Edit Marker"), draft.time));
+        ui.label(&title);
         ui.add_space(6.0);
-        ui.columns(2, |columns| {
-            for ((id, label, value), column) in [("name", tl!("Name"), &mut draft.name), ("author", tl!("Author"), &mut draft.author)].into_iter().zip(columns)
-            {
-                column.label(label);
-                let response = column.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY));
-                app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
-            }
-        });
-        ui.label(tl!("Notes"));
-        let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(3));
-        app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
-        ui.horizontal(|ui| {
-            ui.label(tl!("Type"));
-            let menu = egui::ComboBox::from_id_salt("marker-properties-kind").selected_text(kind_label(draft.kind)).show_ui(ui, |ui| {
-                for kind in [MarkerKind::Comment, MarkerKind::Chapter, MarkerKind::Segmentation, MarkerKind::WebLink, MarkerKind::FlashCue] {
-                    let label = kind_label(kind);
-                    let response = ui.selectable_value(&mut draft.kind, kind, label);
-                    app.auto.add_response(&format!("markerProperties.kind.{}", kind_id(kind)), &response, label);
-                }
+        if width >= 560.0 {
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 16.0;
+                ui.vertical(|ui| {
+                    ui.set_width(width - 112.0);
+                    field_area(app, ui, &mut draft, width - 112.0, max_height);
+                });
+                ui.vertical(|ui| {
+                    ui.set_width(96.0);
+                    action = actions(app, ui, previous, next, true);
+                });
             });
-            app.auto.add_response("markerProperties.kind", &menu.response, tl!("Type"));
-        });
-        if draft.kind == MarkerKind::WebLink {
-            ui.label(tl!("URL"));
-            ui.horizontal(|ui| {
-                let response = ui.add(egui::TextEdit::singleline(&mut draft.url).desired_width(320.0).char_limit(8192).hint_text("https://"));
-                app.auto.add_response("markerProperties.url", &response, tl!("URL"));
-                let address = filmcraft_project::marker_web_url(&draft.url);
-                let response = ui.add_enabled(address.is_some(), egui::Button::new(tl!("Open Link")));
-                let response = response.on_hover_text(tl!("Opens this address in your web browser"));
-                app.auto.add_response("markerProperties.openLink", &response, tl!("Open Link"));
-                if response.clicked()
-                    && let Some(address) = address
-                {
-                    crate::links::open(app, ctx, &address);
-                    if let Some(failure) = app.ui.failed_link.as_ref().filter(|failure| failure.url == address) {
-                        draft.error.clone_from(&failure.error);
-                    }
-                }
-            });
-            if !draft.url.trim().is_empty() && filmcraft_project::marker_web_url(&draft.url).is_none() {
-                ui.colored_label(ui.visuals().error_fg_color, tl!("Enter a valid HTTP or HTTPS URL without credentials"));
-            }
+        } else {
+            field_area(app, ui, &mut draft, width, (max_height - if width < 400.0 { 190.0 } else { 115.0 }).max(80.0));
+            ui.separator();
+            action = actions(app, ui, previous, next, false);
         }
-        ui.add_space(8.0);
-        ui.label(tl!("Color"));
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing.x = 5.0;
-            for preset in Label::ALL {
-                let response =
-                    swatch(ui, app.session.prefs.labels.rgb(preset), !draft.custom && draft.preset == preset).on_hover_text(crate::i18n::t(preset.name()));
-                app.auto.add_response(&format!("markerProperties.preset.{}", preset.name()), &response, crate::i18n::t(preset.name()));
-                if response.clicked() {
-                    draft.preset = preset;
-                    draft.custom = false;
-                    draft.hex = HexColor(app.session.prefs.labels.rgb(preset)).hex();
-                }
-            }
-        });
-        let mut colors = super::custom_colors::available(app);
-        if draft.custom
-            && let Some(color) = HexColor::parse(&draft.hex)
-            && !colors.contains(&color)
-        {
-            colors.push(color);
-        }
-        egui::ScrollArea::vertical().id_salt("marker-custom-colors").max_height(100.0).show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing.x = 5.0;
-                for color in colors {
-                    let hex = color.hex();
-                    let response =
-                        swatch(ui, color.0, draft.custom && draft.hex.eq_ignore_ascii_case(&hex)).on_hover_text(super::custom_colors::name(app, color));
-                    app.auto.add_response(&format!("markerProperties.custom.{hex}"), &response, &hex);
-                    if response.clicked() {
-                        draft.hex = hex;
-                        draft.custom = true;
-                    }
-                }
-                let response = add_color_swatch(ui).on_hover_text(tl!("Add custom color"));
-                app.auto.add_response("markerProperties.addColor", &response, tl!("Add custom color"));
-                if response.clicked() {
-                    draft.error.clear();
-                    draft.color_editor = Some(ColorDraft::new(HexColor::parse(&draft.hex).map_or(app.session.prefs.labels.rgb(draft.preset), |c| c.0)));
-                }
-            });
-        });
         if !draft.error.is_empty() {
             ui.colored_label(ui.visuals().error_fg_color, &draft.error);
         }
-        ui.separator();
-        ui.horizontal(|ui| {
-            let response = ui.button(tl!("Done"));
-            app.auto.add_response("markerProperties.apply", &response, tl!("Done"));
-            apply = response.clicked();
-            let response = ui.button(tl!("Cancel"));
-            app.auto.add_response("markerProperties.cancel", &response, tl!("Cancel"));
-            cancel = response.clicked();
-            let response = ui.button(tl!("Delete Marker"));
-            app.auto.add_response("markerProperties.delete", &response, tl!("Delete Marker"));
-            delete = response.clicked();
-        });
     });
-    if cancel || modal.should_close() {
+    if matches!(action, Some(Action::Cancel)) || modal.should_close() {
         return;
     }
-    if delete {
-        let mut p = draft.owner.params();
-        p["marker"] = json!(draft.marker);
-        match app.session.execute("markers.delete", p) {
-            Ok(_) => return,
-            Err(e) => draft.error = e.to_string(),
+    match action {
+        Some(Action::Delete) => {
+            let mut p = draft.owner.params();
+            p["marker"] = json!(draft.marker);
+            match app.session.execute("markers.delete", p) {
+                Ok(_) => return,
+                Err(e) => draft.error = e.to_string(),
+            }
         }
-    } else if apply {
-        match edit_params(app, &draft).and_then(|p| app.session.execute("markers.edit", p).map_err(|e| e.to_string())) {
-            Ok(_) => return,
+        Some(Action::Done | Action::Navigate(_)) => match save(app, &draft) {
+            Ok(()) => {
+                if let Some(Action::Navigate(marker)) = action {
+                    open_owned(app, &marker, draft.owner);
+                }
+                return;
+            }
             Err(e) => draft.error = e,
-        }
+        },
+        _ => {}
     }
     app.ui.marker_properties = Some(draft);
+}
+
+fn field_area(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, width: f32, height: f32) {
+    ui.allocate_ui_with_layout(vec2(width, height), egui::Layout::top_down(egui::Align::Min), |ui| {
+        egui::ScrollArea::vertical().id_salt("marker-fields").max_height(height).show(ui, |ui| {
+            ui.set_width(width - 12.0);
+            fields(app, ui, draft);
+        });
+    });
+}
+
+fn actions(app: &mut FilmcraftApp, ui: &mut egui::Ui, previous: Option<&Marker>, next: Option<&Marker>, vertical: bool) -> Option<Action> {
+    let mut action = None;
+    let width = if vertical { 96.0 } else { 128.0 };
+    let mut buttons = |ui: &mut egui::Ui| {
+        for (id, label, value) in [("apply", tl!("Done"), Action::Done), ("cancel", tl!("Cancel"), Action::Cancel)] {
+            let response = ui.add_sized(vec2(width, 28.0), egui::Button::new(label));
+            app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
+            if response.clicked() {
+                action = Some(value);
+            }
+            if vertical {
+                ui.add_space(if id == "apply" { 8.0 } else { 20.0 });
+            }
+        }
+        for (id, label, marker) in [("previous", tl!("Previous"), previous), ("next", tl!("Next"), next)] {
+            let response = ui.add_enabled(marker.is_some(), egui::Button::new(label).min_size(vec2(width, 28.0)));
+            app.auto.add_response(&format!("markerProperties.{id}"), &response, label);
+            if response.clicked()
+                && let Some(marker) = marker
+            {
+                action = Some(Action::Navigate(marker.clone()));
+            }
+            if vertical {
+                ui.add_space(8.0);
+            }
+        }
+        if vertical {
+            ui.add_space(8.0);
+        }
+        let response = ui.add_sized(vec2(width, 28.0), egui::Button::new(tl!("Delete Marker")));
+        app.auto.add_response("markerProperties.delete", &response, tl!("Delete Marker"));
+        if response.clicked() {
+            action = Some(Action::Delete);
+        }
+    };
+    if vertical {
+        ui.vertical(&mut buttons);
+    } else {
+        ui.horizontal_wrapped(&mut buttons);
+    }
+    ui.add_space(8.0);
+    ui.small(tl!("Previous and Next save this marker."));
+    action
+}
+
+fn field_row(ui: &mut egui::Ui, label: &str, contents: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal_top(|ui| {
+        ui.allocate_ui_with_layout(vec2(76.0, 24.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(label);
+        });
+        ui.vertical(contents);
+    });
+}
+
+fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft) {
+    field_row(ui, tl!("Name"), |ui| {
+        let response = ui.add(egui::TextEdit::singleline(&mut draft.name).desired_width(f32::INFINITY));
+        app.auto.add_response("markerProperties.name", &response, tl!("Name"));
+        if draft.focus_name {
+            response.request_focus();
+            draft.focus_name = false;
+        }
+    });
+    ui.add_space(10.0);
+    field_row(ui, tl!("Time"), |ui| {
+        ui.horizontal_wrapped(|ui| {
+            let response = ui.add(egui::TextEdit::singleline(&mut draft.time).desired_width(110.0));
+            app.auto.add_response("markerProperties.time", &response, tl!("Time"));
+            ui.add_space(16.0);
+            ui.label(tl!("Duration"));
+            let response = ui.add_enabled(draft.range, egui::TextEdit::singleline(&mut draft.duration).desired_width(110.0));
+            app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
+            let response = ui.checkbox(&mut draft.range, tl!("Range"));
+            app.auto.add_response("markerProperties.range", &response, tl!("Range marker"));
+            if response.changed() && draft.range && draft.original_duration == filmcraft_time::Tick::ZERO && draft.duration == draft.initial_duration {
+                draft.duration = "00:00:00:01".into();
+            }
+        });
+    });
+    ui.add_space(10.0);
+    field_row(ui, tl!("Notes"), |ui| {
+        let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8));
+        app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
+    });
+    ui.add_space(6.0);
+    field_row(ui, tl!("Author"), |ui| {
+        let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
+        app.auto.add_response("markerProperties.author", &response, tl!("Author"));
+    });
+    ui.add_space(14.0);
+    ui.group(|ui| {
+        ui.set_width(ui.available_width().max(100.0));
+        ui.label(tl!("Options"));
+        field_row(ui, tl!("Color"), |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                for preset in Label::ALL {
+                    let response =
+                        swatch(ui, app.session.prefs.labels.rgb(preset), !draft.custom && draft.preset == preset).on_hover_text(crate::i18n::t(preset.name()));
+                    app.auto.add_response(&format!("markerProperties.preset.{}", preset.name()), &response, crate::i18n::t(preset.name()));
+                    if response.clicked() {
+                        draft.preset = preset;
+                        draft.custom = false;
+                        draft.hex = HexColor(app.session.prefs.labels.rgb(preset)).hex();
+                    }
+                }
+            });
+            let mut colors = super::custom_colors::available(app);
+            if draft.custom
+                && let Some(color) = HexColor::parse(&draft.hex)
+                && !colors.contains(&color)
+            {
+                colors.push(color);
+            }
+            egui::ScrollArea::vertical().id_salt("marker-custom-colors").max_height(100.0).show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 5.0;
+                    for color in colors {
+                        let hex = color.hex();
+                        let response =
+                            swatch(ui, color.0, draft.custom && draft.hex.eq_ignore_ascii_case(&hex)).on_hover_text(super::custom_colors::name(app, color));
+                        app.auto.add_response(&format!("markerProperties.custom.{hex}"), &response, &hex);
+                        if response.clicked() {
+                            draft.hex = hex;
+                            draft.custom = true;
+                        }
+                    }
+                    let response = add_color_swatch(ui).on_hover_text(tl!("Add custom color"));
+                    app.auto.add_response("markerProperties.addColor", &response, tl!("Add custom color"));
+                    if response.clicked() {
+                        draft.error.clear();
+                        draft.color_editor = Some(ColorDraft::new(HexColor::parse(&draft.hex).map_or(app.session.prefs.labels.rgb(draft.preset), |c| c.0)));
+                    }
+                });
+            });
+        });
+        ui.add_space(10.0);
+        let group = ui.vertical(|ui| {
+            for kind in [MarkerKind::Comment, MarkerKind::Chapter, MarkerKind::Segmentation, MarkerKind::WebLink, MarkerKind::FlashCue] {
+                let label = kind_label(kind);
+                let response = ui.radio_value(&mut draft.kind, kind, label);
+                app.auto.add_response(&format!("markerProperties.kind.{}", kind_id(kind)), &response, label);
+                if kind == MarkerKind::WebLink && draft.kind == MarkerKind::WebLink {
+                    field_row(ui, tl!("URL"), |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            let response = ui.add(
+                                egui::TextEdit::singleline(&mut draft.url)
+                                    .desired_width((ui.available_width() - 90.0).max(100.0))
+                                    .char_limit(8192)
+                                    .hint_text("https://"),
+                            );
+                            app.auto.add_response("markerProperties.url", &response, tl!("URL"));
+                            let address = filmcraft_project::marker_web_url(&draft.url);
+                            let response = ui.add_enabled(address.is_some(), egui::Button::new(tl!("Open Link")));
+                            let response = response.on_hover_text(tl!("Opens this address in your web browser"));
+                            app.auto.add_response("markerProperties.openLink", &response, tl!("Open Link"));
+                            if response.clicked()
+                                && let Some(address) = address
+                            {
+                                crate::links::open(app, ui.ctx(), &address);
+                                if let Some(failure) = app.ui.failed_link.as_ref().filter(|failure| failure.url == address) {
+                                    draft.error.clone_from(&failure.error);
+                                }
+                            }
+                        });
+                    });
+                    if !draft.url.trim().is_empty() && filmcraft_project::marker_web_url(&draft.url).is_none() {
+                        ui.colored_label(ui.visuals().error_fg_color, tl!("Enter a valid HTTP or HTTPS URL without credentials"));
+                    }
+                }
+            }
+        });
+        app.auto.add_response("markerProperties.kind", &group.response, tl!("Type"));
+    });
+}
+
+/// Navigation commits only this marker; unchanged navigation does not dirty the project or Undo.
+fn save(app: &mut FilmcraftApp, draft: &Draft) -> Result<(), String> {
+    let params = edit_params(app, draft)?;
+    let original = &draft.original;
+    let changed = draft.name != original.name
+        || draft.author != original.author
+        || draft.comment != original.comment
+        || draft.kind != original.kind
+        || draft.url != original.url
+        || draft.time != draft.initial_time
+        || draft.range != (original.duration > filmcraft_time::Tick::ZERO)
+        || (draft.range && draft.duration != draft.initial_duration)
+        || draft.custom != original.custom_color.is_some()
+        || if draft.custom { HexColor::parse(&draft.hex) != original.custom_color } else { draft.preset != original.color };
+    if changed {
+        app.session.execute("markers.edit", params).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, String> {

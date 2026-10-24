@@ -347,9 +347,20 @@ The source-target variants of Add/Edit accept the same properties. Inspect repor
 include `author` and the effective `color`.
 
 `markers.edit` also accepts `kind:"comment|chapter|segmentation|webLink|flashCue"`.
-The existing editor's Type menu (`markerProperties.kind`, with options
-`markerProperties.kind.<kind>`) applies type changes together with the other fields in
-one Undo step. Cancel leaves all fields unchanged. It uses the same sequence/source owner.
+The editor's visible Type radio group (`markerProperties.kind`, with choices
+`markerProperties.kind.<kind>`) applies type changes with the other fields in one Undo
+step. The wide form aligns labels beside broad Name, Notes and Author fields, with
+Time and Duration together, a grouped palette and vertical Type choices, and a side
+action column. Narrow windows move the actions below the scrolling form.
+It retains the same sequence/source owner.
+
+Previous/Next (`markerProperties.previous`, `markerProperties.next`) save valid changes
+to the current marker as one Undo step, then open its neighbour in chronological order
+with marker ID breaking time ties. Navigation stays in the original sequence/source view,
+even if another is opened. Unchanged navigation adds no Undo step; invalid drafts remain
+open without moving or changing the project. Ends disable the corresponding button.
+Cancel discards only the current draft; edits saved by earlier navigation remain undoable.
+These controls change the editor, without redirecting another sequence/source playhead.
 
 Web Link markers show a separate URL field (`markerProperties.url`) and an explicit
 Open Link button (`markerProperties.openLink`). Notes remain independent. `markers.edit`

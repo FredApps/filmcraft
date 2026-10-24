@@ -20,6 +20,178 @@ struct Driver {
 }
 
 #[test]
+fn marker_navigation_saves_one_edit_skips_noops_and_orders_coincident_markers() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let last = d.exec("markers.add", json!({"frame":90}))["marker"].as_u64().unwrap();
+    let first = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    let second = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    let before = d.app().session.project.to_json();
+    let history = d.app().session.history.undo.len();
+    let owner = filmcraft_ui_egui::panels::marker_properties::Owner::current(d.app(), false).unwrap();
+    let marker = owner.details(d.app()).unwrap().3.into_iter().find(|m| m.id.0 == first).unwrap();
+    filmcraft_ui_egui::panels::marker_properties::open_owned(d.app(), &marker, owner);
+    d.frames(3);
+    let previous = d.ok("ui.elements", json!({"prefix":"markerProperties.previous"}));
+    assert_eq!(previous[0]["enabled"], false);
+    d.set_text("markerProperties.name", "Reviewed");
+    d.set_text("markerProperties.author", "BENJI");
+    d.set_text("markerProperties.comment", "Keep this note");
+    d.click("markerProperties.preset.Mango");
+    d.click("markerProperties.kind.chapter");
+    d.snapshot("marker-editor-navigation", "markerProperties.");
+    d.click("markerProperties.next");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, second);
+    let marker = d.app().session.active_sequence().unwrap().markers.iter().find(|m| m.id.0 == first).unwrap().clone();
+    assert_eq!((&*marker.name, &*marker.author, &*marker.comment), ("Reviewed", "BENJI", "Keep this note"));
+    assert_eq!(marker.color, filmcraft_project::Label::Mango);
+    assert_eq!(marker.kind, filmcraft_project::MarkerKind::Chapter);
+    assert_eq!(d.app().session.history.undo.len(), history + 1);
+    let saved = d.app().session.project.to_json();
+    d.click("markerProperties.previous");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, first);
+    d.click("markerProperties.next");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, second);
+    assert_eq!(d.app().session.history.undo.len(), history + 1);
+    d.set_text("markerProperties.comment", "Discard this draft");
+    d.click("markerProperties.cancel");
+    assert_eq!(d.app().session.project.to_json(), saved);
+    d.double_click(&format!("timeline.marker.{last}"));
+    let next = d.ok("ui.elements", json!({"prefix":"markerProperties.next"}));
+    assert_eq!(next[0]["enabled"], false);
+    d.click("markerProperties.apply");
+    assert_eq!(d.app().session.history.undo.len(), history + 1);
+    d.exec("edit.undo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.exec("edit.redo", json!({}));
+    assert_eq!(d.app().session.project.to_json(), saved);
+}
+
+#[test]
+fn marker_navigation_rejects_invalid_drafts_without_moving_or_mutating() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let first = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    let second = d.exec("markers.add", json!({"frame":90}))["marker"].as_u64().unwrap();
+    d.double_click(&format!("timeline.marker.{first}"));
+    let before = d.app().session.project.to_json();
+    let history = d.app().session.history.undo.len();
+    let time = d.app().ui.marker_properties.as_ref().unwrap().time.clone();
+    for (field, invalid, reset) in [("time", "invalid".to_owned(), time), ("author", "x".repeat(1025), String::new())] {
+        d.set_text(&format!("markerProperties.{field}"), &invalid);
+        d.click("markerProperties.next");
+        let draft = d.app().ui.marker_properties.as_ref().unwrap();
+        assert_eq!(draft.marker, first);
+        assert!(!draft.error.is_empty());
+        assert_eq!(d.app().session.project.to_json(), before);
+        assert_eq!(d.app().session.history.undo.len(), history);
+        d.set_text(&format!("markerProperties.{field}"), &reset);
+    }
+    d.click("markerProperties.kind.webLink");
+    d.set_text("markerProperties.url", "file:///tmp/test");
+    d.click("markerProperties.next");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, first);
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.set_text("markerProperties.url", "");
+    d.click("markerProperties.kind.comment");
+    d.click("markerProperties.range");
+    d.set_text("markerProperties.duration", "00:00:00:00");
+    d.click("markerProperties.next");
+    assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().marker, first);
+    assert_eq!(d.app().session.project.to_json(), before);
+    d.click("markerProperties.range");
+    assert!(!d.app().ui.marker_properties.as_ref().unwrap().range);
+    d.click("markerProperties.next");
+    let draft = d.app().ui.marker_properties.as_ref().unwrap();
+    assert_eq!(draft.marker, second, "{draft:?}");
+    assert_eq!(d.app().session.history.undo.len(), history);
+}
+
+#[test]
+fn marker_navigation_keeps_the_original_source_owner_after_source_switch() {
+    let mut d = Driver::demo();
+    d.exec("source.open", json!({"item":5}));
+    d.exec("markers.clearAll", json!({"target":"source"}));
+    let first = d.exec("markers.add", json!({"target":"source","time":0}))["marker"].as_u64().unwrap();
+    let second = d.exec("markers.add", json!({"target":"source","time":254016000000_i64}))["marker"].as_u64().unwrap();
+    let owner = filmcraft_ui_egui::panels::marker_properties::Owner::Source(5);
+    let marker = owner.details(d.app()).unwrap().3.into_iter().find(|m| m.id.0 == first).unwrap();
+    filmcraft_ui_egui::panels::marker_properties::open_owned(d.app(), &marker, owner);
+    d.frames(3);
+    d.exec("source.open", json!({"item":6}));
+    let unrelated = d.app().session.project.item(filmcraft_project::ItemId(6)).unwrap().clone();
+    d.set_text("markerProperties.name", "Original source edit");
+    d.click("markerProperties.next");
+    let draft = d.app().ui.marker_properties.as_ref().unwrap();
+    assert_eq!(draft.owner, owner);
+    assert_eq!(draft.marker, second);
+    assert_eq!(owner.details(d.app()).unwrap().3.iter().find(|m| m.id.0 == first).unwrap().name, "Original source edit");
+    assert_eq!(d.app().session.project.item(filmcraft_project::ItemId(6)).unwrap(), &unrelated);
+    assert_eq!(d.app().session.state.source_item, Some(filmcraft_project::ItemId(6)));
+    d.click("markerProperties.cancel");
+}
+
+#[test]
+fn marker_navigation_keeps_the_original_sequence_after_sequence_switch() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let first = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
+    let second = d.exec("markers.add", json!({"frame":90}))["marker"].as_u64().unwrap();
+    let owner = filmcraft_ui_egui::panels::marker_properties::Owner::current(d.app(), false).unwrap();
+    d.double_click(&format!("timeline.marker.{first}"));
+    d.exec("file.newSequence", json!({"name":"Unrelated sequence"}));
+    let active = d.app().session.state.active_sequence;
+    let unrelated = d.app().session.active_sequence().unwrap().clone();
+    d.set_text("markerProperties.name", "Original sequence edit");
+    d.click("markerProperties.next");
+    let draft = d.app().ui.marker_properties.as_ref().unwrap();
+    assert_eq!(draft.owner, owner);
+    assert_eq!(draft.marker, second);
+    assert_eq!(owner.details(d.app()).unwrap().3.iter().find(|m| m.id.0 == first).unwrap().name, "Original sequence edit");
+    assert_eq!(d.app().session.active_sequence().unwrap(), &unrelated);
+    assert_eq!(d.app().session.state.active_sequence, active);
+    d.click("markerProperties.cancel");
+}
+
+#[test]
+fn marker_editor_wide_form_and_small_window_keep_actions_accessible() {
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.add", json!({"frame":30,"name":"Review this moment","author":"BENJI"}))["marker"].as_u64().unwrap();
+    d.double_click(&format!("timeline.marker.{marker}"));
+    let rect = |elements: &Value, id: &str| -> Vec<f64> {
+        elements.as_array().unwrap().iter().find(|e| e["id"] == id).unwrap()["rect"].as_array().unwrap().iter().map(|n| n.as_f64().unwrap()).collect()
+    };
+    let elements = d.ok("ui.elements", json!({"prefix":"markerProperties."}));
+    let name = rect(&elements, "markerProperties.name");
+    let author = rect(&elements, "markerProperties.author");
+    let notes = rect(&elements, "markerProperties.comment");
+    let done = rect(&elements, "markerProperties.apply");
+    assert!(name[2] > 400.0);
+    assert_eq!(author[2], name[2]);
+    assert!(author[1] > name[1] + name[3]);
+    assert!(notes[3] > 70.0);
+    assert!(done[0] > notes[0] + notes[2]);
+    for kind in ["comment", "chapter", "segmentation", "webLink", "flashCue"] {
+        assert!(!d.ids(&format!("markerProperties.kind.{kind}")).is_empty());
+    }
+    d.snapshot("marker-editor-wide-layout", "markerProperties.");
+    for size in [egui::vec2(480.0, 600.0), egui::vec2(360.0, 600.0), egui::vec2(900.0, 500.0)] {
+        d.harness.set_size(size);
+        d.frames(8);
+        let elements = d.ok("ui.elements", json!({"prefix":"markerProperties."}));
+        for id in ["apply", "cancel", "previous", "next", "delete"] {
+            let action = rect(&elements, &format!("markerProperties.{id}"));
+            assert!(action[0] >= 0.0 && action[0] + action[2] <= f64::from(size.x), "{size:?} {id}: {action:?}");
+            assert!(action[1] >= 0.0 && action[1] + action[3] <= f64::from(size.y), "{size:?} {id}: {action:?}");
+        }
+        d.snapshot(&format!("marker-editor-{}x{}", size.x, size.y), "markerProperties.");
+    }
+    d.click("markerProperties.cancel");
+    assert!(d.app().ui.marker_properties.is_none());
+}
+
+#[test]
 fn review_marker_double_click_over_work_area_preserves_project_and_history() {
     let mut d = Driver::demo();
     d.exec("markers.clearAll", json!({}));
@@ -80,7 +252,6 @@ fn web_link_editor_keeps_notes_and_opens_only_after_an_explicit_click() {
     let history = d.app().session.history.undo.len();
     d.double_click(&format!("timeline.marker.{marker}"));
     assert!(d.ids("markerProperties.url").is_empty());
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.webLink");
     d.set_text("markerProperties.url", "https://example.com/review?take=2#notes");
     d.set_text("markerProperties.comment", "Awaiting producer approval");
@@ -91,16 +262,13 @@ fn web_link_editor_keeps_notes_and_opens_only_after_an_explicit_click() {
     assert_eq!(*opened.borrow(), ["https://example.com/review?take=2#notes"]);
     assert_eq!(d.app().session.project.to_json(), before);
     assert_eq!(d.app().session.history.undo.len(), history);
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.comment");
     assert!(d.ids("markerProperties.url").is_empty());
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.webLink");
     assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().url, "https://example.com/review?take=2#notes");
     d.click("markerProperties.cancel");
     assert_eq!(d.app().session.project.to_json(), before);
     d.double_click(&format!("timeline.marker.{marker}"));
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.webLink");
     d.set_text("markerProperties.url", "https://example.com/final");
     d.set_text("markerProperties.comment", "Keep notes separately");
@@ -116,7 +284,6 @@ fn web_link_editor_keeps_notes_and_opens_only_after_an_explicit_click() {
     assert_eq!(opened.borrow().len(), 1, "editing, reopening, Undo/Redo and seeking must never launch a browser");
     d.double_click(&format!("timeline.marker.{marker}"));
     assert_eq!(d.app().ui.marker_properties.as_ref().unwrap().url, saved.url);
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.comment");
     d.click("markerProperties.apply");
     assert_eq!(d.app().session.active_sequence().unwrap().markers[0].url, saved.url, "type changes must not discard the hidden URL");
@@ -128,7 +295,6 @@ fn web_link_rejects_unsafe_addresses_and_preserves_draft_on_browser_failure() {
     d.exec("markers.clearAll", json!({}));
     let marker = d.exec("markers.add", json!({"frame":30}))["marker"].as_u64().unwrap();
     d.double_click(&format!("timeline.marker.{marker}"));
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.webLink");
     let before = d.app().session.project.to_json();
     for bad in ["file:///tmp/test", "javascript:alert(1)", "example.com", "https://"] {
@@ -156,7 +322,6 @@ fn marker_type_uses_the_existing_editor_and_one_undo_step() {
     let before = d.app().session.project.to_json();
     let history = d.app().session.history.undo.len();
     d.double_click(&format!("timeline.marker.{marker}"));
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.chapter");
     d.set_text("markerProperties.name", "Chapter draft");
     d.snapshot("marker-type-editor", "markerProperties.");
@@ -164,7 +329,6 @@ fn marker_type_uses_the_existing_editor_and_one_undo_step() {
     d.click("markerProperties.cancel");
     assert_eq!(d.app().session.project.to_json(), before);
     d.double_click(&format!("timeline.marker.{marker}"));
-    d.click("markerProperties.kind");
     d.click("markerProperties.kind.chapter");
     d.set_text("markerProperties.name", "Chapter saved");
     d.click("markerProperties.apply");
@@ -816,7 +980,11 @@ impl Driver {
     fn set_text(&mut self, id: &str, text: &str) {
         self.click(id);
         self.ok("ui.key", json!({"key":"Cmd+A"}));
-        self.ok("ui.type", json!({"text":text}));
+        if text.is_empty() {
+            self.ok("ui.key", json!({"key":"Backspace"}));
+        } else {
+            self.ok("ui.type", json!({"text":text}));
+        }
         self.frames(2);
     }
 
@@ -854,13 +1022,14 @@ impl Driver {
                 return;
             }
         };
-        let ppp = img.width() as f32 / 1600.0;
+        let ppp = img.width() as f32 / self.harness.ctx.content_rect().width();
         let x0 = ((bb[0] - 24.0) * ppp).max(0.0) as u32;
         let y0 = ((bb[1] - if prefix == "markerProperties." { 75.0 } else { 40.0 }) * ppp).max(0.0) as u32;
         let x1 = (((bb[2] + 24.0) * ppp) as u32).min(img.width());
         let y1 = (((bb[3] + 24.0) * ppp) as u32).min(img.height());
         let img = image::imageops::crop_imm(&img, x0, y0, x1.saturating_sub(x0), y1.saturating_sub(y0)).to_image();
         std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(format!("{name}.json")), serde_json::to_vec_pretty(&v).unwrap()).unwrap();
         img.save(dir.join(format!("{name}.png"))).unwrap();
     }
 
