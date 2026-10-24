@@ -23,6 +23,7 @@ and write wherever the user can.
 
 ```sh
 cargo build --release -p filmcraft-cli -p filmcraft
+export FILMCRAFT_CONTROL_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 ./target/release/filmcraft --control 9876 &      # only for the bridge server
 claude                                           # approve the project MCP servers when asked
 ```
@@ -123,8 +124,9 @@ progress and stop it:
 - `notifications/cancelled` for the request stops the encode at the next batch (`jobs.cancel`),
   deletes the partial output (the movie, or the frames and caption sidecar written so far) and sends
   no response, as the MCP cancellation utility asks.
-- Without `wait` the command returns `{job, path}` at once, as before: poll `jobs.list` and stop it
-  with `jobs.cancel`. Other exports (`file.exportFrame`, interchange formats, …) finish quickly and
+- Without `wait` the command returns `{job, path, poll: "jobs.list", cancel: "jobs.cancel"}` at
+  once: poll `jobs.list` for the job's `progress`, `etaSeconds`, `finished` and `result`, and stop it
+  with `jobs.cancel` (`export.queue.list` lists the Export Queue only, not direct exports, #1544). Other exports (`file.exportFrame`, interchange formats, …) finish quickly and
   ignore the token.
 - Bridge mode works the same way: the export runs as an app job (the app stays responsive and shows
   "Exporting… NN%" in its status bar) and the call returns when it is written, however long it
@@ -133,29 +135,31 @@ progress and stop it:
 ## 2. Control channel
 
 `filmcraft --control 9876` (or `FILMCRAFT_CONTROL_PORT=9876`) listens on `127.0.0.1` only. Send one
-JSON request per line and get one JSON reply per line. Full method table:
+JSON request per line and get one JSON reply per line. Set a fresh `FILMCRAFT_CONTROL_TOKEN` for the
+desktop session as above; the CLI / MCP bridge must inherit the same variable. Raw requests must
+include it as `token` on every line (replace the placeholders below). Full setup and method table:
 [control-protocol.md](control-protocol.md).
 
 ```jsonc
-{"id":1,"method":"engine.commands"}
-{"id":2,"method":"engine.execute","params":{"command":"file.openDemoProject"}}
-{"id":3,"method":"engine.execute","params":{"command":"playhead.set","params":{"seconds":2}}}
-{"id":4,"method":"engine.execute","params":{"command":"sequence.addEdit"}}
-{"id":5,"method":"engine.execute","params":{"command":"effects.apply","params":{"effect":"Gaussian Blur"}}}
-{"id":6,"method":"ui.elements","params":{"prefix":"tools."}}
-{"id":7,"method":"ui.click","params":{"id":"tools.Razor"}}
-{"id":8,"method":"ui.key","params":{"key":"Cmd+Z"}}
-{"id":9,"method":"ui.screenshot","params":{"path":"/tmp/timeline.png","panel":"Timeline"}}
+{"id":1,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"engine.commands"}
+{"id":2,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"engine.execute","params":{"command":"file.openDemoProject"}}
+{"id":3,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"engine.execute","params":{"command":"playhead.set","params":{"seconds":2}}}
+{"id":4,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"engine.execute","params":{"command":"sequence.addEdit"}}
+{"id":5,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"engine.execute","params":{"command":"effects.apply","params":{"effect":"Gaussian Blur"}}}
+{"id":6,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"ui.elements","params":{"prefix":"tools."}}
+{"id":7,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"ui.click","params":{"id":"tools.Razor"}}
+{"id":8,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"ui.key","params":{"key":"Cmd+Z"}}
+{"id":9,"token":"<FILMCRAFT_CONTROL_TOKEN>","method":"ui.screenshot","params":{"path":"/tmp/timeline.png","panel":"Timeline"}}
 ```
 
 Replies look like `{"id":4,"ok":true,"result":{"cuts":2}}` or `{"id":7,"ok":false,"error":"…"}`.
 Minimal client:
 
 ```python
-import json, socket
+import json, os, socket
 s = socket.create_connection(("127.0.0.1", 9876)); f = s.makefile("rw")
 def call(method, **params):
-    f.write(json.dumps({"id": 1, "method": method, "params": params}) + "\n"); f.flush()
+    f.write(json.dumps({"id": 1, "token": os.environ["FILMCRAFT_CONTROL_TOKEN"], "method": method, "params": params}) + "\n"); f.flush()
     return json.loads(f.readline())
 print(call("engine.execute", command="sequence.inspect"))
 ```
@@ -341,7 +345,24 @@ preserves it; `author: ""` clears attribution, and choosing a preset clears cust
 The source-target variants of Add/Edit accept the same properties. Inspect reports
 include `author` and the effective `color`.
 
+`markers.edit` also accepts `kind:"comment|chapter|segmentation|webLink|flashCue"`.
+The existing editor's Type menu (`markerProperties.kind`, with options
+`markerProperties.kind.<kind>`) applies type changes together with the other fields in
+one Undo step. Cancel leaves all fields unchanged. It uses the same sequence/source owner.
+
+Web Link markers show a separate URL field (`markerProperties.url`) and an explicit
+Open Link button (`markerProperties.openLink`). Notes remain independent. `markers.edit`
+accepts `url` (an absolute HTTP(S) address, up to 8192 UTF-8 bytes, no control characters
+or embedded credentials); an empty string clears it and omission/null retains it.
+The URL is retained across type changes. Opening uses the existing browser service
+and never occurs during playback, seeking, project load or Undo/Redo. URLs survive
+project/OTIO round trips and appear in a separate CSV column; other interchange formats
+report URL loss. Imported addresses are checked again before opening.
+
 `colors.addCustom {color:"#RRGGBB"}` saves a reusable project-local marker/clip swatch (maximum 64). Duplicate colors are no-ops. Palette additions are independently undoable from marker edits.
+Interchange imports fill missing names on existing swatches while preserving target names,
+even when the palette is full. Formats that cannot retain the saved palette warn about its
+loss even if none of its colors are assigned; FilmCraft projects and OTIO retain it.
 
 `edit.label` also accepts a hex `label` and `saveColor:true` to save and apply a custom clip color atomically. Markers and clips share the unchanged sixteen clip presets; Red, Orange, Cyan and Pink are aliases for Rose, Mango, Teal and Magenta.
 

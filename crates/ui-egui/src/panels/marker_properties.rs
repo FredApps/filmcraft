@@ -4,7 +4,7 @@ use crate::{
     widgets::color_picker::{self, ColorDraft},
 };
 use egui::{Color32, Sense, Stroke, vec2};
-use filmcraft_project::{HexColor, Label, Marker};
+use filmcraft_project::{HexColor, Label, Marker, MarkerKind};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -20,6 +20,8 @@ pub struct Draft {
     pub initial_duration: String,
     pub marker: u64,
     pub original: Marker,
+    pub kind: MarkerKind,
+    pub url: String,
     pub name: String,
     pub comment: String,
     pub author: String,
@@ -88,6 +90,8 @@ pub fn open_owned(app: &mut FilmcraftApp, marker: &Marker, owner: Owner) {
         original_duration: marker.duration,
         marker: marker.id.0,
         original: marker.clone(),
+        kind: marker.kind,
+        url: marker.url.clone(),
         name: marker.name.clone(),
         comment: marker.comment.clone(),
         author: marker.author.clone(),
@@ -150,6 +154,39 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         ui.label(tl!("Notes"));
         let response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(3));
         app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
+        ui.horizontal(|ui| {
+            ui.label(tl!("Type"));
+            let menu = egui::ComboBox::from_id_salt("marker-properties-kind").selected_text(kind_label(draft.kind)).show_ui(ui, |ui| {
+                for kind in [MarkerKind::Comment, MarkerKind::Chapter, MarkerKind::Segmentation, MarkerKind::WebLink, MarkerKind::FlashCue] {
+                    let label = kind_label(kind);
+                    let response = ui.selectable_value(&mut draft.kind, kind, label);
+                    app.auto.add_response(&format!("markerProperties.kind.{}", kind_id(kind)), &response, label);
+                }
+            });
+            app.auto.add_response("markerProperties.kind", &menu.response, tl!("Type"));
+        });
+        if draft.kind == MarkerKind::WebLink {
+            ui.label(tl!("URL"));
+            ui.horizontal(|ui| {
+                let response = ui.add(egui::TextEdit::singleline(&mut draft.url).desired_width(320.0).char_limit(8192).hint_text("https://"));
+                app.auto.add_response("markerProperties.url", &response, tl!("URL"));
+                let address = filmcraft_project::marker_web_url(&draft.url);
+                let response = ui.add_enabled(address.is_some(), egui::Button::new(tl!("Open Link")));
+                let response = response.on_hover_text(tl!("Opens this address in your web browser"));
+                app.auto.add_response("markerProperties.openLink", &response, tl!("Open Link"));
+                if response.clicked()
+                    && let Some(address) = address
+                {
+                    crate::links::open(app, ctx, &address);
+                    if let Some(failure) = app.ui.failed_link.as_ref().filter(|failure| failure.url == address) {
+                        draft.error.clone_from(&failure.error);
+                    }
+                }
+            });
+            if !draft.url.trim().is_empty() && filmcraft_project::marker_web_url(&draft.url).is_none() {
+                ui.colored_label(ui.visuals().error_fg_color, tl!("Enter a valid HTTP or HTTPS URL without credentials"));
+            }
+        }
         ui.add_space(8.0);
         ui.label(tl!("Color"));
         ui.horizontal_wrapped(|ui| {
@@ -244,6 +281,10 @@ fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, S
     p["name"] = json!(draft.name);
     p["comment"] = json!(draft.comment);
     p["author"] = json!(draft.author);
+    p["kind"] = json!(kind_id(draft.kind));
+    if draft.url != draft.original.url {
+        p["url"] = json!(draft.url);
+    }
     p["color"] = json!(if draft.custom { draft.hex.clone() } else { draft.preset.name().to_string() });
     // Do not quantize imported subframe positions when only editing text/color.
     if draft.time != draft.initial_time {
@@ -259,6 +300,26 @@ fn edit_params(app: &FilmcraftApp, draft: &Draft) -> Result<serde_json::Value, S
         p["durationFrames"] = json!(duration);
     }
     Ok(p)
+}
+
+fn kind_id(kind: MarkerKind) -> &'static str {
+    match kind {
+        MarkerKind::Comment => "comment",
+        MarkerKind::Chapter => "chapter",
+        MarkerKind::Segmentation => "segmentation",
+        MarkerKind::WebLink => "webLink",
+        MarkerKind::FlashCue => "flashCue",
+    }
+}
+
+fn kind_label(kind: MarkerKind) -> &'static str {
+    match kind {
+        MarkerKind::Comment => tl!("Comment Marker"),
+        MarkerKind::Chapter => tl!("Chapter Marker"),
+        MarkerKind::Segmentation => tl!("Segmentation Marker"),
+        MarkerKind::WebLink => tl!("Web Link"),
+        MarkerKind::FlashCue => tl!("Flash Cue Point"),
+    }
 }
 
 fn color_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, draft: &mut Draft) {

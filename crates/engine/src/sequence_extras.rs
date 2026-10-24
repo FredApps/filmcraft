@@ -531,7 +531,7 @@ fn add_flash_cue(s: &mut Session, p: &Value) -> Result<Value> {
     let dur = u64_p(p, "durationFrames").map(|f| s.sequence_rate().tick_of(f as i64)).unwrap_or(Tick::ZERO);
     let id = s.edit_sequence("Add Flash Cue Marker", |q, ctx, _| {
         let id = MarkerId(ctx.alloc());
-        q.markers.push(Marker { author, custom_color, id, start: t, duration: dur, name, comment, kind: MarkerKind::FlashCue, color });
+        q.markers.push(Marker { url: String::new(), author, custom_color, id, start: t, duration: dur, name, comment, kind: MarkerKind::FlashCue, color });
         q.markers.sort_by_key(|m| m.start);
         Ok(id)
     })?;

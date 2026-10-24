@@ -222,6 +222,8 @@
 	Normalize Mix Track…	Нормалізувати доріжку міксу…
 	Offline File…	Автономний файл…
 	Open Project…	Відкрити проєкт…
+	Open Recent	Нещодавні файли
+	Clear Recent Files	Очистити список нещодавніх файлів
 	Optical Flow	Оптичний потік
 	Overwrite	Перезаписати
 	Paste	Вставити
@@ -274,6 +276,7 @@
 	Review	Перегляд
 	Right	Праворуч
 	Ripple Delete	Видалити зі зсувом
+	Ripple Delete Head Frame	Видалити початок зі зсувом
 	Ripple Sequence Markers	Зсувати маркери секвенції
 	Rose	Рожевий
 	Safe Margins	Безпечні поля
@@ -419,3 +422,16 @@
 	Edit Markers	Редагувати маркери
 	Delete Markers	Видалити маркери
 	Marker changed or was removed. Reopen it to continue.	Маркер змінено або видалено. Відкрийте його знову, щоб продовжити.
+
+# Marker editing controls
+	Comment Marker	Маркер коментаря
+	Chapter Marker	Маркер розділу
+	Segmentation Marker	Маркер сегментації
+	Web Link	Вебпосилання
+	Flash Cue Point	Точка сигналу Flash
+
+# Web Link marker editing.
+	URL	URL
+	Open Link	Відкрити посилання
+	Opens this address in your web browser	Відкриває цю адресу у веббраузері
+	Enter a valid HTTP or HTTPS URL without credentials	Введіть дійсну URL-адресу HTTP або HTTPS без облікових даних

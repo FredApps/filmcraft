@@ -3,6 +3,121 @@ use filmcraft_project::{HexColor, Label};
 use serde_json::json;
 
 #[test]
+fn web_link_url_is_separate_from_notes_atomic_persistent_and_optional_in_old_projects() {
+    use filmcraft_project::MarkerKind;
+    let mut s = Session::default();
+    s.execute("file.newSequence", json!({})).unwrap();
+    let id = s.execute("markers.add", json!({"frame":0,"name":"Review","comment":"Use take two"})).unwrap()["marker"].as_u64().unwrap();
+    let sequence = s.state.active_sequence.unwrap();
+    let before = s.project.to_json();
+    let history = s.history.undo.len();
+    let url = "https://example.com/review?take=2#notes";
+    s.execute("markers.edit", json!({"marker":id,"kind":"webLink","url":format!(" {url} "),"comment":"Awaiting approval"})).unwrap();
+    let marker = s.active_sequence().unwrap().markers[0].clone();
+    assert_eq!((&*marker.url, &*marker.comment, marker.kind), (url, "Awaiting approval", MarkerKind::WebLink));
+    assert_eq!(s.history.undo.len(), history + 1);
+    let loaded = filmcraft_format::decode(&filmcraft_format::encode(&s.project, false)).unwrap();
+    assert_eq!(loaded.project.sequence(sequence).unwrap().markers[0], marker);
+    assert_eq!(s.execute("sequence.inspect", json!({})).unwrap()["markers"][0]["url"], url);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.project.to_json(), before);
+    s.execute("edit.redo", json!({})).unwrap();
+    s.execute("markers.edit", json!({"marker":id,"kind":"comment","url":null})).unwrap();
+    assert_eq!(s.active_sequence().unwrap().markers[0].url, url);
+    s.execute("markers.edit", json!({"marker":id,"kind":"webLink"})).unwrap();
+    assert_eq!(s.active_sequence().unwrap().markers[0].url, url);
+    let mut legacy: serde_json::Value = serde_json::from_slice(&filmcraft_format::encode(&s.project, false)).unwrap();
+    legacy["schema_version"] = json!(16);
+    fn remove_urls(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Object(map) => {
+                map.remove("url");
+                for value in map.values_mut() {
+                    remove_urls(value);
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    remove_urls(value);
+                }
+            }
+            _ => {}
+        }
+    }
+    remove_urls(&mut legacy);
+    let loaded = filmcraft_format::decode(&serde_json::to_vec(&legacy).unwrap()).unwrap();
+    assert!(loaded.migrated());
+    assert!(loaded.project.sequence(sequence).unwrap().markers[0].url.is_empty());
+    for invalid in [
+        json!("file:///tmp/a"),
+        json!("javascript:alert(1)"),
+        json!("https://user:pass@example.com"),
+        json!("https://a\nb"),
+        json!("https://"),
+        json!("https:example.com"),
+        json!("relative/path"),
+        json!(42),
+        json!({}),
+        json!(["https://example.com"]),
+        json!("x".repeat(8193)),
+    ] {
+        let before = s.project.to_json();
+        let history = s.history.undo.len();
+        assert!(s.execute("markers.edit", json!({"marker":id,"url":invalid,"name":"Must not change"})).is_err());
+        assert_eq!(s.project.to_json(), before);
+        assert_eq!(s.history.undo.len(), history);
+    }
+    s.execute("markers.edit", json!({"marker":id,"url":""})).unwrap();
+    assert!(s.active_sequence().unwrap().markers[0].url.is_empty());
+    assert_eq!(s.active_sequence().unwrap().markers[0].comment, "Awaiting approval");
+}
+
+#[test]
+fn review_close_project_renews_runtime_identity() {
+    let mut session = Session::default();
+    session.execute("file.newSequence", json!({})).unwrap();
+    let original = session.project_instance.clone();
+    assert!(session.execute("file.closeProject", json!({})).is_err());
+    assert!(std::sync::Arc::ptr_eq(&original, &session.project_instance), "a rejected close must retain the live project's identity");
+    session.execute("file.closeProject", json!({"force":true})).unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&original, &session.project_instance));
+    assert!(session.project.items.is_empty());
+    assert!(!session.history.can_undo());
+}
+
+#[test]
+fn marker_kinds_edit_atomically_and_reject_invalid_values() {
+    use filmcraft_project::MarkerKind;
+    let mut s = Session::default();
+    s.execute("file.newSequence", json!({})).unwrap();
+    let marker = s.execute("markers.add", json!({"frame":0,"name":"Original"})).unwrap()["marker"].as_u64().unwrap();
+    for (value, expected) in [
+        ("chapter", MarkerKind::Chapter),
+        ("segmentation", MarkerKind::Segmentation),
+        ("webLink", MarkerKind::WebLink),
+        ("flashCue", MarkerKind::FlashCue),
+        ("comment", MarkerKind::Comment),
+    ] {
+        let before = s.project.to_json();
+        let history = s.history.undo.len();
+        s.execute("markers.edit", json!({"marker":marker,"kind":value,"name":"Changed","comment":"Together"})).unwrap();
+        assert_eq!(s.active_sequence().unwrap().markers[0].kind, expected);
+        assert_eq!(s.history.undo.len(), history + 1);
+        s.execute("edit.undo", json!({})).unwrap();
+        assert_eq!(s.project.to_json(), before);
+        s.execute("edit.redo", json!({})).unwrap();
+        assert_eq!(s.active_sequence().unwrap().markers[0].kind, expected);
+    }
+    for kind in [json!("unknown"), json!(true), json!(42), json!([]), json!({})] {
+        let before = s.project.to_json();
+        let history = s.history.undo.len();
+        assert!(s.execute("markers.edit", json!({"marker":marker,"kind":kind,"name":"Must not change"})).is_err());
+        assert_eq!(s.project.to_json(), before);
+        assert_eq!(s.history.undo.len(), history);
+    }
+}
+
+#[test]
 fn custom_marker_properties_survive_undo_and_project_reopen() {
     let mut s = Session::default();
     s.execute("file.newSequence", json!({"name":"Review"})).unwrap();
@@ -203,6 +318,8 @@ fn marker_time_edits_are_sorted_exact_and_reject_hostile_ranges_atomically() {
         json!({"frame":i64::MAX}),
         json!({"durationFrames":-1}),
         json!({"durationFrames":"2"}),
+        json!({"durationFrames":1.5}),
+        json!({"durationFrames":i64::MAX}),
         json!({"time":i64::MAX}),
         json!({"time":true}),
         json!({"frame":1,"time":0}),
@@ -272,8 +389,14 @@ fn source_marker_edits_keep_their_owner_and_enforce_bounds() {
     let view = filmcraft_engine::clip_ops::source_view(&s, source).unwrap();
     let other = s.project.items.values().find(|i| i.as_media().is_some() && i.id != source).unwrap().id;
     s.execute("source.open", json!({"item":other.0})).unwrap();
-    s.execute("markers.edit", json!({"target":"source","item":source.0,"marker":marker,"frame":1,"durationFrames":2})).unwrap();
+    s.execute(
+        "markers.edit",
+        json!({"target":"source","item":source.0,"marker":marker,"frame":1,"durationFrames":2,"kind":"webLink","url":"https://example.com/source"}),
+    )
+    .unwrap();
     assert_eq!(filmcraft_engine::clip_ops::source_view(&s, source).unwrap().markers[0].start, view.rate.tick_of(1));
+    assert_eq!(filmcraft_engine::clip_ops::source_view(&s, source).unwrap().markers[0].kind, filmcraft_project::MarkerKind::WebLink);
+    assert_eq!(filmcraft_engine::clip_ops::source_view(&s, source).unwrap().markers[0].url, "https://example.com/source");
     let before = s.project.to_json();
     let history = s.history.undo.len();
     for change in [json!({"time":view.end.0}), json!({"time":view.end.0-1,"durationFrames":2}), json!({"durationFrames":i64::MAX}), json!({"time":-1})] {

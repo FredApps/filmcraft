@@ -202,6 +202,7 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
             .enumerate()
     {
         s.markers.push(Marker {
+            url: String::new(),
             author: String::new(),
             custom_color: None,
             id: MarkerId(800_000 + i as u64),
@@ -222,5 +223,7 @@ fn build_demo(pool: &MediaPool) -> Option<(Project, ItemId)> {
     for tr in s.all_tracks_mut() {
         tr.sort();
     }
+    // the transitions and markers above take fixed ids: new ones start past them
+    p.next_id = p.next_id.max(p.max_id().saturating_add(1));
     Some((p, seq))
 }

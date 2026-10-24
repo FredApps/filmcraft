@@ -313,7 +313,7 @@ fn marker_json(m: &Marker, rate: FrameRate) -> Value {
         "comment": m.comment,
         "color": color_name(m.color),
         "marked_range": tr(m.start, m.duration, rate),
-        "metadata": {"filmcraft": {"kind": m.kind, "label": m.color, "custom_color": m.custom_color, "author": m.author, "start_ticks": m.start.0, "duration_ticks": m.duration.0}},
+        "metadata": {"filmcraft": {"kind": m.kind, "url": m.url, "label": m.color, "custom_color": m.custom_color, "author": m.author, "start_ticks": m.start.0, "duration_ticks": m.duration.0}},
     })
 }
 
@@ -809,6 +809,7 @@ impl Imp<'_, '_> {
                 .and_then(|l| serde_json::from_value::<Label>(l.clone()).ok())
                 .unwrap_or_else(|| color_label(m.get("color").and_then(Value::as_str).unwrap_or("")));
             out.push(Marker {
+                url: meta.and_then(|x| x.get("url")).and_then(Value::as_str).unwrap_or("").to_string(),
                 author: meta.and_then(|x| x.get("author")).and_then(Value::as_str).unwrap_or("").to_string(),
                 custom_color: meta.and_then(|x| x.get("custom_color")).and_then(|c| c.as_str()).and_then(filmcraft_project::HexColor::parse),
                 id: MarkerId(self.b.alloc()),

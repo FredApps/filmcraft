@@ -206,7 +206,18 @@ pub(crate) fn route(s: &mut Session, id: &str, p: &Value) -> Result<Option<Value
                 }
                 let marker = MarkerId(pr.alloc_id());
                 let list = marker_list(pr, root)?;
-                list.push(Marker { author, custom_color, id: marker, start: time, duration, name, comment, color, kind: MarkerKind::Comment });
+                list.push(Marker {
+                    url: String::new(),
+                    author,
+                    custom_color,
+                    id: marker,
+                    start: time,
+                    duration,
+                    name,
+                    comment,
+                    color,
+                    kind: MarkerKind::Comment,
+                });
                 list.sort_by_key(|m| m.start);
                 Ok(marker)
             })?;

@@ -3,7 +3,7 @@ use crate::{
     EngineError, Result, Session,
     commands::{bad, marker_author_p, marker_color_p},
 };
-use filmcraft_project::{ItemId, Marker, MarkerId, Project};
+use filmcraft_project::{ItemId, Marker, MarkerId, MarkerKind, Project};
 use filmcraft_time::{FrameRate, Tick};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -73,6 +73,17 @@ pub(crate) fn run(s: &mut Session, p: &Value, delete: bool) -> Result<Value> {
     }
     let color = marker_color_p(p, id)?;
     let author = marker_author_p(p, id)?;
+    let kind = match p.get("kind") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(match value.as_str() {
+            Some("comment") => MarkerKind::Comment,
+            Some("chapter") => MarkerKind::Chapter,
+            Some("segmentation") => MarkerKind::Segmentation,
+            Some("webLink") => MarkerKind::WebLink,
+            Some("flashCue") => MarkerKind::FlashCue,
+            _ => return Err(bad(id, "kind must be comment, chapter, segmentation, webLink or flashCue")),
+        }),
+    };
     let text = |key| -> Result<Option<String>> {
         p.get(key)
             .map(|v| v.as_str().filter(|v| v.len() <= 65536).map(str::to_owned).ok_or_else(|| bad(id, "marker text must be a string of at most 65536 bytes")))
@@ -80,6 +91,20 @@ pub(crate) fn run(s: &mut Session, p: &Value, delete: bool) -> Result<Value> {
     };
     let name = text("name")?;
     let comment = text("comment")?;
+    let url = match p.get("url") {
+        None | Some(Value::Null) => None,
+        Some(value) => {
+            let value = value
+                .as_str()
+                .filter(|v| v.len() <= 8192 && !v.chars().any(char::is_control))
+                .ok_or_else(|| bad(id, "url must be text of at most 8192 bytes without control characters"))?
+                .trim();
+            if !value.is_empty() && filmcraft_project::marker_web_url(value).is_none() {
+                return Err(bad(id, "url must be an absolute HTTP or HTTPS address without credentials"));
+            }
+            Some(value.to_string())
+        }
+    };
     s.edit(if delete { "Delete Markers" } else { "Edit Markers" }, |project, _| {
         let markers = list(project, owner)?;
         let present: BTreeSet<_> = markers.iter().map(|m| m.id).collect();
@@ -109,8 +134,14 @@ pub(crate) fn run(s: &mut Session, p: &Value, delete: bool) -> Result<Value> {
                 if let Some(v) = &comment {
                     m.comment.clone_from(v);
                 }
+                if let Some(v) = &url {
+                    m.url.clone_from(v);
+                }
                 if let Some(v) = &author {
                     m.author.clone_from(v);
+                }
+                if let Some(kind) = kind {
+                    m.kind = kind;
                 }
                 if let Some((preset, custom)) = color {
                     if custom.is_none() {

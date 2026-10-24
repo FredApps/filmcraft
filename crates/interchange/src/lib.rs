@@ -50,9 +50,12 @@ pub use comp::ExtractedMedia;
 
 /// Warn once when an export cannot carry exact marker metadata, including nested/source markers.
 fn warn_marker_metadata_loss(project: &Project, sequence: ItemId, report: &mut Report) {
+    if !project.custom_colors.is_empty() {
+        report.warn("This format does not preserve the saved custom-color palette or its swatch names. Use a FilmCraft project or OTIO to retain the palette.");
+    }
     let mut pending = std::collections::BTreeSet::from([sequence]);
     let mut seen = std::collections::BTreeSet::new();
-    let extra = |m: &filmcraft_project::Marker| m.custom_color.is_some() || !m.author.is_empty();
+    let extra = |m: &filmcraft_project::Marker| m.custom_color.is_some() || !m.author.is_empty() || !m.url.is_empty();
     while let Some(id) = pending.pop_first() {
         if !seen.insert(id) {
             continue;
@@ -80,7 +83,7 @@ fn warn_marker_metadata_loss(project: &Project, sequence: ItemId, report: &mut R
                 _ => false,
             };
         if has_extra {
-            report.warn("This format does not preserve marker authors or exact custom colors (including clip labels). Use a FilmCraft project or OTIO for those properties.");
+            report.warn("This format does not preserve marker authors or exact custom colors (including clip labels), or marker URLs. Use a FilmCraft project or OTIO for those properties.");
             return;
         }
     }
@@ -464,14 +467,14 @@ pub fn export_edl_per_track(project: &Project, sequence: ItemId, opts: &ExportOp
 pub fn merge_into(target: &mut Project, fragment: Imported, bin: Option<BinId>) -> Vec<ItemId> {
     let Imported { project: frag, sequences } = fragment;
     for color in &frag.custom_colors {
-        if target.custom_colors.len() >= 64 {
-            break;
-        }
         if !target.custom_colors.contains(color) {
-            target.custom_colors.push(*color);
-            if let Some(name) = frag.custom_color_names.get(color) {
-                target.custom_color_names.insert(*color, name.clone());
+            if target.custom_colors.len() >= 64 {
+                continue;
             }
+            target.custom_colors.push(*color);
+        }
+        if let Some(name) = frag.custom_color_names.get(color) {
+            target.custom_color_names.entry(*color).or_insert_with(|| name.clone());
         }
     }
     let mut items: HashMap<ItemId, ItemId> = HashMap::new();

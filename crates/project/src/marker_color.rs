@@ -76,6 +76,7 @@ mod tests {
         let marker: Marker = serde_json::from_value(value).unwrap();
         assert_eq!(marker.custom_color, None);
         assert_eq!(marker.author, "");
+        assert!(marker.url.is_empty());
         assert_eq!(marker.rgb(), crate::Label::Magenta.marker_rgb());
     }
 }

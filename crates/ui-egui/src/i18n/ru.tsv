@@ -221,6 +221,8 @@
 	Normalize Mix Track…	Нормализовать мастер-дорожку…
 	Offline File…	Автономный файл…
 	Open Project…	Открыть проект…
+	Open Recent	Открыть недавние
+	Clear Recent Files	Очистить список недавних файлов
 	Optical Flow	Оптический поток
 	Overwrite	Перезаписать
 	Paste	Вставить
@@ -273,6 +275,7 @@
 	Review	Рецензирование
 	Right	По правому краю
 	Ripple Delete	Удаление со сдвигом
+	Ripple Delete Head Frame	Удалить начало со сдвигом
 	Ripple Sequence Markers	Сдвигать маркеры эпизода
 	Rose	Розовый
 	Safe Margins	Безопасные поля
@@ -419,3 +422,16 @@
 	Edit Markers	Изменить маркеры
 	Delete Markers	Удалить маркеры
 	Marker changed or was removed. Reopen it to continue.	Маркер изменён или удалён. Откройте его заново, чтобы продолжить.
+
+# Marker editing controls
+	Comment Marker	Маркер комментария
+	Chapter Marker	Маркер главы
+	Segmentation Marker	Маркер сегментации
+	Web Link	Веб-ссылка
+	Flash Cue Point	Точка сигнала Flash
+
+# Web Link marker editing.
+	URL	URL
+	Open Link	Открыть ссылку
+	Opens this address in your web browser	Открывает этот адрес в веб-браузере
+	Enter a valid HTTP or HTTPS URL without credentials	Введите допустимый URL HTTP или HTTPS без учётных данных
