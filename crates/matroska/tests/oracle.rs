@@ -296,10 +296,21 @@ fn laced_remux() {
                 .map(|(ti, t)| {
                     let mut s = TrackSpec::new(t.kind, t.codec_id.clone());
                     s.codec_private = t.codec_private.clone();
-                    // audio without a DefaultDuration gets its mean packet spacing, so it can lace
+                    // Use an actual packet interval, rather than the mean: variable-size Vorbis
+                    // blocks and container timestamp rounding can make the mean match no pair.
+                    // The writer still laces only frames whose original timestamps match exactly.
                     s.default_duration_ns = t.default_duration_ns.or_else(|| {
+                        if t.kind != TrackKind::Audio {
+                            return None;
+                        }
                         let pts: Vec<i64> = packets.iter().filter(|p| p.track == ti).map(|p| p.pts_ns).collect();
-                        (t.kind == TrackKind::Audio && pts.len() > 1).then(|| ((pts[pts.len() - 1] - pts[0]) / (pts.len() as i64 - 1)) as u64)
+                        let mut intervals = std::collections::BTreeMap::<u64, usize>::new();
+                        for pair in pts.windows(2) {
+                            if let Some(delta) = pair[1].checked_sub(pair[0]).filter(|&delta| delta > 0) {
+                                *intervals.entry(delta as u64).or_default() += 1;
+                            }
+                        }
+                        intervals.into_iter().max_by_key(|&(_, count)| count).map(|(duration, _)| duration)
                     });
                     s.video_size = t.video.as_ref().map(|v| (v.pixel_width, v.pixel_height));
                     s.audio = t.audio.as_ref().map(|a| (a.sampling_frequency, a.channels, a.bit_depth));

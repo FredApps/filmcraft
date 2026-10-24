@@ -1048,7 +1048,7 @@ mod tests {
     fn a_panicking_frame_job_is_an_error_not_a_hang() {
         for threads in [1, 3] {
             assert_eq!(decode_key_frame(threads, false), Ok(1), "threads {threads}");
-            assert_eq!(within_a_minute(move || decode_key_frame(threads, true)), Err(Error::Invalid("decoder panicked")), "threads {threads}");
+            assert_eq!(within_a_minute(move || decode_key_frame(threads, true)), Err(Error::Invalid("internal AV1 decoder panic")), "threads {threads}");
         }
     }
 

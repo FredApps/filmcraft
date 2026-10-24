@@ -286,6 +286,13 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
 
     /// Nested sequence from a `<media>` resource.
     fn media(&mut self, id: &str) -> Option<ItemId> {
+        // An active resource may already have a reserved placeholder in `media_items`. Check the
+        // recursion stack before the completed-resource cache so a self-reference is reported and
+        // skipped instead of resolving to that incomplete placeholder.
+        if self.media_active.contains(id) {
+            self.report.warn(format!("recursive FCPXML media resource {id:?} ignored"));
+            return None;
+        }
         if let Some(i) = self.media_items.get(id) {
             return Some(*i);
         }
@@ -296,7 +303,8 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
             return None;
         }
         let name = n.attribute("name").unwrap_or("Compound Clip").to_string();
-        // Reserve and memoize before descending, so recursive references resolve to the placeholder.
+        // Reserve and memoize before descending so the resource keeps one stable identity; active
+        // back-edges are detected above and skipped.
         let settings = self.sequence_settings(s);
         let item = self.b.reserve_sequence(&name, settings.clone(), None);
         self.media_items.insert(id.into(), item);

@@ -151,18 +151,23 @@ fn duplicate_selection_already_in_session_keeps_nudges_equivalent_to_unique_sele
 #[test]
 fn duplicate_selection_delete_matches_unique_selection_with_and_without_links() {
     for linked in [false, true] {
-        for command in ["edit.clear", "edit.rippleDelete"] {
-            let mut s = demo();
-            let (_, v, a_track, a) = pair_in_an_empty_sequence(&mut s, 60.0);
-            s.execute("sequence.linkedSelection", json!({"on": linked})).unwrap();
-            if !linked {
-                s.execute("timeline.setTrack", json!({"track": a_track.0, "syncLock": false})).unwrap();
+        for select_audio in [false, true] {
+            for command in ["edit.clear", "edit.rippleDelete"] {
+                let mut s = demo();
+                let (_, v, a_track, a) = pair_in_an_empty_sequence(&mut s, 60.0);
+                s.execute("sequence.linkedSelection", json!({"on": linked})).unwrap();
+                if !linked {
+                    s.execute("timeline.setTrack", json!({"track": a_track.0, "syncLock": false})).unwrap();
+                }
+                // Current selections are exact (including Alt selections). Linked expansion
+                // happens when selecting, not when deleting the already-selected identities.
+                s.state.selection = if select_audio { vec![v.id, v.id, a.id, a.id] } else { vec![v.id, v.id] };
+                let unique_selection = if select_audio { vec![v.id, a.id] } else { vec![v.id] };
+                assert_selection_edit_matches_control(&mut s, unique_selection, command, json!({}));
+                assert!(s.active_sequence().unwrap().find_item(v.id).is_none());
+                assert_eq!(s.active_sequence().unwrap().find_item(a.id).is_none(), select_audio);
+                assert!(s.state.selection.is_empty());
             }
-            s.state.selection = vec![v.id, v.id];
-            assert_selection_edit_matches_control(&mut s, vec![v.id], command, json!({}));
-            assert!(s.active_sequence().unwrap().find_item(v.id).is_none());
-            assert_eq!(s.active_sequence().unwrap().find_item(a.id).is_none(), linked);
-            assert!(s.state.selection.is_empty());
         }
     }
 }
@@ -205,7 +210,7 @@ fn reject_duplicate_new_track_move(s: &mut Session, clip: ClipId, insert: bool, 
         "timeline.move",
         json!({"moves": [{"clip": clip.0, "track": tracks[0], "time": at}, {"clip": clip.0, "track": tracks[1], "time": at}], "insert": insert, "linked": linked}),
     );
-    assert!(matches!(result, Err(EngineError::Edit(filmcraft_edit::EditError::Other(_)))), "duplicate move entries must be rejected: {result:?}");
+    assert!(matches!(result, Err(EngineError::BadParams { .. })), "duplicate move entries must be rejected: {result:?}");
     assert_eq!(s.project, before, "the project and its id allocator stay unchanged");
     assert_eq!(s.state.selection, selection);
     assert_eq!(serde_json::to_value(&s.state).unwrap(), editor_state);

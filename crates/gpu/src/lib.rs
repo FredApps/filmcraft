@@ -1066,6 +1066,8 @@ impl GpuCompositor {
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
                 mapped_at_creation: false,
             });
+            #[cfg(test)]
+            eprintln!("GPU accumulator readback: {w}x{h}, row={row}, bytes={needed}");
             self.accum_readback_buf = Some((b, needed));
         }
         let (tex, _, _) = self.accum.as_ref()?;
@@ -1122,6 +1124,8 @@ impl GpuCompositor {
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
+        #[cfg(test)]
+        eprintln!("GPU output readback: {w}x{h}, row={row}, bytes={}", row * h);
         let mut enc = self.device.create_command_encoder(&Default::default());
         enc.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },

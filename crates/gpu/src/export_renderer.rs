@@ -81,6 +81,8 @@ static DEVICE_FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicB
 fn mark_device_failed(why: &str) {
     if !DEVICE_FAILED.swap(true, std::sync::atomic::Ordering::SeqCst) {
         log::error!("GPU export disabled for this session ({why}); exports render on the CPU");
+        #[cfg(test)]
+        eprintln!("GPU export device failed: {why}");
     }
 }
 
@@ -113,7 +115,21 @@ impl ExportRenderer {
                 }
                 let instance = wgpu::Instance::default();
                 let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).ok()?;
+                #[cfg(test)]
+                {
+                    let info = adapter.get_info();
+                    eprintln!(
+                        "GPU export test adapter: {} ({:?}, {:?}, vendor {:04x}, device {:04x})",
+                        info.name, info.backend, info.device_type, info.vendor, info.device
+                    );
+                }
                 let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()?;
+                #[cfg(test)]
+                eprintln!(
+                    "GPU export test limits: max_buffer_size={}, max_texture_2d={}",
+                    device.limits().max_buffer_size,
+                    device.limits().max_texture_dimension_2d
+                );
                 // wgpu's default handler panics on a validation or out-of-memory error; log it and
                 // send the remaining frames to the CPU instead.
                 device.on_uncaptured_error(std::sync::Arc::new(|e: wgpu::Error| mark_device_failed(&format!("GPU error: {e}"))));

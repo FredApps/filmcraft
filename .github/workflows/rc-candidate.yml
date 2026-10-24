@@ -52,6 +52,7 @@
         "with":
           "shared-key": "rc-windows-x64-1.99.1"
           "cache-on-failure": true
+          "cache-workspace-crates": true
           "save-if": true
       -
         "uses": "actions/setup-dotnet@v4"
@@ -61,25 +62,68 @@
         "name": "Install external oracles and WiX"
         "run": |
           $ErrorActionPreference='Stop'
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { throw 'FFmpeg installation failed' }
+          New-Item -ItemType Directory -Force logs | Out-Null
+          $oracleArchive = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle.zip'
+          Invoke-WebRequest 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-24-13-02/ffmpeg-N-128013-g6b05263b44-win64-gpl.zip' -OutFile $oracleArchive
+          $expectedOracleHash = '5c31cb2f41de970ed9a49414c232b7eb83c1a2632ae5245225013335f8ff1fab'
+          if ((Get-FileHash -LiteralPath $oracleArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedOracleHash) { throw 'Oracle archive checksum mismatch' }
+          $oracleRoot = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle'
+          Expand-Archive -LiteralPath $oracleArchive -DestinationPath $oracleRoot
+          $oracleFfmpeg = (Get-ChildItem -LiteralPath $oracleRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1).FullName
+          if (-not $oracleFfmpeg) { throw 'Oracle ffmpeg missing' }
+          $oracleBin = Split-Path -Parent $oracleFfmpeg
+          $env:FILMCRAFT_FFMPEG = $oracleFfmpeg
+          $env:FILMCRAFT_FFPROBE = Join-Path $oracleBin 'ffprobe.exe'
+          "FILMCRAFT_FFMPEG=$env:FILMCRAFT_FFMPEG" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FILMCRAFT_FFPROBE=$env:FILMCRAFT_FFPROBE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          $oracleBin | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          $encoderList = (& $oracleFfmpeg -hide_banner -encoders 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate oracle encoders' }
+          $encoderList | Set-Content logs/oracle-encoders.log
+          foreach ($codec in @('libx264', 'libx265', 'libaom-av1', 'libsvtav1', 'libkvazaar')) {
+            if ($encoderList -notmatch "(?m)^\s*\S+\s+$([regex]::Escape($codec))\s") { throw "Oracle lacks $codec" }
           }
+          $decoderList = (& $oracleFfmpeg -hide_banner -decoders 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $decoderList -notmatch '(?m)^\s*\S+\s+libdav1d\s') { throw 'Oracle lacks libdav1d' }
+          $decoderList | Set-Content logs/oracle-decoders.log
+          "$expectedOracleHash  ffmpeg-oracle.zip" | Set-Content logs/oracle-sha256.log
           dotnet tool install --global wix --version 5.0.2
           if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
           "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          ffmpeg -version
-          ffprobe -version
+          & $env:FILMCRAFT_FFMPEG -version 2>&1 | Tee-Object logs/oracle-version.log
+          & $env:FILMCRAFT_FFPROBE -version
       -
-        "name": "Format, native Clippy, workspace tests and doctests"
+        "name": "Check source formatting"
         "run": |
           New-Item -ItemType Directory -Force logs | Out-Null
           cargo fmt --all -- --check 2>&1 | Tee-Object logs/fmt.log
           if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
+      -
+        "name": "Native Clippy"
+        "run": |
           cargo clippy --workspace --all-targets --keep-going --locked -- -D warnings 2>&1 | Tee-Object logs/clippy.log
           if ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }
+      -
+        "name": "GPU readback diagnostics"
+        "continue-on-error": true
+        "run": |
+          cargo test --locked -p filmcraft-gpu --lib -- --nocapture 2>&1 | Tee-Object logs/gpu-diagnostic.log
+          if ($LASTEXITCODE -ne 0) { throw 'GPU diagnostics failed; full suite remains required' }
+      -
+        "name": "Publish GPU diagnostics"
+        "uses": "actions/upload-artifact@v4"
+        "with":
+          "name": "filmcraft-rc-gpu-diagnostics"
+          "path": "logs/gpu-diagnostic.log"
+          "if-no-files-found": "error"
+      -
+        "name": "Workspace tests"
+        "run": |
           cargo test --workspace --lib --bins --tests --locked --no-fail-fast 2>&1 | Tee-Object logs/tests.log
           if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
+      -
+        "name": "Doctests"
+        "run": |
           cargo test --workspace --doc --locked 2>&1 | Tee-Object logs/doctests.log
           if ($LASTEXITCODE -ne 0) { throw 'Doctests failed' }
       -

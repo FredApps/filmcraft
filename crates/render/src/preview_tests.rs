@@ -210,6 +210,16 @@ fn need_classification_none_yellow_red() {
 }
 
 #[test]
+fn resolved_default_motion_stays_native_but_a_moved_position_is_realtime() {
+    let (mut p, matte, _, seq) = setup();
+    let clip = place(&mut p, seq, 0, matte, 0, 24);
+    assert_eq!(video_segments(&p, seq)[0].need, Need::None, "resolved auto-centre is still the default");
+    let motion = p.sequence_mut(seq).unwrap().find_item_mut(clip).unwrap().1.effect_mut("motion").unwrap();
+    motion.param_mut("position").unwrap().value = ParamValue::Vec2(filmcraft_geom::Vec2::new(961.0, 540.0));
+    assert_eq!(video_segments(&p, seq)[0].need, Need::Realtime, "a one-pixel move is no longer native");
+}
+
+#[test]
 fn effect_tiers_are_ordered() {
     assert!(effect_cost_ms("lumetri") > effect_cost_ms("tint"));
     assert!(effect_cost_ms("tint") > effect_cost_ms("crop"));

@@ -13,7 +13,11 @@ use filmcraft_render::plan::execute_cpu;
 pub(crate) fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
     let instance = wgpu::Instance::default();
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).ok()?;
-    pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()
+    let info = adapter.get_info();
+    eprintln!("GPU test adapter: {} ({:?}, {:?}, vendor {:04x}, device {:04x})", info.name, info.backend, info.device_type, info.vendor, info.device);
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()?;
+    eprintln!("GPU test limits: max_buffer_size={}, max_texture_2d={}", device.limits().max_buffer_size, device.limits().max_texture_dimension_2d);
+    Some((device, queue))
 }
 
 pub(crate) fn yuv_frame(w: u32, h: u32) -> Arc<VideoFrame> {
@@ -53,6 +57,7 @@ pub(crate) fn read_accum(c: &GpuCompositor) -> Vec<f32> {
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
+    eprintln!("GPU test accumulator readback: {w}x{h}, row={row}, bytes={}", row * h);
     let mut enc = c.device.create_command_encoder(&Default::default());
     enc.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo { texture: tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },

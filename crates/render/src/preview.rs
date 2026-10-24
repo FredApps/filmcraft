@@ -39,7 +39,7 @@
 //! size and rate match the sequence. Green (a valid preview exists) is decided by the preview
 //! store, which knows which hashes have files.
 
-use filmcraft_project::{ClipId, ItemId, ItemKind, Project, Sequence, TrackItem, TrackKind, Transition};
+use filmcraft_project::{ClipId, ItemId, ItemKind, ParamValue, Project, Sequence, TrackItem, TrackKind, Transition};
 use filmcraft_time::{FrameRate, Tick};
 use serde::Serialize;
 
@@ -517,15 +517,59 @@ fn estimate_cost(project: &Project, seq: &Sequence, layers: &[Layer]) -> f64 {
 /// A single clip that plays natively: no standard effects, untouched fixed effects, normal speed,
 /// source frame size and rate equal to the sequence's.
 fn native(project: &Project, seq: &Sequence, it: &TrackItem) -> bool {
-    if it.has_standard_effects() || it.has_modified_intrinsics() || (it.speed - 1.0).abs() > 1e-9 || it.reverse || it.frame_hold.is_some() {
+    if it.has_standard_effects() || (it.speed - 1.0).abs() > 1e-9 || it.reverse || it.frame_hold.is_some() {
         return false;
     }
     match project.item(it.item).map(|p| &p.kind) {
-        Some(ItemKind::Media(m)) => {
-            m.info.video.as_ref().is_some_and(|v| v.width == seq.settings.width && v.height == seq.settings.height && m.frame_rate() == seq.settings.frame_rate)
-        }
+        Some(ItemKind::Media(m)) => m.info.video.as_ref().is_some_and(|v| {
+            v.width == seq.settings.width
+                && v.height == seq.settings.height
+                && m.frame_rate() == seq.settings.frame_rate
+                && intrinsic_values_are_default(it, (v.width, v.height), (seq.settings.width, seq.settings.height))
+        }),
         _ => false,
     }
+}
+
+/// Placing a clip resolves default auto-points from NaN into concrete coordinates. These
+/// sequence/source-relative defaults must not make an otherwise untouched clip acquire a render
+/// bar. A different coordinate, animation, or mask remains a modified intrinsic.
+fn intrinsic_values_are_default(it: &TrackItem, source: (u32, u32), frame: (u32, u32)) -> bool {
+    it.effects.iter().all(|effect| {
+        let Some(def) = effect.def() else { return true };
+        if !def.intrinsic {
+            return true;
+        }
+        if effect.is_animated() || !effect.masks.is_empty() {
+            return false;
+        }
+        def.params.iter().all(|param| {
+            let Some(value) = effect.params.get(param.id) else { return true };
+            match (&value.value, &param.default) {
+                (ParamValue::Vec2(current), ParamValue::Vec2(default)) if default.x.is_nan() || default.y.is_nan() => {
+                    let size = if param.id == "anchor" { source } else { frame };
+                    let auto = filmcraft_project::effect::auto_point(&effect.effect, param.id);
+                    let resolved = |current: f64, default: f64, axis: usize| {
+                        if !default.is_nan() {
+                            current == default
+                        } else if current.is_nan() {
+                            true
+                        } else {
+                            let extent = if axis == 0 { size.0 } else { size.1 };
+                            let fraction = auto.map(|point| if axis == 0 { point.0 } else { point.1 });
+                            let expected = fraction.map_or_else(
+                                || if axis == 1 && param.id == "end" { extent as f64 } else { extent as f64 / 2.0 },
+                                |fraction| fraction * extent as f64,
+                            );
+                            (current - expected).abs() <= 1e-9
+                        }
+                    };
+                    resolved(current.x, default.x, 0) && resolved(current.y, default.y, 1)
+                }
+                _ => value.value == param.default,
+            }
+        })
+    })
 }
 
 // ---------------------------------------------------------------- hashing

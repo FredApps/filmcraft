@@ -3638,3 +3638,4 @@
 	Camera Label	Etiqueta de cámara
 	Leave out clips without timecode	Omitir clips sin código de tiempo
 	No timecode: {names}	Sin código de tiempo: {names}
+	Opens in your web browser: {url}	Se abre en tu navegador web: {url}
