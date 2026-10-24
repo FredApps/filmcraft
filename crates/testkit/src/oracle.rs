@@ -254,10 +254,8 @@ mod tests {
         assert_eq!(passthrough_args_for(None), fps_mode);
     }
 
-    fn tmpdir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("filmcraft-testkit-{tag}-{}", std::process::id()));
-        std::fs::create_dir_all(&d).unwrap();
-        d
+    fn tmpdir(_tag: &str) -> PathBuf {
+        tempfile::tempdir().unwrap().keep()
     }
 
     #[test]
