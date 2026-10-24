@@ -1322,10 +1322,6 @@ impl FrameHeader {
     }
 }
 
-fn strictly_increasing(values: &[u8]) -> bool {
-    values.windows(2).all(|pair| pair[0] < pair[1])
-}
-
 #[cfg(test)]
 mod tests {
     use super::strictly_increasing;

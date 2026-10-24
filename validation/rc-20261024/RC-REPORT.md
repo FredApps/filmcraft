@@ -18,11 +18,11 @@ Held commits that were integrated early remain in Git history with targeted corr
 
 Trusted source formatting and static inspection were completed, including conflict delimiter repairs, test-module relocation, RC workspace version checks, lockfile reference repairs, catalog key checks and exact named test/package mapping against the integrated source. The trusted Cargo resolver also successfully refreshed only workspace dependencies from the pre-upgrade lock: six required packages changed for cpal 0.18.2, and unrelated dependency versions were retained. No candidate code, build script, test or binary was built or executed on the operator machine.
 
-The dedicated fork workflow is registered and active. It defines Linux core quality gates; Linux AppImage/tar packaging and authenticated graphical X11 smoke; Windows x64 Clippy/tests/doctests and MSI/portable packaging; and macOS arm64 Clippy/tests/doctests, native-font validation and DMG/CLI packaging. Artifacts are designed to carry exact source/tree, lock/toolchain/font evidence, notices, SHA-256 manifests and the acceptance kit. Windows packaging is unsigned; macOS signing is ad hoc, without notarization.
+The dedicated fork workflow now builds **Windows x64 only**, per the user's updated scope. It runs formatting, Clippy, workspace tests, doctests, dependency-layer and asset-attribution checks, then creates MSI and portable ZIP packages. Artifacts carry exact source/tree, lock/toolchain/font evidence, notices, hashes and the acceptance kit. Windows packages are unsigned. Linux and macOS jobs have been removed.
 
-**No new binary build is ready.** GitHub rejects workflow dispatch before creating a run with HTTP 422, `Actions has been disabled for this repository`. Repository permissions nevertheless report `enabled: true`, and workflow 395281842 reports `active`. Re-enabling both did not clear the rejection. See `github-actions-blocker.json` for exact CLI diagnostics. This is consistent with the separate GitHub-controlled disabled state described in [GitHub's repository Actions settings documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository); the underlying reason has not been established.
+GitHub Actions access was restored on 2026-10-24. The earlier disabled-state diagnostics are retained as historical evidence; no Support action is currently required. The first Windows run (40119629548) passed formatting and then found a duplicate AV1 helper from overlapping integrations. The duplicate was consolidated, retaining the bounded helper and regression test. Build/test/package acceptance remains pending the subsequent hosted run.
 
-After access is restored, dispatch the exact branch:
+To dispatch the Windows-only branch:
 
 ```powershell
 gh workflow run rc-candidate.yml -R FredApps/filmcraft --ref rc/20261024

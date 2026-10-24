@@ -1,3 +1,5 @@
+**Obsolete: Actions access was restored on 2026-10-24. Retained only as historical evidence; do not submit.**
+
 # Draft: Actions disabled despite enabled permissions
 
 This is a prepared draft, not a submitted support request.

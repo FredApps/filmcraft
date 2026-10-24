@@ -83,6 +83,13 @@
           cargo test --workspace --doc --locked 2>&1 | Tee-Object logs/doctests.log
           if ($LASTEXITCODE -ne 0) { throw 'Doctests failed' }
       -
+        "name": "Validate dependency layers and asset attribution"
+        "run": |
+          cargo run --locked -p xtask -- layers 2>&1 | Tee-Object logs/layers.log
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency layer check failed' }
+          cargo run --locked -p xtask -- assets 2>&1 | Tee-Object logs/assets.log
+          if ($LASTEXITCODE -ne 0) { throw 'Asset attribution check failed' }
+      -
         "name": "Build and package the RC"
         "run": |
           & packaging/windows/package.ps1 -Arch x64 2>&1 | Tee-Object logs/packaging.log
