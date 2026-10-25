@@ -1,0 +1,47 @@
+{
+  "name": "FilmCraft pinned MSI installation verification",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read",
+    "actions": "read"
+  },
+  "jobs": {
+    "msi": {
+      "runs-on": "windows-2022",
+      "timeout-minutes": 30,
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/download-artifact@v4",
+          "with": {
+            "artifact-ids": "12582742725",
+            "run-id": "40146573846",
+            "repository": "FredApps/filmcraft",
+            "github-token": "${{ secrets.GITHUB_TOKEN }}",
+            "path": "downloaded"
+          }
+        },
+        {
+          "name": "Verify pinned package and install MSI on clean runner",
+          "run": "$ErrorActionPreference = 'Stop'\nNew-Item -ItemType Directory -Force package-evidence | Out-Null\n$root = (Resolve-Path downloaded).Path\n$source = (Get-Content (Join-Path $root 'source-commit.txt') -Raw).Trim()\nif ($source -ne 'ab77f2d8329550fb80a8bd9a20dec206f05b6958') { throw 'Wrong package source' }\n$verified = @()\nforeach ($line in Get-Content (Join-Path $root 'SHA256SUMS.txt')) {\n  if ($line -notmatch '^([a-fA-F0-9]{64})  (.+)$') { throw 'Malformed hash manifest' }\n  $expected = $Matches[1]; $relative = $Matches[2]\n  $target = [IO.Path]::GetFullPath((Join-Path $root $relative))\n  if (-not $target.StartsWith($root + [IO.Path]::DirectorySeparatorChar)) { throw 'Manifest escapes root' }\n  $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne $expected) { throw \"Hash mismatch $relative\" }\n  $verified += @{path=$relative;sha256=$actual}\n}\n$verified | ConvertTo-Json -Depth 4 | Set-Content package-evidence/verified-files.json\n$msi = Join-Path $root 'packages/filmcraft-0.12.0-rc.20261024.1-windows-x64.msi'\nif ((Get-FileHash $msi -Algorithm SHA256).Hash.ToLowerInvariant() -ne '99088ba7bfd5a572fe5959b9f09c249a5219a729cbf71df2654a043f2708af18') { throw 'Wrong pinned MSI' }\n$zip = Join-Path $root 'packages/filmcraft-0.12.0-rc.20261024.1-windows-x64-portable.zip'\nif ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3ccee7ead9859c868c383e0ebd6c14f0c6c27ed3933b613ba3788ef37117cf63') { throw 'Wrong pinned portable ZIP' }\nExpand-Archive -LiteralPath $zip -DestinationPath portable-control\n$portable = (Get-ChildItem portable-control -Directory | Select-Object -First 1).FullName\n$install = Join-Path $env:ProgramFiles 'FilmCraft'\nif (Test-Path -LiteralPath $install) { throw 'Runner already has FilmCraft; not a clean install' }\n$log = Join-Path $env:GITHUB_WORKSPACE 'package-evidence/msi-install.log'\n$p = Start-Process msiexec.exe -ArgumentList @('/i',('\"'+$msi+'\"'),'/qn','/norestart','/L*v',('\"'+$log+'\"')) -WindowStyle Hidden -Wait -PassThru\n@{exit_code=$p.ExitCode;source_sha=$source;os=[Environment]::OSVersion.VersionString;install_path=$install} | ConvertTo-Json | Set-Content package-evidence/install-result.json\nif ($p.ExitCode -notin @(0,3010)) { throw \"MSI install failed $($p.ExitCode)\" }\n$files = @()\nforeach ($exe in @('filmcraft.exe','filmcraft-cli.exe')) {\n  $actual = (Get-FileHash -LiteralPath (Join-Path $install $exe) -Algorithm SHA256).Hash.ToLowerInvariant()\n  $expected = (Get-FileHash -LiteralPath (Join-Path $portable $exe) -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne $expected) { throw \"Installed binary differs: $exe\" }\n  $files += @{path=$exe;sha256=$actual}\n}\nforeach ($file in Get-ChildItem -LiteralPath $portable -File | Where-Object { $_.Name -match '^(LICENSE-|NOTICE$|OFL-)' }) {\n  $installed = Join-Path $install ('licenses/'+$file.Name)\n  if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) { throw \"Missing installed license $($file.Name)\" }\n  $actual = (Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()) { throw \"License differs $($file.Name)\" }\n  $files += @{path=('licenses/'+$file.Name);sha256=$actual}\n}\n$files | ConvertTo-Json -Depth 4 | Set-Content package-evidence/installed-files.json\n$version = & (Join-Path $install 'filmcraft-cli.exe') --version 2>&1\n$version | Set-Content package-evidence/installed-cli-version.txt\nif ($LASTEXITCODE -ne 0 -or \"$version\" -notmatch '0.12.0-rc.20261024.1' -or \"$version\" -notmatch 'ab77f2d') { throw 'Installed CLI version mismatch' }\n$portableVersion = & (Join-Path $portable 'filmcraft-cli.exe') --version 2>&1\n$portableVersion | Set-Content package-evidence/portable-cli-version.txt\nif ($LASTEXITCODE -ne 0 -or \"$portableVersion\" -ne \"$version\") { throw 'Portable/installed version mismatch' }\n$registration = Get-ItemProperty -LiteralPath 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\filmcraft.exe'\nif ($registration.'(default)' -ne (Join-Path $install 'filmcraft.exe')) { throw 'App Paths registration mismatch' }\n$shortcut = Join-Path $env:ProgramData 'Microsoft/Windows/Start Menu/Programs/FilmCraft.lnk'\nif (-not (Test-Path -LiteralPath $shortcut)) { throw 'Start Menu shortcut missing' }\n@{status='PASS';scope='Clean hosted MSI installation, installed hashes/notices/fonts/CLI version/registration/shortcut; portable CLI version control. Native GUI/About checks remain separate.';installed_files=$files.Count;verified_artifact_files=$verified.Count} | ConvertTo-Json | Set-Content package-evidence/summary.json\n"
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "rc-20261024-msi-install-verification",
+            "path": "package-evidence/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    }
+  }
+}
