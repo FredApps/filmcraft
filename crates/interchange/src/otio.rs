@@ -11,7 +11,7 @@
 //! state, sequence settings, media info, generators) round-trip through `metadata.filmcraft`.
 //! Nested sequences are `Stack` items inside tracks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use filmcraft_media::{Generator, MediaInfo};
 use filmcraft_project::{
@@ -22,8 +22,8 @@ use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick};
 use serde_json::{Value, json};
 
 use crate::common::{
-    Builder, MediaSpec, base_item, empty_sequence, file_name, generator_of, item_media, path_to_file_url, rate_from_f64, relative_path, resolve_path,
-    settings_for, transition_effect, transition_name,
+    Builder, MediaSpec, base_item, empty_sequence, file_name, generator_of, item_media, media_info, path_to_file_url, rate_from_f64, relative_path,
+    resolve_path, settings_for, transition_effect, transition_name,
 };
 use crate::{Error, ExportOptions, Format, ImportOptions, Imported, Report, Result};
 
@@ -369,8 +369,10 @@ struct Imp<'a, 'r> {
     report: &'r mut Report,
     links: HashMap<u64, u64>,
     groups: HashMap<u64, u64>,
+    explicit_dimensions: HashSet<ItemId>,
 }
 
+/// Imports OTIO timelines into one project while preserving supported source metadata.
 pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> Result<Imported> {
     let v: Value = serde_json::from_str(text).map_err(|e| Error::parse(Format::Otio, e.to_string()))?;
     let mut timelines = Vec::new();
@@ -378,7 +380,7 @@ pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> R
     if timelines.is_empty() {
         return Err(Error::parse(Format::Otio, format!("no Timeline in a {} document", schema(&v))));
     }
-    let mut imp = Imp { b: Builder::new(&name_of(&v)), opts, report, links: HashMap::new(), groups: HashMap::new() };
+    let mut imp = Imp { b: Builder::new(&name_of(&v)), opts, report, links: HashMap::new(), groups: HashMap::new(), explicit_dimensions: HashSet::new() };
     if imp.b.p.name.is_empty() {
         imp.b.p.name = "Imported OTIO".into();
     }
@@ -402,6 +404,7 @@ fn collect_timelines<'v>(v: &'v Value, out: &mut Vec<&'v Value>) {
     }
 }
 
+/// Finds the first source-range frame rate while walking a timeline's children.
 fn first_rate(v: &Value) -> Option<FrameRate> {
     if let Some(sr) = v.get("source_range").filter(|s| !s.is_null()) {
         return sr.get("duration").and_then(read_rate);
@@ -457,7 +460,10 @@ fn reference_dimensions(reference: &Value) -> Option<(u32, u32)> {
 fn active_media_reference(clip: &Value) -> Option<&Value> {
     let refs = clip.get("media_references");
     let key = clip.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
-    refs.and_then(|r| r.get(key).or_else(|| r.as_object().and_then(|o| o.values().next()))).or_else(|| clip.get("media_reference"))
+    match refs {
+        Some(refs) => refs.get(key).or_else(|| refs.as_object().and_then(|o| o.values().next())),
+        None => clip.get("media_reference"),
+    }
 }
 
 /// Returns dimensions only for a clip import() will retain (positive source duration).
@@ -523,6 +529,7 @@ impl Imp<'_, '_> {
         id
     }
 
+    /// Imports a sequence, preferring explicit settings over inferred video dimensions.
     fn sequence(&mut self, stack: &Value, name: &str, meta: Option<&Value>, rate: FrameRate) -> ItemId {
         let settings: SequenceSettings = meta.and_then(|m| m.get("settings")).and_then(|s| serde_json::from_value(s.clone()).ok()).unwrap_or_else(|| {
             let (width, height) = first_video_dimensions(stack).unwrap_or((1920, 1080));
@@ -710,16 +717,9 @@ impl Imp<'_, '_> {
         }
     }
 
+    /// Imports a positive-duration clip using the same reference selection as dimension discovery.
     fn clip(&mut self, c: &Value, kind: TrackKind, pos: Tick) -> Option<TrackItem> {
-        let mref = match c.get("media_references") {
-            Some(refs) => {
-                let key = c.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
-                refs.get(key).or_else(|| refs.as_object().and_then(|o| o.values().next()))
-            }
-            None => c.get("media_reference"),
-        }
-        .cloned()
-        .unwrap_or(Value::Null);
+        let mref = active_media_reference(c).cloned().unwrap_or(Value::Null);
         let name = name_of(c);
         let avail = mref.get("available_range").and_then(read_tr);
         let (src_in, dur) = c.get("source_range").and_then(read_tr).or(avail)?;
@@ -766,6 +766,7 @@ impl Imp<'_, '_> {
         Some(ti)
     }
 
+    /// Registers a referenced media item with dimensions inferred from its reference metadata.
     fn media(&mut self, r: &Value, clip_name: &str, kind: TrackKind, avail: Option<(Tick, Tick)>) -> Option<ItemId> {
         let meta = fc(r);
         let info: Option<MediaInfo> = meta.and_then(|m| m.get("info")).and_then(|i| serde_json::from_value(i.clone()).ok());
@@ -841,6 +842,24 @@ impl Imp<'_, '_> {
                 id
             }
         };
+        if kind == TrackKind::Video
+            && let Some((width, height)) = dimensions
+            && !self.explicit_dimensions.contains(&id)
+            && let Some(media) = self.b.p.item_mut(id).and_then(|item| item.as_media_mut())
+        {
+            if let Some(video) = media.info.video.as_mut() {
+                video.width = width;
+                video.height = height;
+            } else {
+                media.info.video = media_info(&media.info.name, &spec).video;
+            }
+            if media.info.video.is_some() {
+                if media.info.kind == filmcraft_media::MediaKind::AudioOnly {
+                    media.info.kind = filmcraft_media::MediaKind::Movie;
+                }
+                self.explicit_dimensions.insert(id);
+            }
+        }
         Some(id)
     }
 

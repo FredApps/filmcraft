@@ -252,6 +252,7 @@ fn lossless_roundtrip_with_filmcraft_metadata() {
     assert_eq!(structure(&imp2.project, imp2.sequences[0], TrackKind::Video), structure(&p, s, TrackKind::Video));
 }
 
+/// Explicit sequence metadata is absent; the first video's FilmCraft media info supplies the size.
 #[test]
 fn sequence_dimensions_default_from_first_video_clip_media_info() {
     let document = r#"{
@@ -274,6 +275,7 @@ fn sequence_dimensions_default_from_first_video_clip_media_info() {
     assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
 }
 
+/// Image bounds supply portrait dimensions without any FilmCraft metadata.
 #[test]
 fn sequence_dimensions_default_from_first_video_clip_image_bounds() {
     let document = r#"{
@@ -296,6 +298,7 @@ fn sequence_dimensions_default_from_first_video_clip_image_bounds() {
     assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
 }
 
+/// Integral JSON floats preserve portrait dimensions for both the sequence and imported media.
 #[test]
 fn sequence_dimensions_accept_integral_float_media_metadata() {
     let document = r#"{
@@ -318,6 +321,7 @@ fn sequence_dimensions_accept_integral_float_media_metadata() {
     assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
 }
 
+/// Invalid numeric dimensions retain the HD fallback rather than admitting unsafe frame sizes.
 #[test]
 fn sequence_dimensions_reject_invalid_metadata_widths() {
     let template = r#"{
@@ -341,6 +345,109 @@ fn sequence_dimensions_reject_invalid_metadata_widths() {
     }
 }
 
+/// A present but empty media_references map does not fall back to the legacy field.
+#[test]
+fn empty_media_references_do_not_use_legacy_reference_dimensions() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"clip",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_references":{},
+                 "active_media_reference_key":"DEFAULT_MEDIA",
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"legacy.mp4",
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1080,"height":1920}}}}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    assert_eq!((sequence.settings.width, sequence.settings.height), (1920, 1080));
+}
+
+/// Updates deduplicated default media dimensions when a later reference supplies them.
+#[test]
+fn later_same_path_metadata_updates_default_media_dimensions() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"first",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{}}},
+                {"OTIO_SCHEMA":"Clip.2","name":"second",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1080,"height":1920}}}}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    assert_eq!((sequence.settings.width, sequence.settings.height), (1080, 1920));
+    let media = imp.project.item(sequence.video_tracks[0].items[0].item).unwrap().as_media().unwrap();
+    assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
+}
+
+/// Adds a later video stream when an audio reference created the shared media item first.
+#[test]
+fn later_video_reference_adds_dimensions_to_audio_only_shared_media() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Audio","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"audio first",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{}}}
+            ]},
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"video later",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1080,"height":1920}}}}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    let audio_item = sequence.audio_tracks[0].items[0].item;
+    let video_item = sequence.video_tracks[0].items[0].item;
+    assert_eq!(audio_item, video_item);
+    let media = imp.project.item(audio_item).unwrap().as_media().unwrap();
+    assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
+    assert_eq!(media.info.kind, filmcraft_media::MediaKind::Movie);
+    assert_eq!(media.info.audio_streams.len(), 1);
+}
+
+/// Keeps the first explicit dimensions when later references to the same file disagree.
+#[test]
+fn first_explicit_same_path_dimensions_are_preserved() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"first",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1920,"height":1080}}}}}},
+                {"OTIO_SCHEMA":"Clip.2","name":"second",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"shared.mp4",
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1080,"height":1920}}}}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    assert_eq!((sequence.settings.width, sequence.settings.height), (1920, 1080));
+    let media = imp.project.item(sequence.video_tracks[0].items[0].item).unwrap().as_media().unwrap();
+    assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1920, 1080)));
+}
+
+/// Empty clips are skipped when choosing the sequence's video dimensions.
 #[test]
 fn sequence_dimensions_skip_zero_duration_video_clips() {
     let document = r#"{
