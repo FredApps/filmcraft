@@ -297,6 +297,76 @@ fn sequence_dimensions_default_from_first_video_clip_image_bounds() {
 }
 
 #[test]
+fn sequence_dimensions_accept_integral_float_media_metadata() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"portrait",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"portrait.mp4",
+                    "available_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":100}},
+                    "metadata":{"width":1080.0,"height":1920.0}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    assert_eq!((sequence.settings.width, sequence.settings.height), (1080, 1920));
+    let media_id = sequence.video_tracks[0].items[0].item;
+    let media = imp.project.item(media_id).unwrap().as_media().unwrap();
+    assert_eq!(media.info.video.as_ref().map(|v| (v.width, v.height)), Some((1080, 1920)));
+}
+
+#[test]
+fn sequence_dimensions_reject_invalid_metadata_widths() {
+    let template = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"portrait",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"portrait.mp4",
+                    "available_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":100}},
+                    "metadata":{"width":WIDTH,"height":1920}}}
+            ]}
+        ]}
+    }"#;
+
+    for width in ["1080.5", "-1", "0", "4294967296"] {
+        let document = template.replace("\"width\":WIDTH", &format!("\"width\":{width}"));
+        let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+        let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+        assert_eq!((sequence.settings.width, sequence.settings.height), (1920, 1080), "width={width}");
+    }
+}
+
+#[test]
+fn sequence_dimensions_skip_zero_duration_video_clips() {
+    let document = r#"{
+        "OTIO_SCHEMA":"Timeline.1",
+        "tracks":{"OTIO_SCHEMA":"Stack.1","children":[
+            {"OTIO_SCHEMA":"Track.1","kind":"Video","children":[
+                {"OTIO_SCHEMA":"Clip.2","name":"empty landscape",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"empty.mp4",
+                    "available_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":100}},
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1920,"height":1080}}}}}},
+                {"OTIO_SCHEMA":"Clip.2","name":"portrait",
+                 "source_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":24}},
+                 "media_reference":{"OTIO_SCHEMA":"ExternalReference.1","target_url":"portrait.mp4",
+                    "available_range":{"OTIO_SCHEMA":"TimeRange.1","start_time":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":0},"duration":{"OTIO_SCHEMA":"RationalTime.1","rate":24,"value":100}},
+                    "metadata":{"filmcraft":{"info":{"video":{"width":1080,"height":1920}}}}}}
+            ]}
+        ]}
+    }"#;
+    let (imp, _) = import(document.as_bytes(), Format::Otio, None).unwrap();
+    let sequence = imp.project.sequence(imp.sequences[0]).unwrap();
+    assert_eq!((sequence.settings.width, sequence.settings.height), (1080, 1920));
+    assert_eq!(sequence.video_tracks[0].items.len(), 1);
+}
+
+#[test]
 fn collections_and_bare_tracks() {
     let one = r#"{"OTIO_SCHEMA": "SerializableCollection.1", "name": "Bundle", "children": [
         {"OTIO_SCHEMA": "Timeline.1", "name": "T1", "tracks": {"OTIO_SCHEMA": "Stack.1", "children": [

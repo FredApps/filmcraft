@@ -409,23 +409,39 @@ fn first_rate(v: &Value) -> Option<FrameRate> {
     v.get("children").and_then(Value::as_array).into_iter().flatten().find_map(first_rate)
 }
 
+/// Converts a positive integral JSON number within the u32 dimension range.
+fn frame_dimension(value: &Value) -> Option<u32> {
+    if let Some(integer) = value.as_u64() {
+        let dimension = u32::try_from(integer).ok()?;
+        return (dimension > 0).then_some(dimension);
+    }
+    frame_dimension_number(value.as_f64()?)
+}
+
+/// Converts a finite, positive integral float within the frame-size integer range.
+fn frame_dimension_number(value: f64) -> Option<u32> {
+    if !value.is_finite() || value.fract() != 0.0 || value <= 0.0 || value > f64::from(u32::MAX) {
+        return None;
+    }
+    Some(value as u32)
+}
+
+/// Reads and validates dimensions from media metadata or an OTIO image bounds box.
 fn image_dimensions(v: &Value) -> Option<(u32, u32)> {
-    let (width, height) = if let (Some(width), Some(height)) = (v.get("width").and_then(Value::as_u64), v.get("height").and_then(Value::as_u64)) {
-        (u32::try_from(width).ok()?, u32::try_from(height).ok()?)
+    let (width, height) = if let (Some(width), Some(height)) = (v.get("width"), v.get("height")) {
+        (frame_dimension(width)?, frame_dimension(height)?)
     } else {
         let min = v.get("min")?;
         let max = v.get("max")?;
         let width = max.get("x")?.as_f64()? - min.get("x")?.as_f64()?;
         let height = max.get("y")?.as_f64()? - min.get("y")?.as_f64()?;
-        if !width.is_finite() || !height.is_finite() || width.fract() != 0.0 || height.fract() != 0.0 || width <= 0.0 || height <= 0.0 {
-            return None;
-        }
-        (u32::try_from(width as u64).ok()?, u32::try_from(height as u64).ok()?)
+        (frame_dimension_number(width)?, frame_dimension_number(height)?)
     };
     filmcraft_project::validate_frame_size(width, height).ok()?;
     Some((width, height))
 }
 
+/// Prefers FilmCraft media info, then OTIO metadata, then available image bounds.
 fn reference_dimensions(reference: &Value) -> Option<(u32, u32)> {
     let metadata = reference.get("metadata");
     let filmcraft = metadata.and_then(|m| m.get("filmcraft"));
@@ -437,13 +453,25 @@ fn reference_dimensions(reference: &Value) -> Option<(u32, u32)> {
         .or_else(|| reference.get("available_image_bounds").and_then(image_dimensions))
 }
 
-fn media_reference_dimensions(clip: &Value) -> Option<(u32, u32)> {
+/// Selects the active OTIO media reference, falling back to the first one if needed.
+fn active_media_reference(clip: &Value) -> Option<&Value> {
     let refs = clip.get("media_references");
     let key = clip.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
-    let reference = refs.and_then(|r| r.get(key).or_else(|| r.as_object().and_then(|o| o.values().next()))).or_else(|| clip.get("media_reference"))?;
+    refs.and_then(|r| r.get(key).or_else(|| r.as_object().and_then(|o| o.values().next()))).or_else(|| clip.get("media_reference"))
+}
+
+/// Returns dimensions only for a clip import() will retain (positive source duration).
+fn media_reference_dimensions(clip: &Value) -> Option<(u32, u32)> {
+    let reference = active_media_reference(clip)?;
+    let available = reference.get("available_range").and_then(read_tr);
+    let (_, duration) = clip.get("source_range").and_then(read_tr).or(available)?;
+    if duration <= Tick::ZERO {
+        return None;
+    }
     reference_dimensions(reference)
 }
 
+/// Finds dimensions from the first importable video clip, respecting nested stacks.
 fn first_video_dimensions_at(stack: &Value, depth: usize) -> Option<(u32, u32)> {
     if depth >= 64 {
         return None;
@@ -466,6 +494,7 @@ fn first_video_dimensions_at(stack: &Value, depth: usize) -> Option<(u32, u32)> 
     None
 }
 
+/// Returns the first usable video clip dimensions in a stack.
 fn first_video_dimensions(stack: &Value) -> Option<(u32, u32)> {
     first_video_dimensions_at(stack, 0)
 }
