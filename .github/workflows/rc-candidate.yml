@@ -1,186 +1,122 @@
-"name": "FilmCraft Windows RC candidate"
-"on":
-  "push":
-    "branches":
-      - "rc/20261024"
-  "workflow_dispatch": {}
-"permissions":
-  "contents": "read"
-"concurrency":
-  "group": "filmcraft-rc-${{ github.ref }}"
-  "cancel-in-progress": true
-"env":
-  "CARGO_BUILD_JOBS": "2"
-  "CARGO_INCREMENTAL": "0"
-  "CARGO_PROFILE_DEV_DEBUG": "0"
-  "CARGO_PROFILE_TEST_DEBUG": "0"
-  "CARGO_PROFILE_RELEASE_DEBUG": "0"
-  "RUST_TEST_THREADS": "1"
-  "FILMCRAFT_REQUIRE_ORACLES": "1"
-  "FILMCRAFT_BUILD_SHA": "${{ github.sha }}"
-  "FILMCRAFT_BUILD_DATE": "2026-10-24"
-"jobs":
-  "windows":
-    "name": "Windows x64 quality, MSI and portable ZIP"
-    "runs-on": "windows-2022"
-    "timeout-minutes": 240
-    "env":
-      "CRAFT_FONTS_DIR": "${{ github.workspace }}\\.rc-fonts"
-    "defaults":
-      "run":
-        "shell": "pwsh"
-    "steps":
-      -
-        "uses": "actions/checkout@v4"
-        "with":
-          "persist-credentials": false
-          "fetch-depth": 0
-      -
-        "uses": "actions/checkout@v4"
-        "with":
-          "repository": "storytold/craft-fonts"
-          "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414"
-          "path": ".rc-fonts"
-          "persist-credentials": false
-      -
-        "uses": "dtolnay/rust-toolchain@stable"
-        "with":
-          "toolchain": "1.99.1"
-          "components": "clippy,rustfmt"
-      -
-        "uses": "Swatinem/rust-cache@v2"
-        "with":
-          "shared-key": "rc-windows-x64-1.99.1"
-          "cache-on-failure": true
-          "cache-workspace-crates": true
-          "save-if": true
-      -
-        "name": "Install pinned WARP for hosted GPU tests"
-        "run": |
-          # wgpu CI also installs WARP beside test executables on windows-2022.
-          # This runtime is for hosted tests only; release packages contain no WARP DLL.
-          New-Item -ItemType Directory -Force logs | Out-Null
-          $warpArchive = Join-Path $env:RUNNER_TEMP 'warp-1.0.20.zip'
-          Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.warp/1.0.20/microsoft.direct3d.warp.1.0.20.nupkg' -OutFile $warpArchive
-          $warpHash = 'e5fe5de661ce98b58ef9cfb736e73c0a7a2623d3bbf5f14839b2d55566d87e40'
-          if ((Get-FileHash -LiteralPath $warpArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $warpHash) { throw 'WARP archive checksum mismatch' }
-          $warpRoot = Join-Path $env:RUNNER_TEMP 'warp-1.0.20'
-          Expand-Archive -LiteralPath $warpArchive -DestinationPath $warpRoot
-          $warpDll = Join-Path $warpRoot 'build/native/bin/x64/d3d10warp.dll'
-          foreach ($destination in @('target/debug', 'target/debug/deps')) {
-            New-Item -ItemType Directory -Force $destination | Out-Null
-            Copy-Item -LiteralPath $warpDll -Destination $destination
+{
+  "name": "FilmCraft finite pitch source isolation",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0"
+  },
+  "jobs": {
+    "pitch": {
+      "runs-on": "windows-2022",
+      "timeout-minutes": 45,
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "include": [
+            {
+              "label": "base",
+              "sha": "bfc23840b603e69c782302c6ed04d4a9f6ec26a8"
+            },
+            {
+              "label": "pre3146",
+              "sha": "e423cb32eb8bc694deb323944fa74b4822a0b0f3"
+            },
+            {
+              "label": "after3146",
+              "sha": "0f7770342b1e8db2b75123a9d3e354bb055c6eab"
+            },
+            {
+              "label": "after3148",
+              "sha": "66bf499e0d19dc3d7cb9e298b84d495403614e2a"
+            },
+            {
+              "label": "candidate",
+              "sha": "ab77f2d8329550fb80a8bd9a20dec206f05b6958"
+            }
+          ]
+        }
+      },
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "ref": "${{ matrix.sha }}",
+            "path": "source",
+            "persist-credentials": false,
+            "fetch-depth": 1
           }
-          "$warpHash  microsoft.direct3d.warp.1.0.20.nupkg" | Set-Content logs/warp-sha256.log
-          (Get-Item -LiteralPath $warpDll).VersionInfo | Format-List FileVersion,ProductVersion | Out-File logs/warp-version.log
-      -
-        "uses": "actions/setup-dotnet@v4"
-        "with":
-          "dotnet-version": "8.0.x"
-      -
-        "name": "Install external oracles and WiX"
-        "run": |
-          $ErrorActionPreference='Stop'
-          New-Item -ItemType Directory -Force logs | Out-Null
-          $oracleArchive = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle.zip'
-          Invoke-WebRequest 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-24-13-02/ffmpeg-N-128013-g6b05263b44-win64-gpl.zip' -OutFile $oracleArchive
-          $expectedOracleHash = '5c31cb2f41de970ed9a49414c232b7eb83c1a2632ae5245225013335f8ff1fab'
-          if ((Get-FileHash -LiteralPath $oracleArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedOracleHash) { throw 'Oracle archive checksum mismatch' }
-          $oracleRoot = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle'
-          Expand-Archive -LiteralPath $oracleArchive -DestinationPath $oracleRoot
-          $oracleFfmpeg = (Get-ChildItem -LiteralPath $oracleRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1).FullName
-          if (-not $oracleFfmpeg) { throw 'Oracle ffmpeg missing' }
-          $oracleBin = Split-Path -Parent $oracleFfmpeg
-          $env:FILMCRAFT_FFMPEG = $oracleFfmpeg
-          $env:FILMCRAFT_FFPROBE = Join-Path $oracleBin 'ffprobe.exe'
-          "FILMCRAFT_FFMPEG=$env:FILMCRAFT_FFMPEG" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          "FILMCRAFT_FFPROBE=$env:FILMCRAFT_FFPROBE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          $oracleBin | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          $encoderList = (& $oracleFfmpeg -hide_banner -encoders 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate oracle encoders' }
-          $encoderList | Set-Content logs/oracle-encoders.log
-          foreach ($codec in @('libx264', 'libx265', 'libaom-av1', 'libsvtav1', 'libkvazaar')) {
-            if ($encoderList -notmatch "(?m)^\s*\S+\s+$([regex]::Escape($codec))\s") { throw "Oracle lacks $codec" }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1"
           }
-          $decoderList = (& $oracleFfmpeg -hide_banner -decoders 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0 -or $decoderList -notmatch '(?m)^\s*\S+\s+libdav1d\s') { throw 'Oracle lacks libdav1d' }
-          $decoderList | Set-Content logs/oracle-decoders.log
-          "$expectedOracleHash  ffmpeg-oracle.zip" | Set-Content logs/oracle-sha256.log
-          dotnet tool install --global wix --version 5.0.2
-          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
-          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          & $env:FILMCRAFT_FFMPEG -version 2>&1 | Tee-Object logs/oracle-version.log
-          & $env:FILMCRAFT_FFPROBE -version
-      -
-        "name": "Check source formatting"
-        "run": |
-          New-Item -ItemType Directory -Force logs | Out-Null
-          cargo fmt --all -- --check 2>&1 | Tee-Object logs/fmt.log
-          if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
-      -
-        "name": "DNx and MP4 oracle regressions"
-        "run": |
-          # Fail these interoperability regressions before compiling the entire UI/workspace.
-          $env:DNX_CID = '1271'
-          cargo test --locked -p filmcraft-dnx --lib ffmpeg_probe::probe_weights -- --ignored --nocapture 2>&1 | Tee-Object logs/dnx-weight-probe.log
-          if ($LASTEXITCODE -ne 0) { throw 'DNx external weight probe failed' }
-          cargo test --locked -p filmcraft-dnx --test it 2>&1 | Tee-Object logs/dnx-regressions.log
-          if ($LASTEXITCODE -ne 0) { throw 'DNx interoperability regressions failed' }
-          cargo test --locked -p filmcraft-isobmff --test it 2>&1 | Tee-Object logs/mp4-regressions.log
-          if ($LASTEXITCODE -ne 0) { throw 'MP4 interoperability regressions failed' }
-      -
-        "name": "Native Clippy"
-        "run": |
-          cargo clippy --workspace --all-targets --keep-going --locked -- -D warnings 2>&1 | Tee-Object logs/clippy.log
-          if ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }
-      -
-        "name": "GPU readback diagnostics"
-        "id": "gpu_tests"
-        "run": |
-          cargo test --locked -p filmcraft-gpu --lib -- --nocapture 2>&1 | Tee-Object logs/gpu-diagnostic.log
-          if ($LASTEXITCODE -ne 0) { throw 'GPU readback and parity tests failed' }
-          if (Select-String -Path logs/gpu-diagnostic.log -Pattern 'SKIPPED|no (GPU|DX12) adapter; skipping' -Quiet) { throw 'Required hosted GPU coverage was skipped' }
-      -
-        "name": "Publish GPU diagnostics"
-        "if": "${{ always() && steps.gpu_tests.outcome != 'skipped' }}"
-        "uses": "actions/upload-artifact@v4"
-        "with":
-          "name": "filmcraft-rc-gpu-diagnostics"
-          "path": "logs/gpu-diagnostic.log"
-          "if-no-files-found": "error"
-      -
-        "name": "Workspace tests"
-        "run": |
-          cargo test --workspace --lib --bins --tests --locked --no-fail-fast 2>&1 | Tee-Object logs/tests.log
-          if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
-      -
-        "name": "Doctests"
-        "run": |
-          cargo test --workspace --doc --locked 2>&1 | Tee-Object logs/doctests.log
-          if ($LASTEXITCODE -ne 0) { throw 'Doctests failed' }
-      -
-        "name": "Validate dependency layers and asset attribution"
-        "run": |
-          cargo run --locked -p xtask -- layers 2>&1 | Tee-Object logs/layers.log
-          if ($LASTEXITCODE -ne 0) { throw 'Dependency layer check failed' }
-          cargo run --locked -p xtask -- assets 2>&1 | Tee-Object logs/assets.log
-          if ($LASTEXITCODE -ne 0) { throw 'Asset attribution check failed' }
-      -
-        "name": "Build and package the RC"
-        "run": |
-          & packaging/windows/package.ps1 -Arch x64 2>&1 | Tee-Object logs/packaging.log
-          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
-      -
-        "name": "Record exact source, packages, checksums and acceptance kit"
-        "run": "python validation/rc-20261024/record-build.py windows-x64"
-        "if": "always()"
-        "env":
-          "RC_JOB_STATUS": "${{ job.status }}"
-      -
-        "uses": "actions/upload-artifact@v4"
-        "if": "always()"
-        "with":
-          "name": "filmcraft-rc-windows-x64"
-          "path": "rc-artifacts/"
-          "if-no-files-found": "error"
-          "retention-days": 30
+        },
+        {
+          "name": "Discover and run finite pitch public API harness",
+          "env": {
+            "QA_LABEL": "${{ matrix.label }}",
+            "QA_SOURCE_SHA": "${{ matrix.sha }}"
+          },
+          "run": "[IO.File]::WriteAllBytes('qa-runner.py',[Convert]::FromBase64String('UlVTVF9TT1VSQ0U9J3VzZSBzdGQ6OntlbnYsZnMscGF0aDo6UGF0aEJ1Zn07XG51c2UgZmlsbWNyYWZ0X2F1ZGlvX2RzcDo6Y3JlYXRlX2VmZmVjdDtcbiNbdGVzdF1cbmZuIHFhX3BpdGNoX291dHB1dHMoKSB7XG4gICAgbGV0IHJhdz1mczo6cmVhZChlbnY6OnZhcigiUUFfSU5QVVQiKS51bndyYXAoKSkudW53cmFwKCk7XG4gICAgbGV0IG11dCBsZWZ0PVZlYzo6bmV3KCk7IGxldCBtdXQgcmlnaHQ9VmVjOjpuZXcoKTtcbiAgICBmb3IgZiBpbiByYXcuY2h1bmtzX2V4YWN0KDQpIHtsZWZ0LnB1c2goaTE2Ojpmcm9tX2xlX2J5dGVzKFtmWzBdLGZbMV1dKSBhcyBmMzIvMzI3NjguMCk7cmlnaHQucHVzaChpMTY6OmZyb21fbGVfYnl0ZXMoW2ZbMl0sZlszXV0pIGFzIGYzMi8zMjc2OC4wKTt9XG4gICAgbGV0IGNhc2VzPXZlYyFbXG4gICAgICAoIm1vbm9fbGVmdCIsdmVjIVtsZWZ0LmNsb25lKCldLDMuMCksXG4gICAgICAoIm1vbm9fcmlnaHQiLHZlYyFbcmlnaHQuY2xvbmUoKV0sMy4wKSxcbiAgICAgICgic3RlcmVvIix2ZWMhW2xlZnQuY2xvbmUoKSxyaWdodC5jbG9uZSgpXSwzLjApLFxuICAgICAgKCJzYW1lX3JpZ2h0Iix2ZWMhW3JpZ2h0LmNsb25lKCkscmlnaHQuY2xvbmUoKV0sMy4wKSxcbiAgICAgICgidGhyZWVfcmlnaHQiLHZlYyFbcmlnaHQuY2xvbmUoKSxyaWdodC5jbG9uZSgpLHJpZ2h0LmNsb25lKCldLDMuMCksXG4gICAgICAoInplcm9fc2hpZnQiLHZlYyFbbGVmdC5jbG9uZSgpLHJpZ2h0LmNsb25lKCldLDAuMCksXG4gICAgICAoInN0ZXJlb19zY2FsZWQiLHZlYyFbbGVmdC5pdGVyKCkubWFwKHx4fHgqMC45OTk5OTk5NCkuY29sbGVjdCgpLHJpZ2h0Lml0ZXIoKS5tYXAofHh8eCowLjk5OTk5OTk0KS5jb2xsZWN0KCldLDMuMCksXG4gICAgXTtcbiAgICBsZXQgZGlyPVBhdGhCdWY6OmZyb20oZW52Ojp2YXIoIlFBX09VVFBVVCIpLnVud3JhcCgpKTtmczo6Y3JlYXRlX2Rpcl9hbGwoJmRpcikudW53cmFwKCk7XG4gICAgZm9yIChuYW1lLG11dCBjaGFubmVscyxzaGlmdCkgaW4gY2FzZXMge1xuICAgICAgICBsZXQgbXV0IGVmZmVjdD1jcmVhdGVfZWZmZWN0KCJwaXRjaF9zaGlmdGVyIiw0ODAwMC4wLGNoYW5uZWxzLmxlbigpKS51bndyYXAoKTtcbiAgICAgICAgYXNzZXJ0IShlZmZlY3Quc2V0X3BhcmFtKCJzZW1pdG9uZXMiLHNoaWZ0KSk7ZWZmZWN0LnJlc2V0KCk7XG4gICAgICAgIGxldCBuPWNoYW5uZWxzWzBdLmxlbigpO1xuICAgICAgICBmb3Igc3RhcnQgaW4gKDAuLm4pLnN0ZXBfYnkoMjU2KSB7bGV0IGVuZD0oc3RhcnQrMjU2KS5taW4obik7bGV0IG11dCBibG9jazpWZWM8Jm11dFtmMzJdPj1jaGFubmVscy5pdGVyX211dCgpLm1hcCh8Y3wmbXV0IGNbc3RhcnQuLmVuZF0pLmNvbGxlY3QoKTtlZmZlY3QucHJvY2VzcygmbXV0IGJsb2NrKTt9XG4gICAgICAgIGFzc2VydCEoY2hhbm5lbHMuaXRlcigpLmZsYXR0ZW4oKS5hbGwofHh8eC5pc19maW5pdGUoKSkpO1xuICAgICAgICBsZXQgbXV0IG91dHB1dD1WZWM6Om5ldygpO2ZvciBpIGluIDAuLm4ge2ZvciBjIGluICZjaGFubmVscyB7b3V0cHV0LmV4dGVuZF9mcm9tX3NsaWNlKCZjW2ldLnRvX2xlX2J5dGVzKCkpO319XG4gICAgICAgIGZzOjp3cml0ZShkaXIuam9pbihmb3JtYXQhKCJ7bmFtZX0uZjMyIikpLG91dHB1dCkudW53cmFwKCk7XG4gICAgfVxufVxuJwppbXBvcnQgb3MsanNvbixzdWJwcm9jZXNzLG1hdGgsc3RydWN0LGhhc2hsaWIsZGF0ZXRpbWUKZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnJvb3Q9UGF0aC5jd2QoKTtzb3VyY2U9cm9vdC8nc291cmNlJztsYWJlbD1vcy5lbnZpcm9uWydRQV9MQUJFTCddO291dD1yb290LydxYS1ldmlkZW5jZScvbGFiZWw7b3V0Lm1rZGlyKHBhcmVudHM9VHJ1ZSxleGlzdF9vaz1UcnVlKQpzdGFydD1kYXRldGltZS5kYXRldGltZS5ub3coZGF0ZXRpbWUudGltZXpvbmUudXRjKS5pc29mb3JtYXQoKTtkYXRhPWJ5dGVhcnJheSgpCmZvciBpIGluIHJhbmdlKDQ4MDAwKToKIHNhbXBsZXM9WzAsMF0gaWYgaTwyNDAwMCBlbHNlIFtyb3VuZCg0MDk2Km1hdGguc2luKDIqbWF0aC5waSpmKmkvNDgwMDApKSBmb3IgZiBpbiAoNDQwLDY2MCldCiBpZiBpPT0yNDAwMDpzYW1wbGVzPVszMDAwMCwtMzAwMDBdCiBkYXRhLmV4dGVuZChzdHJ1Y3QucGFjaygnPGhoJywqc2FtcGxlcykpCmFzc2VydCBoYXNobGliLnNoYTI1NihkYXRhKS5oZXhkaWdlc3QoKT09JzUwNDBlN2VjNDc0ZmE2Njc2M2M3NzE3MmI2NjBiZGFiMTRhNDhmOThjYzA4ZWU4M2EzNzk5YmJhZGU4YzEwNGQnCmZpeHR1cmU9cm9vdC8ncWEtaW5wdXQucGNtJztmaXh0dXJlLndyaXRlX2J5dGVzKGRhdGEpO29zLmVudmlyb25bJ1FBX0lOUFVUJ109c3RyKGZpeHR1cmUpO29zLmVudmlyb25bJ1FBX09VVFBVVCddPXN0cihvdXQpO29zLmVudmlyb25bJ0NBUkdPX1RBUkdFVF9ESVInXT1zdHIocm9vdC8ncWEtdGFyZ2V0JykKdGVzdD1zb3VyY2UvJ2NyYXRlcy9hdWRpby1kc3AvdGVzdHMvcWFfcGl0Y2gucnMnO3Rlc3QucGFyZW50Lm1rZGlyKGV4aXN0X29rPVRydWUpO3Rlc3Qud3JpdGVfdGV4dChSVVNUX1NPVVJDRSxlbmNvZGluZz0ndXRmLTgnKQphY3R1YWw9c3VicHJvY2Vzcy5jaGVja19vdXRwdXQoWydnaXQnLCdyZXYtcGFyc2UnLCdIRUFEJ10sY3dkPXNvdXJjZSx0ZXh0PVRydWUpLnN0cmlwKCk7YXNzZXJ0IGFjdHVhbD09b3MuZW52aXJvblsnUUFfU09VUkNFX1NIQSddCm1ldGE9eydsYWJlbCc6bGFiZWwsJ3NvdXJjZV9zaGEnOmFjdHVhbCwnaW5wdXRfc2hhMjU2JzpoYXNobGliLnNoYTI1NihkYXRhKS5oZXhkaWdlc3QoKSwnc3RhcnRlZF91dGMnOnN0YXJ0LCd0b29sY2hhaW4nOnN1YnByb2Nlc3MuY2hlY2tfb3V0cHV0KFsncnVzdGMnLCctVnYnXSx0ZXh0PVRydWUpLCdsb2NrX3NoYTI1Nic6aGFzaGxpYi5zaGEyNTYoKHNvdXJjZS8nQ2FyZ28ubG9jaycpLnJlYWRfYnl0ZXMoKSkuaGV4ZGlnZXN0KCksJ3Njb3BlJzonVW5tb2RpZmllZCBwcm9kdWN0aW9uIGNyYXRlIHBsdXMgZ2VuZXJhdGVkIHB1YmxpYy1BUEkgdGVzdCBoYXJuZXNzOyBvcmlnaW5hbCBmaW5pdGUgUENNIHJlY2lwZS4gSG9zdGVkIG9ubHkuJ30KKG91dC8nbWV0YWRhdGEuanNvbicpLndyaXRlX3RleHQoanNvbi5kdW1wcyhtZXRhLGluZGVudD0yKSxlbmNvZGluZz0ndXRmLTgnKQpmb3IgbmFtZSxhcmdzIGluIFsoJ2Rpc2NvdmVyeScsWyctLScsJy0tbGlzdCddKSwoJ2V4ZWN1dGlvbicsWydxYV9waXRjaF9vdXRwdXRzJywnLS0nLCctLWV4YWN0JywnLS1ub2NhcHR1cmUnXSldOgogY21kPVsnY2FyZ28nLCd0ZXN0JywnLS1sb2NrZWQnLCctLXJlbGVhc2UnLCctcCcsJ2ZpbG1jcmFmdC1hdWRpby1kc3AnLCctLXRlc3QnLCdxYV9waXRjaCcsKmFyZ3NdCiBwPXN1YnByb2Nlc3MucnVuKGNtZCxjd2Q9c291cmNlLHN0ZG91dD1zdWJwcm9jZXNzLlBJUEUsc3RkZXJyPXN1YnByb2Nlc3MuU1RET1VULGVuY29kaW5nPSd1dGYtOCcsZXJyb3JzPSdyZXBsYWNlJyk7KG91dC8obmFtZSsnLmxvZycpKS53cml0ZV90ZXh0KHAuc3Rkb3V0LGVuY29kaW5nPSd1dGYtOCcpO2Fzc2VydCBwLnJldHVybmNvZGU9PTAscC5zdGRvdXRbLTUwMDA6XQogaWYgbmFtZT09J2Rpc2NvdmVyeSc6YXNzZXJ0ICdxYV9waXRjaF9vdXRwdXRzOiB0ZXN0JyBpbiBwLnN0ZG91dAogZWxzZTphc3NlcnQgJ3Rlc3QgcWFfcGl0Y2hfb3V0cHV0cyAuLi4gb2snIGluIHAuc3Rkb3V0IGFuZCAnMSBwYXNzZWQnIGluIHAuc3Rkb3V0CnN1YnByb2Nlc3MucnVuKFsnZ2l0JywnZGlmZicsJy0tZXhpdC1jb2RlJ10sY3dkPXNvdXJjZSxjaGVjaz1UcnVlKTttZXRhWydmaW5pc2hlZF91dGMnXT1kYXRldGltZS5kYXRldGltZS5ub3coZGF0ZXRpbWUudGltZXpvbmUudXRjKS5pc29mb3JtYXQoKTttZXRhWyduYW1lZF90ZXN0X3Bhc3NlZCddPVRydWU7KG91dC8nbWV0YWRhdGEuanNvbicpLndyaXRlX3RleHQoanNvbi5kdW1wcyhtZXRhLGluZGVudD0yKSxlbmNvZGluZz0ndXRmLTgnKQo='))\npython -X utf8 qa-runner.py\nif ($LASTEXITCODE -ne 0) { throw 'Pitch harness failed' }"
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "pitch-isolation-${{ matrix.label }}",
+            "path": "qa-evidence/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    },
+    "compare": {
+      "needs": "pitch",
+      "if": "always()",
+      "runs-on": "windows-2022",
+      "timeout-minutes": 10,
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/download-artifact@v4",
+          "with": {
+            "pattern": "pitch-isolation-*",
+            "path": "combined",
+            "merge-multiple": true
+          }
+        },
+        {
+          "name": "Compare source versions and channel isolation",
+          "run": "[IO.File]::WriteAllBytes('qa-analysis.py',[Convert]::FromBase64String('aW1wb3J0IGpzb24sYXJyYXksbWF0aCxoYXNobGliCmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aApyb290PVBhdGgoJ2NvbWJpbmVkJyk7bGFiZWxzPVsnYmFzZScsJ3ByZTMxNDYnLCdhZnRlcjMxNDYnLCdhZnRlcjMxNDgnLCdjYW5kaWRhdGUnXTtjYXNlcz17J21vbm9fbGVmdCc6MSwnbW9ub19yaWdodCc6MSwnc3RlcmVvJzoyLCdzYW1lX3JpZ2h0JzoyLCd0aHJlZV9yaWdodCc6MywnemVyb19zaGlmdCc6Miwnc3RlcmVvX3NjYWxlZCc6Mn07cmVwb3J0PXsnc2NvcGUnOidGb2N1c2VkIHB1YmxpYy1BUEkgcGl0Y2ggaXNvbGF0aW9uLiBQYWlyL3NlcGFyYXRlIHNvdXJjZSB0b2xlcmFuY2UgaXMxZS01KnBlYWsgZnJvbSBlZmZlY3RzL3N0ZnQucnM7IG5hdGl2ZSBzaXgtc2Vjb25kIGRpZmZlcmVuY2UgcmVtYWlucyBzZXBhcmF0ZS4nLCdzb3VyY2VzJzp7fSwnY29tcGFyaXNvbnMnOltdLCdwYWlyX3NlcGFyYXRlJzpbXX0KZm9yIGxhYmVsIGluIGxhYmVsczoKIHJlcG9ydFsnc291cmNlcyddW2xhYmVsXT1qc29uLmxvYWRzKChyb290L2xhYmVsLydtZXRhZGF0YS5qc29uJykucmVhZF90ZXh0KCkpCmRlZiByZWFkKGxhYmVsLGNhc2UpOgogYT1hcnJheS5hcnJheSgnZicpO2EuZnJvbWJ5dGVzKChyb290L2xhYmVsLyhjYXNlKycuZjMyJykpLnJlYWRfYnl0ZXMoKSk7cmV0dXJuIGEKZm9yIHByZXZpb3VzLGN1cnJlbnQgaW4gemlwKGxhYmVscyxsYWJlbHNbMTpdKToKIGZvciBjYXNlLGNoIGluIGNhc2VzLml0ZW1zKCk6CiAgYSxiPXJlYWQocHJldmlvdXMsY2FzZSkscmVhZChjdXJyZW50LGNhc2UpO2Fzc2VydCBsZW4oYSk9PWxlbihiKT09NDgwMDAqY2g7ZD1bYWJzKHgteSkgZm9yIHgseSBpbiB6aXAoYSxiKV07aT1tYXgocmFuZ2UobGVuKGQpKSxrZXk9ZC5fX2dldGl0ZW1fXyk7cmVwb3J0Wydjb21wYXJpc29ucyddLmFwcGVuZCh7J3ByZXZpb3VzJzpwcmV2aW91cywnY3VycmVudCc6Y3VycmVudCwnY2FzZSc6Y2FzZSwnbWF4X2Fic19kZWx0YSc6ZFtpXSwncm1zX2RlbHRhJzptYXRoLnNxcnQoc3VtKHgqeCBmb3IgeCBpbiBkKS9sZW4oZCkpLCdtYXhfc2FtcGxlJzppLy9jaCwnbWF4X2NoYW5uZWwnOmklY2gsJ2RlY29kZWRfZXF1YWwnOmEudG9ieXRlcygpPT1iLnRvYnl0ZXMoKX0pCmZvciBsYWJlbCBpbiBsYWJlbHM6CiBhPXJlYWQobGFiZWwsJ3RocmVlX3JpZ2h0Jyk7cGVhaz1tYXgoYWJzKHgpIGZvciB4IGluIGFbMjo6M10pO2Rldj1tYXgoYWJzKGFbaV0tYVtpKzJdKSBmb3IgaSBpbiByYW5nZSgwLGxlbihhKSwzKSk7cmVwb3J0WydwYWlyX3NlcGFyYXRlJ10uYXBwZW5kKHsnbGFiZWwnOmxhYmVsLCdwYWlyZWRfY2hhbm5lbCc6MCwnc2luZ2xlX2NoYW5uZWwnOjIsJ3BlYWsnOnBlYWssJ21heF9hYnNfZGVsdGEnOmRldiwnc291cmNlX3RvbGVyYW5jZSc6MWUtNSpwZWFrLCdwYXNzZXNfc291cmNlX3JvdW5kaW5nX2JvdW5kJzpkZXY8MWUtNSpwZWFrfSkKUGF0aCgnYW5hbHlzaXMtZXZpZGVuY2UnKS5ta2RpcihleGlzdF9vaz1UcnVlKTtQYXRoKCdhbmFseXNpcy1ldmlkZW5jZS9yZXN1bHRzLmpzb24nKS53cml0ZV90ZXh0KGpzb24uZHVtcHMocmVwb3J0LGluZGVudD0yKSxlbmNvZGluZz0ndXRmLTgnKTtwcmludChqc29uLmR1bXBzKHJlcG9ydFsncGFpcl9zZXBhcmF0ZSddLGluZGVudD0yKSkKaWYgbm90IHJlcG9ydFsncGFpcl9zZXBhcmF0ZSddWy0xXVsncGFzc2VzX3NvdXJjZV9yb3VuZGluZ19ib3VuZCddOnJhaXNlIFN5c3RlbUV4aXQoJ0NhbmRpZGF0ZSBwaXRjaCBwYWlyL3NlcGFyYXRlIHJvdW5kaW5nIGJvdW5kIGZhaWxzIG9uIGZpbml0ZSBpbXB1bHNlL3RvbmUgY29udHJvbCcpCg=='))\npython -X utf8 qa-analysis.py\nif ($LASTEXITCODE -ne 0) { throw 'Pitch parity isolation found a failure or coverage gap' }"
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "pitch-isolation-analysis",
+            "path": "analysis-evidence/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    }
+  }
+}
