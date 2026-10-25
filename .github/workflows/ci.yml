@@ -1,30 +1,86 @@
-name: CI
-
-# Quality gates for every push to main and every pull request (`cargo xtask ci`), through the
-# suite's shared gate workflow in craft-common-actions.
-on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-# A newer push to a PR branch cancels its older run; every push to main runs to the end.
-concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-jobs:
-  gate:
-    # Tracks @main so suite-wide CI fixes reach every app without a PR in each repository.
-    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
-    with:
-      # Same craft-fonts commit as release.yml.
-      craft-fonts-ref: abb83316d96aa59c1cf64784289e378fe9fa5695
-      timeout-minutes: 120
-      packages: >-
-        pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcursor-dev
-        libxrandr-dev libxi-dev libfontconfig1-dev libfreetype-dev mesa-vulkan-drivers
-        libasound2-dev
+{
+  "name": "FilmCraft RC panning gap controls",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "1",
+    "FILMCRAFT_REQUIRE_ORACLES": "1",
+    "FILMCRAFT_BUILD_SHA": "ab77f2d8329550fb80a8bd9a20dec206f05b6958",
+    "CRAFT_FONTS_DIR": "${{ github.workspace }}\\.rc-fonts"
+  },
+  "jobs": {
+    "focused": {
+      "runs-on": "windows-2022",
+      "timeout-minutes": 240,
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "ref": "ab77f2d8329550fb80a8bd9a20dec206f05b6958",
+            "persist-credentials": false,
+            "fetch-depth": 1
+          }
+        },
+        {
+          "uses": "actions/checkout@v4",
+          "with": {
+            "repository": "storytold/craft-fonts",
+            "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414",
+            "path": ".rc-fonts",
+            "persist-credentials": false
+          }
+        },
+        {
+          "uses": "dtolnay/rust-toolchain@stable",
+          "with": {
+            "toolchain": "1.99.1",
+            "components": "clippy"
+          }
+        },
+        {
+          "uses": "Swatinem/rust-cache@v2",
+          "with": {
+            "shared-key": "rc-windows-x64-1.99.1",
+            "cache-on-failure": true,
+            "cache-workspace-crates": true
+          }
+        },
+        {
+          "name": "Install pinned WARP for hosted GPU tests",
+          "run": "# wgpu CI also installs WARP beside test executables on windows-2022.\n# This runtime is for hosted tests only; release packages contain no WARP DLL.\nNew-Item -ItemType Directory -Force logs | Out-Null\n$warpArchive = Join-Path $env:RUNNER_TEMP 'warp-1.0.20.zip'\nInvoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.warp/1.0.20/microsoft.direct3d.warp.1.0.20.nupkg' -OutFile $warpArchive\n$warpHash = 'e5fe5de661ce98b58ef9cfb736e73c0a7a2623d3bbf5f14839b2d55566d87e40'\nif ((Get-FileHash -LiteralPath $warpArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $warpHash) { throw 'WARP archive checksum mismatch' }\n$warpRoot = Join-Path $env:RUNNER_TEMP 'warp-1.0.20'\nExpand-Archive -LiteralPath $warpArchive -DestinationPath $warpRoot\n$warpDll = Join-Path $warpRoot 'build/native/bin/x64/d3d10warp.dll'\nforeach ($destination in @('target/debug', 'target/debug/deps')) {\n  New-Item -ItemType Directory -Force $destination | Out-Null\n  Copy-Item -LiteralPath $warpDll -Destination $destination\n}\n\"$warpHash  microsoft.direct3d.warp.1.0.20.nupkg\" | Set-Content logs/warp-sha256.log\n(Get-Item -LiteralPath $warpDll).VersionInfo | Format-List FileVersion,ProductVersion | Out-File logs/warp-version.log"
+        },
+        {
+          "name": "Append QA-only four-way panning regression",
+          "run": "$bytes=[Convert]::FromBase64String('CiNbdGVzdF0KZm4gcmMyNjc3X2FsbF9mb3VyX2hhbGZfYW5kX2J1dHRvbl9jb250cm9scygpIHsKICAgIGZvciBhdWRpbyBpbiBbZmFsc2UsIHRydWVdIHsKICAgICAgICBmb3IgYnV0dG9uIGluIFtlZ3VpOjpQb2ludGVyQnV0dG9uOjpNaWRkbGUsIGVndWk6OlBvaW50ZXJCdXR0b246OlByaW1hcnldIHsKICAgICAgICAgICAgbGV0IG11dCBkID0gRHJpdmVyOjpkZW1vKCk7CiAgICAgICAgICAgIGQuc2V0dXAoKTsKICAgICAgICAgICAgaWYgYnV0dG9uID09IGVndWk6OlBvaW50ZXJCdXR0b246OlByaW1hcnkgeyBkLm9rKCJ1aS5zZXQiLCBqc29uISh7InRvb2wiOiJIYW5kIn0pKTsgfQogICAgICAgICAgICBkLmFwcCgpLnVpLnRpbWVsaW5lLnZpZGVvX3RyYWNrX2g9MzIwLjA7CiAgICAgICAgICAgIGQuYXBwKCkudWkudGltZWxpbmUuYXVkaW9fdHJhY2tfaD0zMjAuMDsKICAgICAgICAgICAgZC5hcHAoKS51aS50aW1lbGluZS52X3Njcm9sbD0xMDAuMDsKICAgICAgICAgICAgZC5hcHAoKS51aS50aW1lbGluZS5hX3Njcm9sbD03MC4wOwogICAgICAgICAgICBkLmZyYW1lcyg0KTsKICAgICAgICAgICAgbGV0ICh2MCxhMCk9KGQuYXBwKCkudWkudGltZWxpbmUudl9zY3JvbGwsZC5hcHAoKS51aS50aW1lbGluZS5hX3Njcm9sbCk7CiAgICAgICAgICAgIGFzc2VydCEodjA+PTIwLjApOwogICAgICAgICAgICBsZXQgdHJhY2tzPWQucmVjdCgidGltZWxpbmUudHJhY2tzIik7CiAgICAgICAgICAgIGxldCBmcm9tPWVndWk6OnBvczIodHJhY2tzLmNlbnRlcigpLngsdHJhY2tzLm1pbi55K3RyYWNrcy5oZWlnaHQoKSppZiBhdWRpbyB7MC43NX0gZWxzZSB7MC4yNX0pOwogICAgICAgICAgICBsZXQgdG89ZnJvbS1lZ3VpOjp2ZWMyKDAuMCwyMC4wKTsKICAgICAgICAgICAgbGV0IHByb2plY3Q9ZC5hcHAoKS5zZXNzaW9uLnN0YXRlLnByb2plY3QuY2xvbmUoKTsKICAgICAgICAgICAgZC5zZW5kKGVndWk6OkV2ZW50OjpQb2ludGVyTW92ZWQoZnJvbSkpOwogICAgICAgICAgICBkLnNlbmQoZWd1aTo6RXZlbnQ6OlBvaW50ZXJCdXR0b257cG9zOmZyb20sYnV0dG9uLHByZXNzZWQ6dHJ1ZSxtb2RpZmllcnM6RGVmYXVsdDo6ZGVmYXVsdCgpfSk7CiAgICAgICAgICAgIGZvciBrIGluIDEuLj04IHtkLnNlbmQoZWd1aTo6RXZlbnQ6OlBvaW50ZXJNb3ZlZChmcm9tLmxlcnAodG8sayBhcyBmMzIvOC4wKSkpO30KICAgICAgICAgICAgZC5zZW5kKGVndWk6OkV2ZW50OjpQb2ludGVyQnV0dG9ue3Bvczp0byxidXR0b24scHJlc3NlZDpmYWxzZSxtb2RpZmllcnM6RGVmYXVsdDo6ZGVmYXVsdCgpfSk7CiAgICAgICAgICAgIGQuZnJhbWVzKDIpOwogICAgICAgICAgICBsZXQgKHYxLGExKT0oZC5hcHAoKS51aS50aW1lbGluZS52X3Njcm9sbCxkLmFwcCgpLnVpLnRpbWVsaW5lLmFfc2Nyb2xsKTsKICAgICAgICAgICAgcHJpbnRsbiEoIlJDMjY3NyBhdWRpbz17YXVkaW99IGJ1dHRvbj17YnV0dG9uOj99IHY9e3YwfS0+e3YxfSBhPXthMH0tPnthMX0iKTsKICAgICAgICAgICAgaWYgYXVkaW8ge2Fzc2VydCEoKGExLWEwLTIwLjApLmFicygpPDEuMCk7YXNzZXJ0X2VxISh2MSx2MCk7fQogICAgICAgICAgICBlbHNlIHthc3NlcnQhKCh2MS12MCsyMC4wKS5hYnMoKTwxLjApO2Fzc2VydF9lcSEoYTEsYTApO30KICAgICAgICAgICAgYXNzZXJ0X2VxIShkLmFwcCgpLnNlc3Npb24uc3RhdGUucHJvamVjdCxwcm9qZWN0KTsKICAgICAgICB9CiAgICB9Cn0K')\n[IO.File]::AppendAllText('crates/ui-egui/tests/it/timeline_middle_pan_ui.rs',[Text.Encoding]::UTF8.GetString($bytes))\ngit diff -- crates/ui-egui/tests/it/timeline_middle_pan_ui.rs | Out-File logs/qa-only-test-diff.txt\ngit rev-parse HEAD | Out-File logs/source-sha.txt"
+        },
+        {
+          "name": "Discover and execute panning controls",
+          "run": "cargo test --locked -p filmcraft-ui-egui rc2677_all_four_half_and_button_controls -- --list 2>&1 | Tee-Object logs/discovery.log\nif ($LASTEXITCODE -ne 0) { throw 'Discovery failed' }\ncargo test --locked -p filmcraft-ui-egui rc2677_all_four_half_and_button_controls -- --nocapture 2>&1 | Tee-Object logs/four-way.log\nif ($LASTEXITCODE -ne 0) { throw 'Four-way controls failed' }\ncargo test --locked -p filmcraft-ui-egui cancelling_an_audio_pan_restores_its_own_scroll_for_middle_and_hand -- --nocapture 2>&1 | Tee-Object logs/cancellation.log\nif ($LASTEXITCODE -ne 0) { throw 'Cancellation failed' }"
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "rc-2677-gap-controls",
+            "path": "logs/",
+            "if-no-files-found": "error",
+            "retention-days": 30
+          }
+        }
+      ]
+    }
+  }
+}
