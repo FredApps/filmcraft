@@ -409,6 +409,67 @@ fn first_rate(v: &Value) -> Option<FrameRate> {
     v.get("children").and_then(Value::as_array).into_iter().flatten().find_map(first_rate)
 }
 
+fn image_dimensions(v: &Value) -> Option<(u32, u32)> {
+    let (width, height) = if let (Some(width), Some(height)) = (v.get("width").and_then(Value::as_u64), v.get("height").and_then(Value::as_u64)) {
+        (u32::try_from(width).ok()?, u32::try_from(height).ok()?)
+    } else {
+        let min = v.get("min")?;
+        let max = v.get("max")?;
+        let width = max.get("x")?.as_f64()? - min.get("x")?.as_f64()?;
+        let height = max.get("y")?.as_f64()? - min.get("y")?.as_f64()?;
+        if !width.is_finite() || !height.is_finite() || width.fract() != 0.0 || height.fract() != 0.0 || width <= 0.0 || height <= 0.0 {
+            return None;
+        }
+        (u32::try_from(width as u64).ok()?, u32::try_from(height as u64).ok()?)
+    };
+    filmcraft_project::validate_frame_size(width, height).ok()?;
+    Some((width, height))
+}
+
+fn reference_dimensions(reference: &Value) -> Option<(u32, u32)> {
+    let metadata = reference.get("metadata");
+    let filmcraft = metadata.and_then(|m| m.get("filmcraft"));
+    filmcraft
+        .and_then(|m| m.get("info"))
+        .and_then(|i| i.get("video"))
+        .and_then(image_dimensions)
+        .or_else(|| metadata.and_then(image_dimensions))
+        .or_else(|| reference.get("available_image_bounds").and_then(image_dimensions))
+}
+
+fn media_reference_dimensions(clip: &Value) -> Option<(u32, u32)> {
+    let refs = clip.get("media_references");
+    let key = clip.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
+    let reference = refs.and_then(|r| r.get(key).or_else(|| r.as_object().and_then(|o| o.values().next()))).or_else(|| clip.get("media_reference"))?;
+    reference_dimensions(reference)
+}
+
+fn first_video_dimensions_at(stack: &Value, depth: usize) -> Option<(u32, u32)> {
+    if depth >= 64 {
+        return None;
+    }
+    for track in stack.get("children").and_then(Value::as_array).into_iter().flatten() {
+        if schema_name(track) != "Track" || track.get("kind").and_then(Value::as_str) == Some("Audio") {
+            continue;
+        }
+        for child in track.get("children").and_then(Value::as_array).into_iter().flatten() {
+            let dimensions = match schema_name(child) {
+                "Clip" => media_reference_dimensions(child),
+                "Stack" => first_video_dimensions_at(child, depth + 1),
+                _ => None,
+            };
+            if dimensions.is_some() {
+                return dimensions;
+            }
+        }
+    }
+    None
+}
+
+fn first_video_dimensions(stack: &Value) -> Option<(u32, u32)> {
+    first_video_dimensions_at(stack, 0)
+}
+
 impl Imp<'_, '_> {
     fn timeline(&mut self, tl: &Value) -> ItemId {
         let name = name_of(tl);
@@ -434,8 +495,10 @@ impl Imp<'_, '_> {
     }
 
     fn sequence(&mut self, stack: &Value, name: &str, meta: Option<&Value>, rate: FrameRate) -> ItemId {
-        let settings: SequenceSettings =
-            meta.and_then(|m| m.get("settings")).and_then(|s| serde_json::from_value(s.clone()).ok()).unwrap_or_else(|| settings_for(rate, 1920, 1080, false));
+        let settings: SequenceSettings = meta.and_then(|m| m.get("settings")).and_then(|s| serde_json::from_value(s.clone()).ok()).unwrap_or_else(|| {
+            let (width, height) = first_video_dimensions(stack).unwrap_or((1920, 1080));
+            settings_for(rate, width, height, false)
+        });
         let id = self.b.reserve_sequence(name, settings.clone(), None);
         if let Some(l) = meta.and_then(|m| m.get("label")).and_then(|l| serde_json::from_value::<Label>(l.clone()).ok())
             && let Some(it) = self.b.p.item_mut(id)
@@ -681,9 +744,13 @@ impl Imp<'_, '_> {
             let n = name_of(r);
             if n.is_empty() { clip_name.to_string() } else { n }
         };
+        let dimensions = reference_dimensions(r);
         let spec = MediaSpec {
             duration: avail.map(|a| a.1),
-            video: (kind == TrackKind::Video).then(|| (1920, 1080, FrameRate::default())),
+            video: (kind == TrackKind::Video).then(|| {
+                let (width, height) = dimensions.unwrap_or((1920, 1080));
+                (width, height, FrameRate::default())
+            }),
             audio: (kind == TrackKind::Audio).then_some((48_000, 2)),
             start_tc: None,
             kind: None,
