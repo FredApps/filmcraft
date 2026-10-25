@@ -391,6 +391,7 @@ pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> R
     Ok(imp.b.finish())
 }
 
+/// Collects importable timelines, stacks and standalone tracks from an OTIO document.
 fn collect_timelines<'v>(v: &'v Value, out: &mut Vec<&'v Value>) {
     match schema_name(v) {
         "Timeline" | "Stack" => out.push(v),
@@ -489,7 +490,7 @@ fn first_video_dimensions_at(stack: &Value, depth: usize) -> Option<(u32, u32)> 
         for child in track.get("children").and_then(Value::as_array).into_iter().flatten() {
             let dimensions = match schema_name(child) {
                 "Clip" => media_reference_dimensions(child),
-                "Stack" => first_video_dimensions_at(child, depth + 1),
+                "Stack" => child.get("source_range").and_then(read_tr).and_then(|_| first_video_dimensions_at(child, depth + 1)),
                 _ => None,
             };
             if dimensions.is_some() {
@@ -863,9 +864,12 @@ impl Imp<'_, '_> {
         Some(id)
     }
 
+    /// Applies FilmCraft media info and availability metadata to an imported media item.
     fn fill_media(&mut self, id: ItemId, info: Option<MediaInfo>, meta: Option<&Value>, kind: TrackKind) {
         let label = meta.and_then(|m| m.get("label")).and_then(|l| serde_json::from_value::<Label>(l.clone()).ok());
         let offline = meta.and_then(|m| m.get("offline")).and_then(Value::as_bool);
+        let explicit_video_dimensions =
+            info.as_ref().and_then(|i| i.video.as_ref()).is_some_and(|v| filmcraft_project::validate_frame_size(v.width, v.height).is_ok());
         let Some(it) = self.b.p.item_mut(id) else { return };
         if let Some(l) = label {
             it.label = l;
@@ -881,6 +885,9 @@ impl Imp<'_, '_> {
             if let Some(o) = offline {
                 m.offline = o;
             }
+        }
+        if explicit_video_dimensions {
+            self.explicit_dimensions.insert(id);
         }
     }
 
