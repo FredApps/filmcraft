@@ -391,6 +391,41 @@ mod tests {
         assert!(failures.is_empty(), "{failures:#?}");
     }
 
+    /// DeNoise's noise gate is a hard threshold on the smoothed PSD: on stationary noise many bins
+    /// sit near it. With a shared forward FFT a rounding-level change flipped some, and the output
+    /// moved by up to ~4e-4 of the peak here. Paired channels must match mono to rounding.
+    #[test]
+    fn paired_denoise_matches_mono_near_its_threshold() {
+        use crate::AudioEffect;
+        use crate::effects::DeNoise;
+        const SR: f32 = 48_000.0;
+        let len = 512 * 940;
+        let mut rng = Rng::new(9);
+        let a: Vec<f32> = (0..len).map(|_| 0.1 * rng.uniform()).collect();
+        let t = crate::testutil::sine(700.0, 0.2, SR as f64, len, 0.0);
+        let b: Vec<f32> = (0..len).map(|i| t[i] + 0.03 * rng.uniform()).collect();
+        for (thr, red) in [(0.5, 20.0), (2.0, 30.0)] {
+            let run = |src: &[&Vec<f32>]| -> Vec<Vec<f32>> {
+                let mut fx = DeNoise::new(SR, src.len());
+                fx.set_param("threshold", thr);
+                fx.set_param("reduction", red);
+                let mut y: Vec<Vec<f32>> = src.iter().map(|c| c.to_vec()).collect();
+                for s in (0..len).step_by(512) {
+                    let mut blk: Vec<&mut [f32]> = y.iter_mut().map(|c| &mut c[s..s + 512]).collect();
+                    fx.process(&mut blk);
+                }
+                y
+            };
+            let joint = run(&[&a, &b]);
+            for (ch, c) in [&a, &b].into_iter().enumerate() {
+                let want = run(&[c]).remove(0);
+                let peak = want.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+                let dev = want.iter().zip(&joint[ch]).fold(0.0f32, |m, (p, q)| m.max((p - q).abs()));
+                assert!(peak > 0.05 && dev <= 1e-5 * peak, "threshold {thr} ch{ch}: deviation {dev} (peak {peak})");
+            }
+        }
+    }
+
     /// A non-finite sample in one channel must not reach its partner through the packed FFT: the
     /// clean channel stays finite and equals what it would be as a mono signal.
     #[test]
