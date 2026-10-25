@@ -1,186 +1,47 @@
-"name": "FilmCraft Windows RC candidate"
-"on":
-  "push":
-    "branches":
-      - "rc/20261024"
-  "workflow_dispatch": {}
-"permissions":
-  "contents": "read"
-"concurrency":
-  "group": "filmcraft-rc-${{ github.ref }}"
-  "cancel-in-progress": true
-"env":
-  "CARGO_BUILD_JOBS": "2"
-  "CARGO_INCREMENTAL": "0"
-  "CARGO_PROFILE_DEV_DEBUG": "0"
-  "CARGO_PROFILE_TEST_DEBUG": "0"
-  "CARGO_PROFILE_RELEASE_DEBUG": "0"
-  "RUST_TEST_THREADS": "1"
-  "FILMCRAFT_REQUIRE_ORACLES": "1"
-  "FILMCRAFT_BUILD_SHA": "${{ github.sha }}"
-  "FILMCRAFT_BUILD_DATE": "2026-10-24"
-"jobs":
-  "windows":
-    "name": "Windows x64 quality, MSI and portable ZIP"
-    "runs-on": "windows-2022"
-    "timeout-minutes": 240
-    "env":
-      "CRAFT_FONTS_DIR": "${{ github.workspace }}\\.rc-fonts"
-    "defaults":
-      "run":
-        "shell": "pwsh"
-    "steps":
-      -
-        "uses": "actions/checkout@v4"
-        "with":
-          "persist-credentials": false
-          "fetch-depth": 0
-      -
-        "uses": "actions/checkout@v4"
-        "with":
-          "repository": "storytold/craft-fonts"
-          "ref": "bfcbf714e45a3ea8e98f88ab2b7971372a576414"
-          "path": ".rc-fonts"
-          "persist-credentials": false
-      -
-        "uses": "dtolnay/rust-toolchain@stable"
-        "with":
-          "toolchain": "1.99.1"
-          "components": "clippy,rustfmt"
-      -
-        "uses": "Swatinem/rust-cache@v2"
-        "with":
-          "shared-key": "rc-windows-x64-1.99.1"
-          "cache-on-failure": true
-          "cache-workspace-crates": true
-          "save-if": true
-      -
-        "name": "Install pinned WARP for hosted GPU tests"
-        "run": |
-          # wgpu CI also installs WARP beside test executables on windows-2022.
-          # This runtime is for hosted tests only; release packages contain no WARP DLL.
-          New-Item -ItemType Directory -Force logs | Out-Null
-          $warpArchive = Join-Path $env:RUNNER_TEMP 'warp-1.0.20.zip'
-          Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.direct3d.warp/1.0.20/microsoft.direct3d.warp.1.0.20.nupkg' -OutFile $warpArchive
-          $warpHash = 'e5fe5de661ce98b58ef9cfb736e73c0a7a2623d3bbf5f14839b2d55566d87e40'
-          if ((Get-FileHash -LiteralPath $warpArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $warpHash) { throw 'WARP archive checksum mismatch' }
-          $warpRoot = Join-Path $env:RUNNER_TEMP 'warp-1.0.20'
-          Expand-Archive -LiteralPath $warpArchive -DestinationPath $warpRoot
-          $warpDll = Join-Path $warpRoot 'build/native/bin/x64/d3d10warp.dll'
-          foreach ($destination in @('target/debug', 'target/debug/deps')) {
-            New-Item -ItemType Directory -Force $destination | Out-Null
-            Copy-Item -LiteralPath $warpDll -Destination $destination
+{
+  "name": "FilmCraft pinned MSI installation verification",
+  "on": {
+    "workflow_dispatch": {}
+  },
+  "permissions": {
+    "contents": "read",
+    "actions": "read"
+  },
+  "jobs": {
+    "msi": {
+      "runs-on": "windows-2022",
+      "timeout-minutes": 30,
+      "defaults": {
+        "run": {
+          "shell": "pwsh"
+        }
+      },
+      "steps": [
+        {
+          "uses": "actions/download-artifact@v4",
+          "with": {
+            "artifact-ids": "12582742725",
+            "run-id": "40146573846",
+            "repository": "FredApps/filmcraft",
+            "github-token": "${{ secrets.GITHUB_TOKEN }}",
+            "path": "downloaded"
           }
-          "$warpHash  microsoft.direct3d.warp.1.0.20.nupkg" | Set-Content logs/warp-sha256.log
-          (Get-Item -LiteralPath $warpDll).VersionInfo | Format-List FileVersion,ProductVersion | Out-File logs/warp-version.log
-      -
-        "uses": "actions/setup-dotnet@v4"
-        "with":
-          "dotnet-version": "8.0.x"
-      -
-        "name": "Install external oracles and WiX"
-        "run": |
-          $ErrorActionPreference='Stop'
-          New-Item -ItemType Directory -Force logs | Out-Null
-          $oracleArchive = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle.zip'
-          Invoke-WebRequest 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-24-13-02/ffmpeg-N-128013-g6b05263b44-win64-gpl.zip' -OutFile $oracleArchive
-          $expectedOracleHash = '5c31cb2f41de970ed9a49414c232b7eb83c1a2632ae5245225013335f8ff1fab'
-          if ((Get-FileHash -LiteralPath $oracleArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedOracleHash) { throw 'Oracle archive checksum mismatch' }
-          $oracleRoot = Join-Path $env:RUNNER_TEMP 'ffmpeg-oracle'
-          Expand-Archive -LiteralPath $oracleArchive -DestinationPath $oracleRoot
-          $oracleFfmpeg = (Get-ChildItem -LiteralPath $oracleRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1).FullName
-          if (-not $oracleFfmpeg) { throw 'Oracle ffmpeg missing' }
-          $oracleBin = Split-Path -Parent $oracleFfmpeg
-          $env:FILMCRAFT_FFMPEG = $oracleFfmpeg
-          $env:FILMCRAFT_FFPROBE = Join-Path $oracleBin 'ffprobe.exe'
-          "FILMCRAFT_FFMPEG=$env:FILMCRAFT_FFMPEG" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          "FILMCRAFT_FFPROBE=$env:FILMCRAFT_FFPROBE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-          $oracleBin | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          $encoderList = (& $oracleFfmpeg -hide_banner -encoders 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate oracle encoders' }
-          $encoderList | Set-Content logs/oracle-encoders.log
-          foreach ($codec in @('libx264', 'libx265', 'libaom-av1', 'libsvtav1', 'libkvazaar')) {
-            if ($encoderList -notmatch "(?m)^\s*\S+\s+$([regex]::Escape($codec))\s") { throw "Oracle lacks $codec" }
+        },
+        {
+          "name": "Verify pinned package and install MSI on clean runner",
+          "run": "$ErrorActionPreference = 'Stop'\nNew-Item -ItemType Directory -Force package-evidence | Out-Null\n$root = (Resolve-Path downloaded).Path\n$source = (Get-Content (Join-Path $root 'source-commit.txt') -Raw).Trim()\nif ($source -ne 'ab77f2d8329550fb80a8bd9a20dec206f05b6958') { throw 'Wrong package source' }\n$verified = @()\nforeach ($line in Get-Content (Join-Path $root 'SHA256SUMS.txt')) {\n  if ($line -notmatch '^([a-fA-F0-9]{64})  (.+)$') { throw 'Malformed hash manifest' }\n  $expected = $Matches[1]; $relative = $Matches[2]\n  $target = [IO.Path]::GetFullPath((Join-Path $root $relative))\n  if (-not $target.StartsWith($root + [IO.Path]::DirectorySeparatorChar)) { throw 'Manifest escapes root' }\n  $actual = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne $expected) { throw \"Hash mismatch $relative\" }\n  $verified += @{path=$relative;sha256=$actual}\n}\n$verified | ConvertTo-Json -Depth 4 | Set-Content package-evidence/verified-files.json\n$msi = Join-Path $root 'packages/filmcraft-0.12.0-rc.20261024.1-windows-x64.msi'\nif ((Get-FileHash $msi -Algorithm SHA256).Hash.ToLowerInvariant() -ne '99088ba7bfd5a572fe5959b9f09c249a5219a729cbf71df2654a043f2708af18') { throw 'Wrong pinned MSI' }\n$zip = Join-Path $root 'packages/filmcraft-0.12.0-rc.20261024.1-windows-x64-portable.zip'\nif ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3ccee7ead9859c868c383e0ebd6c14f0c6c27ed3933b613ba3788ef37117cf63') { throw 'Wrong pinned portable ZIP' }\nExpand-Archive -LiteralPath $zip -DestinationPath portable-control\n$portable = (Get-ChildItem portable-control -Directory | Select-Object -First 1).FullName\n$install = Join-Path $env:ProgramFiles 'FilmCraft'\nif (Test-Path -LiteralPath $install) { throw 'Runner already has FilmCraft; not a clean install' }\n$log = Join-Path $env:GITHUB_WORKSPACE 'package-evidence/msi-install.log'\n$p = Start-Process msiexec.exe -ArgumentList @('/i',('\"'+$msi+'\"'),'/qn','/norestart','/L*v',('\"'+$log+'\"')) -WindowStyle Hidden -Wait -PassThru\n@{exit_code=$p.ExitCode;source_sha=$source;os=[Environment]::OSVersion.VersionString;install_path=$install} | ConvertTo-Json | Set-Content package-evidence/install-result.json\nif ($p.ExitCode -notin @(0,3010)) { throw \"MSI install failed $($p.ExitCode)\" }\n$files = @()\nforeach ($exe in @('filmcraft.exe','filmcraft-cli.exe')) {\n  $actual = (Get-FileHash -LiteralPath (Join-Path $install $exe) -Algorithm SHA256).Hash.ToLowerInvariant()\n  $expected = (Get-FileHash -LiteralPath (Join-Path $portable $exe) -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne $expected) { throw \"Installed binary differs: $exe\" }\n  $files += @{path=$exe;sha256=$actual}\n}\nforeach ($file in Get-ChildItem -LiteralPath $portable -File | Where-Object { $_.Name -match '^(LICENSE-|NOTICE$|OFL-)' }) {\n  $installed = Join-Path $install ('licenses/'+$file.Name)\n  if (-not (Test-Path -LiteralPath $installed -PathType Leaf)) { throw \"Missing installed license $($file.Name)\" }\n  $actual = (Get-FileHash -LiteralPath $installed -Algorithm SHA256).Hash.ToLowerInvariant()\n  if ($actual -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()) { throw \"License differs $($file.Name)\" }\n  $files += @{path=('licenses/'+$file.Name);sha256=$actual}\n}\n$files | ConvertTo-Json -Depth 4 | Set-Content package-evidence/installed-files.json\n$version = & (Join-Path $install 'filmcraft-cli.exe') --version 2>&1\n$version | Set-Content package-evidence/installed-cli-version.txt\nif ($LASTEXITCODE -ne 0 -or \"$version\" -notmatch '0.12.0-rc.20261024.1' -or \"$version\" -notmatch 'ab77f2d') { throw 'Installed CLI version mismatch' }\n$portableVersion = & (Join-Path $portable 'filmcraft-cli.exe') --version 2>&1\n$portableVersion | Set-Content package-evidence/portable-cli-version.txt\nif ($LASTEXITCODE -ne 0 -or \"$portableVersion\" -ne \"$version\") { throw 'Portable/installed version mismatch' }\n$registration = Get-ItemProperty -LiteralPath 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\filmcraft.exe'\nif ($registration.'(default)' -ne (Join-Path $install 'filmcraft.exe')) { throw 'App Paths registration mismatch' }\n$shortcut = Join-Path $env:ProgramData 'Microsoft/Windows/Start Menu/Programs/FilmCraft.lnk'\nif (-not (Test-Path -LiteralPath $shortcut)) { throw 'Start Menu shortcut missing' }\n@{status='PASS';scope='Clean hosted MSI installation, installed hashes/notices/fonts/CLI version/registration/shortcut; portable CLI version control. Native GUI/About checks remain separate.';installed_files=$files.Count;verified_artifact_files=$verified.Count} | ConvertTo-Json | Set-Content package-evidence/summary.json\n"
+        },
+        {
+          "uses": "actions/upload-artifact@v4",
+          "if": "always()",
+          "with": {
+            "name": "rc-20261024-msi-install-verification",
+            "path": "package-evidence/",
+            "if-no-files-found": "error",
+            "retention-days": 30
           }
-          $decoderList = (& $oracleFfmpeg -hide_banner -decoders 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0 -or $decoderList -notmatch '(?m)^\s*\S+\s+libdav1d\s') { throw 'Oracle lacks libdav1d' }
-          $decoderList | Set-Content logs/oracle-decoders.log
-          "$expectedOracleHash  ffmpeg-oracle.zip" | Set-Content logs/oracle-sha256.log
-          dotnet tool install --global wix --version 5.0.2
-          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
-          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          & $env:FILMCRAFT_FFMPEG -version 2>&1 | Tee-Object logs/oracle-version.log
-          & $env:FILMCRAFT_FFPROBE -version
-      -
-        "name": "Check source formatting"
-        "run": |
-          New-Item -ItemType Directory -Force logs | Out-Null
-          cargo fmt --all -- --check 2>&1 | Tee-Object logs/fmt.log
-          if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
-      -
-        "name": "DNx and MP4 oracle regressions"
-        "run": |
-          # Fail these interoperability regressions before compiling the entire UI/workspace.
-          $env:DNX_CID = '1271'
-          cargo test --locked -p filmcraft-dnx --lib ffmpeg_probe::probe_weights -- --ignored --nocapture 2>&1 | Tee-Object logs/dnx-weight-probe.log
-          if ($LASTEXITCODE -ne 0) { throw 'DNx external weight probe failed' }
-          cargo test --locked -p filmcraft-dnx --test it 2>&1 | Tee-Object logs/dnx-regressions.log
-          if ($LASTEXITCODE -ne 0) { throw 'DNx interoperability regressions failed' }
-          cargo test --locked -p filmcraft-isobmff --test it 2>&1 | Tee-Object logs/mp4-regressions.log
-          if ($LASTEXITCODE -ne 0) { throw 'MP4 interoperability regressions failed' }
-      -
-        "name": "Native Clippy"
-        "run": |
-          cargo clippy --workspace --all-targets --keep-going --locked -- -D warnings 2>&1 | Tee-Object logs/clippy.log
-          if ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }
-      -
-        "name": "GPU readback diagnostics"
-        "id": "gpu_tests"
-        "run": |
-          cargo test --locked -p filmcraft-gpu --lib -- --nocapture 2>&1 | Tee-Object logs/gpu-diagnostic.log
-          if ($LASTEXITCODE -ne 0) { throw 'GPU readback and parity tests failed' }
-          if (Select-String -Path logs/gpu-diagnostic.log -Pattern 'SKIPPED|no (GPU|DX12) adapter; skipping' -Quiet) { throw 'Required hosted GPU coverage was skipped' }
-      -
-        "name": "Publish GPU diagnostics"
-        "if": "${{ always() && steps.gpu_tests.outcome != 'skipped' }}"
-        "uses": "actions/upload-artifact@v4"
-        "with":
-          "name": "filmcraft-rc-gpu-diagnostics"
-          "path": "logs/gpu-diagnostic.log"
-          "if-no-files-found": "error"
-      -
-        "name": "Workspace tests"
-        "run": |
-          cargo test --workspace --lib --bins --tests --locked --no-fail-fast 2>&1 | Tee-Object logs/tests.log
-          if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
-      -
-        "name": "Doctests"
-        "run": |
-          cargo test --workspace --doc --locked 2>&1 | Tee-Object logs/doctests.log
-          if ($LASTEXITCODE -ne 0) { throw 'Doctests failed' }
-      -
-        "name": "Validate dependency layers and asset attribution"
-        "run": |
-          cargo run --locked -p xtask -- layers 2>&1 | Tee-Object logs/layers.log
-          if ($LASTEXITCODE -ne 0) { throw 'Dependency layer check failed' }
-          cargo run --locked -p xtask -- assets 2>&1 | Tee-Object logs/assets.log
-          if ($LASTEXITCODE -ne 0) { throw 'Asset attribution check failed' }
-      -
-        "name": "Build and package the RC"
-        "run": |
-          & packaging/windows/package.ps1 -Arch x64 2>&1 | Tee-Object logs/packaging.log
-          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed' }
-      -
-        "name": "Record exact source, packages, checksums and acceptance kit"
-        "run": "python validation/rc-20261024/record-build.py windows-x64"
-        "if": "always()"
-        "env":
-          "RC_JOB_STATUS": "${{ job.status }}"
-      -
-        "uses": "actions/upload-artifact@v4"
-        "if": "always()"
-        "with":
-          "name": "filmcraft-rc-windows-x64"
-          "path": "rc-artifacts/"
-          "if-no-files-found": "error"
-          "retention-days": 30
+        }
+      ]
+    }
+  }
+}
