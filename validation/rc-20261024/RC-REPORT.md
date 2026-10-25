@@ -2,7 +2,7 @@
 
 The 2026-10-24 16:20 UTC snapshot contained 754 open upstream PRs. The expanded integration contains 116 selected changes, including five selective adaptations; 628 candidates are held and ten are already covered in the combined tree. These are source integration dispositions, not runtime acceptance results.
 
-Source branch: [FredApps/filmcraft â€” rc/20261024](https://github.com/FredApps/filmcraft/tree/rc/20261024). Version: `0.12.0-rc.20261024.1`. The exact reviewed PR tips, selective integration commits, hold reasons and covered dispositions are in `integration-receipts-expanded.json` and `expanded-integration-plan.json`.
+Source branch: [FredApps/filmcraft — rc/20261024](https://github.com/FredApps/filmcraft/tree/rc/20261024). Version: `0.12.0-rc.20261024.1`. The exact reviewed PR tips, selective integration commits, hold reasons and covered dispositions are in `integration-receipts-expanded.json` and `expanded-integration-plan.json`.
 
 ## Scope and review
 
@@ -46,3 +46,5 @@ Run 40140677286 at source 319584296ffe9035741ca75391f095193990c561 passed format
 The follow-up retains strict DNx numeric tolerances, corrects the CID 1271 weight-table assignment, preserves FCPXML self-references while emitting a cycle warning, and isolates selection deduplication from the separate sync-lock refusal contract. DNx and MP4 oracle regressions now run before the expensive full workspace compilation, with a black-box CID 1271 weight probe retained in the logs. Exact successful follow-up evidence remains required before package acceptance.
 
 Run 40146002238 confirmed the CID 1271 external weight probe matches D.1, and all six active DNx integration tests passed with the original strict tolerances. MP4 cut-edit packet comparison and the explicit AAC presentation-duration regression passed; only the convenience AAC expectation failed because it omitted integer rounding through the default movie timescale (96,256 media ticks → 2,005 movie ticks → 96,240 reported media ticks). The next repair uses that documented conversion in the expected value. Early failure also now skips GPU-log publication when the GPU test step did not run.
+
+Run 40146330005 confirmed both AAC duration tests pass. Four remux metadata checks failed because a source-edit encoding mistake changed the test-only title atom key from `\u{00a9}nam` to an extra-prefix variant; the UTF-8 key is restored. Their exact title assertions remain unchanged.
