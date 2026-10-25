@@ -188,13 +188,17 @@ fn hevc_422_10bit_mov_matches_ffmpeg() {
         "yuv422p10le",
         "-c:a",
         "pcm_s24le",
-        "-shortest",
+        // No `-shortest` (or frame limit): both inputs end by themselves, the video after its 24
+        // pictures and the tone after 1 s. `-shortest` cut the last picture with ffmpeg 7.1 (the
+        // video track ends at 0.959 s, before the audio), and `-frames:v 24` cut the audio to
+        // one packet with ffmpeg 4.4.
     ];
-    let Some(path) = fixture(&ff, "hevc_422_10.mov", &args) else {
+    // (named for this recipe, so a cached clip made with `-shortest` is not reused)
+    let Some(path) = fixture(&ff, "hevc_422_10_24f.mov", &args) else {
         eprintln!("SKIPPED: ffmpeg without libx265 4:2:2 10-bit");
         return;
     };
-    let src = filmcraft_codecs::open_bytes("hevc_422_10.mov", bytes(&path)).unwrap();
+    let src = filmcraft_codecs::open_bytes("hevc_422_10_24f.mov", bytes(&path)).unwrap();
     let v = src.info().video.clone().unwrap();
     let (w, h) = (320usize, 240usize);
     assert_eq!((v.width as usize, v.height as usize), (w, h));
