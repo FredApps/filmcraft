@@ -286,15 +286,20 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
 
     /// Nested sequence from a `<media>` resource.
     fn media(&mut self, id: &str) -> Option<ItemId> {
-        // An active resource may already have a reserved placeholder in `media_items`. Check the
-        // recursion stack before the completed-resource cache so a self-reference is reported and
-        // skipped instead of resolving to that incomplete placeholder.
+        // Resources are reserved and memoized before their sequence is filled. Resolving a
+        // back-edge to that stable identity preserves the clip in the imported spine without
+        // descending again, so cycles cannot recurse indefinitely. Still report the cycle.
+        if let Some(i) = self.media_items.get(id) {
+            if self.media_active.contains(id) {
+                self.report.warn(format!("recursive FCPXML media resource {id:?} retained as a sequence reference"));
+            }
+            return Some(*i);
+        }
+        // An active resource without a memoized item would mean we re-entered before reservation;
+        // fail closed rather than recurse. The normal traversal reserves before filling children.
         if self.media_active.contains(id) {
             self.report.warn(format!("recursive FCPXML media resource {id:?} ignored"));
             return None;
-        }
-        if let Some(i) = self.media_items.get(id) {
-            return Some(*i);
         }
         let n = *self.media_nodes.get(id)?;
         let s = child(n, "sequence")?;
@@ -303,8 +308,7 @@ impl<'a, 'i> Imp<'a, 'i, '_> {
             return None;
         }
         let name = n.attribute("name").unwrap_or("Compound Clip").to_string();
-        // Reserve and memoize before descending so the resource keeps one stable identity; active
-        // back-edges are detected above and skipped.
+        // Reserve and memoize before descending so a back-edge resolves to this stable identity.
         let settings = self.sequence_settings(s);
         let item = self.b.reserve_sequence(&name, settings.clone(), None);
         self.media_items.insert(id.into(), item);

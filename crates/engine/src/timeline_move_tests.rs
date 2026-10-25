@@ -156,9 +156,9 @@ fn duplicate_selection_delete_matches_unique_selection_with_and_without_links() 
                 let mut s = demo();
                 let (_, v, a_track, a) = pair_in_an_empty_sequence(&mut s, 60.0);
                 s.execute("sequence.linkedSelection", json!({"on": linked})).unwrap();
-                if !linked {
-                    s.execute("timeline.setTrack", json!({"track": a_track.0, "syncLock": false})).unwrap();
-                }
+                // This test covers duplicate selection semantics, not sync-lock refusal. A
+                // video-only delete conflicts with the linked audio track while sync lock is on.
+                s.execute("timeline.setTrack", json!({"track": a_track.0, "syncLock": false})).unwrap();
                 // Current selections are exact (including Alt selections). Linked expansion
                 // happens when selecting, not when deleting the already-selected identities.
                 s.state.selection = if select_audio { vec![v.id, v.id, a.id, a.id] } else { vec![v.id, v.id] };

@@ -122,8 +122,9 @@ fn gcd(a: u32, b: u32) -> u32 {
     if b == 0 { a.max(1) } else { gcd(b, a % b) }
 }
 
-/// `strict`: ffprobe timestamps must equal ours + edit offset. Otherwise (edit starting mid-frame,
-/// which ffmpeg snaps to a frame boundary) only a constant shift within one frame is required.
+/// `strict`: compare every raw sample and require ffprobe timestamps to equal ours + edit offset.
+/// Otherwise (a cut edit list) ffprobe may expose only the visible contiguous sample range; match
+/// it by byte position, then allow its cut-point timestamp to snap by less than one frame.
 fn check_packets(file: &Mp4File, idx: usize, pk: &[&Value], strict: bool) -> Result<(), String> {
     let t = &file.tracks[idx];
     if t.pcm_chunked {
@@ -137,21 +138,48 @@ fn check_packets(file: &Mp4File, idx: usize, pk: &[&Value], strict: bool) -> Res
         }
         return Ok(());
     }
-    if pk.len() != t.samples.len() {
+    if strict && pk.len() != t.samples.len() {
         return Err(format!("packet count {} vs {}", pk.len(), t.samples.len()));
     }
+    if pk.len() > t.samples.len() {
+        return Err(format!("packet count {} exceeds raw sample count {}", pk.len(), t.samples.len()));
+    }
+    if !strict && !t.samples.is_empty() && pk.is_empty() {
+        return Err("edit list hides every raw sample from ffprobe".into());
+    }
+    // A presentation edit can hide samples at either end from ffprobe while the demuxer correctly
+    // retains the complete raw sample table. Match the visible contiguous run by file position so
+    // packet count differences do not discard the byte/timestamp/keyframe oracle.
+    let mut sample_indices = Vec::with_capacity(pk.len());
+    let mut next_sample = 0usize;
+    for (i, p) in pk.iter().enumerate() {
+        let Some(pos) = int(&p["pos"]).and_then(|pos| u64::try_from(pos).ok()) else {
+            return Err(format!("packet {i}: ffprobe omitted a valid byte position"));
+        };
+        let Some(relative) = t.samples.get(next_sample..).and_then(|s| s.iter().position(|sample| sample.offset == pos)) else {
+            return Err(format!("packet {i}: byte position {pos} does not match the next raw sample"));
+        };
+        let sample_index = next_sample + relative;
+        if i > 0 && sample_index != next_sample {
+            return Err(format!("packet {i}: visible packets are not a contiguous raw sample range"));
+        }
+        sample_indices.push(sample_index);
+        next_sample = sample_index.saturating_add(1);
+    }
+    let first_sample = sample_indices.first().and_then(|&i| t.samples.get(i));
     let e = if strict || pk.is_empty() {
         t.edit_offset
     } else {
-        let e = int(&pk[0]["pts"]).unwrap_or(0) - t.samples[0].pts;
+        let e = int(&pk[0]["pts"]).unwrap_or(0) - first_sample.map_or(0, |s| s.pts);
         let max_dur = t.samples.iter().map(|s| s.duration as i64).max().unwrap_or(0);
         if (e - t.edit_offset).abs() >= max_dur {
             return Err(format!("shift {e} vs edit offset {}", t.edit_offset));
         }
         e
     };
-    let last = pk.len() - 1;
-    for (i, (p, s)) in pk.iter().zip(&t.samples).enumerate() {
+    let last = pk.len().saturating_sub(1);
+    for (i, (p, &sample_index)) in pk.iter().zip(&sample_indices).enumerate() {
+        let Some(s) = t.samples.get(sample_index) else { return Err(format!("packet {i}: matched sample disappeared")) };
         let size = int(&p["size"]);
         let pos = int(&p["pos"]);
         let pts = int(&p["pts"]);

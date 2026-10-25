@@ -225,7 +225,40 @@ fn aac_priming_edit() {
     decode_clean(&out);
     let pk = packets(&out);
     assert_eq!(int(&pk[0]["pts"]), Some(-1024));
-    assert_eq!(int(&streams(&out)[0]["duration_ts"]), int(&streams(&src)[0]["duration_ts"]));
+    // `media_start` exposes the remaining raw media. The source's edit list trims 240 trailing
+    // AAC padding samples too, so its presented 96,000 ticks are shorter than this convenience
+    // edit. Preserve the documented raw-remainder behavior exactly; use an explicit edit to trim
+    // both encoder priming and padding (covered below).
+    let raw_duration = t.samples.iter().fold(0u64, |sum, sample| sum.saturating_add(sample.duration as u64));
+    let expected_duration = raw_duration.saturating_sub(1024);
+    assert_eq!(int(&streams(&out)[0]["duration_ts"]), i64::try_from(expected_duration).ok());
+}
+
+#[test]
+fn aac_priming_edit_preserves_the_presentation_duration() {
+    let (Some(src), Some(_)) = (fixture("aac.mp4"), ffprobe()) else { return };
+    let data = std::fs::read(&src).unwrap();
+    let f = open(data.as_slice()).unwrap();
+    let t = &f.tracks[0];
+    let duration = int(&streams(&src)[0]["duration_ts"]).and_then(|v| u64::try_from(v).ok()).unwrap();
+    let mut options = WriterOptions::new(Brand::Mp4);
+    // Use the media timescale as the movie timescale so the exact sample duration needs no
+    // movie-timescale rounding.
+    options.movie_timescale = t.timescale;
+    let mut w = Mp4Writer::new(Cursor::new(Vec::new()), options).unwrap();
+    let mut cfg = TrackConfig::new(t.entries[0].clone(), t.timescale);
+    cfg.edits = vec![Edit { segment_duration: duration, media_time: 1024, media_rate: 0x10000 }];
+    let k = w.add_track(cfg).unwrap();
+    for (i, s) in t.samples.iter().enumerate() {
+        let d = f.read_sample(data.as_slice(), 0, i).unwrap();
+        w.write_sample(k, WriteSample { data: &d, duration: s.duration, composition_offset: 0, is_sync: true }).unwrap();
+    }
+    let out = out_dir().join("aac_priming_presentation.mp4");
+    std::fs::write(&out, w.finish().unwrap().into_inner()).unwrap();
+    decode_clean(&out);
+    let pk = packets(&out);
+    assert_eq!(int(&pk[0]["pts"]), Some(-1024));
+    assert_eq!(int(&streams(&out)[0]["duration_ts"]), i64::try_from(duration).ok());
 }
 
 #[test]

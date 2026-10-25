@@ -64,7 +64,7 @@ first frame header to label the stream.
 ### Where we follow ffmpeg rather than the letter of the standard
 
 ffmpeg's decoder is the reference everyone interoperates with (and the oracle of our tests). In
-three places it differs from the text of ST 2019-1:2016; black-box probes (`src/ffmpeg_probe.rs`:
+two places it differs from the text of ST 2019-1:2016; black-box probes (`src/ffmpeg_probe.rs`:
 streams with a single coefficient, decoded by ffmpeg, measured with a forward DCT) pinned down
 its behaviour, and we match it by default:
 
@@ -73,14 +73,15 @@ its behaviour, and we match it by default:
    steps for every CID family and step size). The decoder does the same;
    `DecodeOptions::spec_dequant` selects equation 8.1 instead. The encoder picks the amplitude
    nearest to the `(A + ¾)` reconstruction.
-2. **CID 1271 (DNxHR HQX) weights.** Table C.2 assigns Table D.1 to CID 1271. ffmpeg's decoder and
-   encoder use Table D.4 (the CID 1241 weights) — fitted RMS error 0.65 against D.4, > 2.6
-   against every other table. We use D.4.
-3. **4:4:4 signalling.** ffmpeg writes RGB DNxHR 444 with `CLF = 0`, and Y′CbCr 444 with `CLF = 1`
+2. **4:4:4 signalling.** ffmpeg writes RGB DNxHR 444 with `CLF = 0`, and Y′CbCr 444 with `CLF = 1`
    plus `ACF = 1` on every macroblock; its channel order is G, B, R (Ch1 = G). The decoder treats
    every 4:4:4 stream as RGB except macroblocks flagged `ACF = 1` (a stream that is entirely
    ACF = 1 is returned as Y′CbCr; mixed streams are converted to RGB macroblock by macroblock as
    §8.1.1 describes), and the encoder writes the same signalling.
+
+CID 1271 uses Table D.1 as assigned by Table C.2. Earlier black-box measurements against older
+ffmpeg builds suggested Table D.4; that empirical result no longer justifies overriding the
+standard's assignment.
 
 Also noted: the RLE alpha pseudo code (Figure 50) tests the header bit the opposite way from
 the prose of §7.3.1.2; we follow the prose (normative text takes precedence).

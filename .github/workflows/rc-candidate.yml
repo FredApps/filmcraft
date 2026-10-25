@@ -118,6 +118,17 @@
           cargo fmt --all -- --check 2>&1 | Tee-Object logs/fmt.log
           if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
       -
+        "name": "DNx and MP4 oracle regressions"
+        "run": |
+          # Fail these interoperability regressions before compiling the entire UI/workspace.
+          $env:DNX_CID = '1271'
+          cargo test --locked -p filmcraft-dnx --lib ffmpeg_probe::probe_weights -- --ignored --nocapture 2>&1 | Tee-Object logs/dnx-weight-probe.log
+          if ($LASTEXITCODE -ne 0) { throw 'DNx external weight probe failed' }
+          cargo test --locked -p filmcraft-dnx --test it 2>&1 | Tee-Object logs/dnx-regressions.log
+          if ($LASTEXITCODE -ne 0) { throw 'DNx interoperability regressions failed' }
+          cargo test --locked -p filmcraft-isobmff --test it 2>&1 | Tee-Object logs/mp4-regressions.log
+          if ($LASTEXITCODE -ne 0) { throw 'MP4 interoperability regressions failed' }
+      -
         "name": "Native Clippy"
         "run": |
           cargo clippy --workspace --all-targets --keep-going --locked -- -D warnings 2>&1 | Tee-Object logs/clippy.log
