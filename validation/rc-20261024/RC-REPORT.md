@@ -2,7 +2,7 @@
 
 The 2026-10-24 16:20 UTC snapshot contained 754 open upstream PRs. The expanded integration contains 116 selected changes, including five selective adaptations; 628 candidates are held and ten are already covered in the combined tree. These are source integration dispositions, not runtime acceptance results.
 
-Source branch: [FredApps/filmcraft — rc/20261024](https://github.com/FredApps/filmcraft/tree/rc/20261024). Version: `0.12.0-rc.20261024.1`. The exact reviewed PR tips, selective integration commits, hold reasons and covered dispositions are in `integration-receipts-expanded.json` and `expanded-integration-plan.json`.
+Source branch: [FredApps/filmcraft â€” rc/20261024](https://github.com/FredApps/filmcraft/tree/rc/20261024). Version: `0.12.0-rc.20261024.1`. The exact reviewed PR tips, selective integration commits, hold reasons and covered dispositions are in `integration-receipts-expanded.json` and `expanded-integration-plan.json`.
 
 ## Scope and review
 
@@ -44,3 +44,5 @@ The next required work is to resolve any hosted failures, obtain successful pack
 Run 40140677286 at source 319584296ffe9035741ca75391f095193990c561 passed formatting, native Clippy, and all 47 required GPU library tests (zero failures or skips). The full workspace test step reported 3,906 passes and seven failures across five targets; doctests and packaging were consequently not reached. The remaining failures were DNx HQX decode/encode oracle comparisons, duplicate-selection ripple-delete fixture sync-lock setup, FCPXML self-reference preservation, MP4 edit-list/padding oracle expectations, and the Lao Sequence menu term. This failed run is not an accepted RC.
 
 The follow-up retains strict DNx numeric tolerances, corrects the CID 1271 weight-table assignment, preserves FCPXML self-references while emitting a cycle warning, and isolates selection deduplication from the separate sync-lock refusal contract. DNx and MP4 oracle regressions now run before the expensive full workspace compilation, with a black-box CID 1271 weight probe retained in the logs. Exact successful follow-up evidence remains required before package acceptance.
+
+Run 40146002238 confirmed the CID 1271 external weight probe matches D.1, and all six active DNx integration tests passed with the original strict tolerances. MP4 cut-edit packet comparison and the explicit AAC presentation-duration regression passed; only the convenience AAC expectation failed because it omitted integer rounding through the default movie timescale (96,256 media ticks → 2,005 movie ticks → 96,240 reported media ticks). The next repair uses that documented conversion in the expected value. Early failure also now skips GPU-log publication when the GPU test step did not run.

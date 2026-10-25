@@ -41,7 +41,7 @@ fn remux(input: &Path, out_name: &str, brand: Brand, finish: Finish, timecode: O
     let f = open(data.as_slice()).unwrap();
     let mut opts = WriterOptions::new(brand);
     opts.movie_timescale = f.timescale;
-    opts.metadata.push(("©nam".into(), "FilmCraft test".into()));
+    opts.metadata.push(("Â©nam".into(), "FilmCraft test".into()));
     let mut w = Mp4Writer::new(Cursor::new(Vec::new()), opts).unwrap();
     let av: Vec<usize> = (0..f.tracks.len()).filter(|&i| matches!(f.tracks[i].kind, TrackKind::Video | TrackKind::Audio)).collect();
     let mut map = vec![usize::MAX; f.tracks.len()];
@@ -212,7 +212,9 @@ fn aac_priming_edit() {
     let data = std::fs::read(&src).unwrap();
     let f = open(data.as_slice()).unwrap();
     let t = &f.tracks[0];
-    let mut w = Mp4Writer::new(Cursor::new(Vec::new()), WriterOptions::new(Brand::Mp4)).unwrap();
+    let options = WriterOptions::new(Brand::Mp4);
+    let movie_timescale = options.movie_timescale;
+    let mut w = Mp4Writer::new(Cursor::new(Vec::new()), options).unwrap();
     let mut cfg = TrackConfig::new(t.entries[0].clone(), t.timescale);
     cfg.media_start = Some(1024);
     let k = w.add_track(cfg).unwrap();
@@ -225,12 +227,14 @@ fn aac_priming_edit() {
     decode_clean(&out);
     let pk = packets(&out);
     assert_eq!(int(&pk[0]["pts"]), Some(-1024));
-    // `media_start` exposes the remaining raw media. The source's edit list trims 240 trailing
+    // `media_start` exposes the remaining raw media. The source's edit list trims trailing
     // AAC padding samples too, so its presented 96,000 ticks are shorter than this convenience
-    // edit. Preserve the documented raw-remainder behavior exactly; use an explicit edit to trim
-    // both encoder priming and padding (covered below).
+    // edit. The convenience edit is stored in the movie timescale, so compare after the writer's
+    // integer floor conversion to that scale and back to media ticks.
     let raw_duration = t.samples.iter().fold(0u64, |sum, sample| sum.saturating_add(sample.duration as u64));
-    let expected_duration = raw_duration.saturating_sub(1024);
+    let remaining_media = raw_duration.saturating_sub(1024);
+    let expected_movie_duration = (remaining_media as u128 * movie_timescale as u128 / t.timescale as u128) as u64;
+    let expected_duration = (expected_movie_duration as u128 * t.timescale as u128 / movie_timescale as u128) as u64;
     assert_eq!(int(&streams(&out)[0]["duration_ts"]), i64::try_from(expected_duration).ok());
 }
 

@@ -135,13 +135,14 @@
           if ($LASTEXITCODE -ne 0) { throw 'Native Clippy failed' }
       -
         "name": "GPU readback diagnostics"
+        "id": "gpu_tests"
         "run": |
           cargo test --locked -p filmcraft-gpu --lib -- --nocapture 2>&1 | Tee-Object logs/gpu-diagnostic.log
           if ($LASTEXITCODE -ne 0) { throw 'GPU readback and parity tests failed' }
           if (Select-String -Path logs/gpu-diagnostic.log -Pattern 'SKIPPED|no (GPU|DX12) adapter; skipping' -Quiet) { throw 'Required hosted GPU coverage was skipped' }
       -
         "name": "Publish GPU diagnostics"
-        "if": "always()"
+        "if": "${{ always() && steps.gpu_tests.outcome != 'skipped' }}"
         "uses": "actions/upload-artifact@v4"
         "with":
           "name": "filmcraft-rc-gpu-diagnostics"
