@@ -155,7 +155,10 @@ fn preview_and_hex(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: 
 
 fn hex_field(ui: &mut egui::Ui, auto: &mut Registry, prefix: &str, draft: &mut ColorDraft) {
     ui.label(tl!("Hex"));
-    let response = ui.add(egui::TextEdit::singleline(&mut draft.hex).font(egui::TextStyle::Monospace).desired_width(58.0).char_limit(7));
+    let response = super::accessible_name(
+        ui.add(egui::TextEdit::singleline(&mut draft.hex).font(egui::TextStyle::Monospace).desired_width(58.0).char_limit(7)),
+        tl!("Hex color"),
+    );
     auto.add_response(&format!("{prefix}.hex"), &response, tl!("Hex color"));
     if response.changed() {
         if let Some(hex) = draft.hex.strip_prefix('#') {

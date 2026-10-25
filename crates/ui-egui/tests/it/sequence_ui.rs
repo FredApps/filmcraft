@@ -95,6 +95,42 @@ fn high_frame_rate_marker_duration_starts_at_one_valid_frame() {
 }
 
 #[test]
+fn marker_timecodes_fit_inside_their_paint_clip() {
+    fn check(shape: &egui::Shape, clip: egui::Rect, field: egui::Rect, expected: &str, found: &mut bool) {
+        match shape {
+            egui::Shape::Text(text) if text.galley.text() == expected => {
+                let bounds = text.galley.rect.translate(text.pos.to_vec2());
+                if field.intersects(bounds) {
+                    *found = true;
+                    assert!(clip.expand(0.5).contains_rect(bounds), "{expected}: text {bounds:?} is clipped by {clip:?}");
+                }
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| check(shape, clip, field, expected, found)),
+            _ => {}
+        }
+    }
+    let mut d = Driver::demo();
+    d.exec("markers.clearAll", json!({}));
+    let marker = d.exec("markers.addRange", json!({"frame":30,"durationFrames":24}))["marker"].as_u64().unwrap();
+    d.double_click(&format!("timeline.marker.{marker}"));
+    let elements = d.ok("ui.elements", json!({"prefix":"markerProperties."}));
+    for field in ["time", "duration"] {
+        let expected = marker_draft_text(&d, field).to_owned();
+        let entry = elements.as_array().unwrap().iter().find(|e| e["id"] == format!("markerProperties.{field}")).unwrap();
+        let r = &entry["rect"];
+        let rect = egui::Rect::from_min_size(
+            egui::pos2(r[0].as_f64().unwrap() as f32, r[1].as_f64().unwrap() as f32),
+            egui::vec2(r[2].as_f64().unwrap() as f32, r[3].as_f64().unwrap() as f32),
+        );
+        let mut found = false;
+        for clipped in &d.harness.output().shapes {
+            check(&clipped.shape, clipped.clip_rect, rect, &expected, &mut found);
+        }
+        assert!(found, "{field}: timecode text is drawn");
+    }
+}
+
+#[test]
 fn marker_notes_scroll_and_timecode_fields_require_complete_valid_values() {
     let mut d = Driver::demo();
     d.exec("markers.clearAll", json!({}));

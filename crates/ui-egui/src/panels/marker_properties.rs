@@ -137,7 +137,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let previous = index.and_then(|i| i.checked_sub(1)).and_then(|i| markers.get(i));
     let next = index.and_then(|i| i.checked_add(1)).and_then(|i| markers.get(i));
     let mut action = None;
-    let modal = egui::Modal::new(egui::Id::new("marker-properties")).show(ctx, |ui| {
+    let modal = egui::Modal::new(egui::Id::unique("marker-properties")).show(ctx, |ui| {
         let width = (ctx.content_rect().width() - 40.0).clamp(240.0, 560.0);
         let max_height = (ctx.content_rect().height() - 110.0).max(100.0);
         ui.set_width(width);
@@ -275,11 +275,16 @@ impl egui::TextBuffer for TimecodeBuffer<'_> {
     }
 }
 
-fn timecode_field(ui: &mut egui::Ui, value: &mut String, rate: filmcraft_time::FrameRate) -> egui::Response {
+fn timecode_field(ui: &mut egui::Ui, value: &mut String, rate: filmcraft_time::FrameRate, label: &str) -> egui::Response {
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let sample = if rate.timecode_base() >= 100 { "00:00:00:000" } else { "00:00:00:00" };
-    let width = ui.painter().layout_no_wrap(sample.into(), font.clone(), ui.visuals().text_color()).size().x + 8.0;
-    ui.add(egui::TextEdit::singleline(&mut TimecodeBuffer(value, sample.len())).font(font).desired_width(width))
+    // egui 0.37 includes frame padding in desired_width; reserve it and the caret explicitly.
+    let margin = egui::Margin::symmetric(4, 3);
+    let width = ui.painter().layout_no_wrap(sample.into(), font.clone(), ui.visuals().text_color()).size().x + margin.sum().x + 2.0;
+    crate::widgets::accessible_name(
+        ui.add(egui::TextEdit::singleline(&mut TimecodeBuffer(value, sample.len())).font(font).margin(margin).desired_width(width)),
+        label,
+    )
 }
 
 fn parse_marker_timecode(value: &str, rate: filmcraft_time::FrameRate, drop: bool) -> Result<i64, String> {
@@ -318,7 +323,7 @@ fn field_row_height(ui: &mut egui::Ui, label: &str, min_height: f32, contents: i
 
 fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, rate: filmcraft_time::FrameRate) {
     field_row(ui, tl!("Name"), |ui| {
-        let response = ui.add(egui::TextEdit::singleline(&mut draft.name).desired_width(f32::INFINITY));
+        let response = crate::widgets::accessible_name(ui.add(egui::TextEdit::singleline(&mut draft.name).desired_width(f32::INFINITY)), tl!("Name"));
         app.auto.add_response("markerProperties.name", &response, tl!("Name"));
         if draft.focus_name {
             response.request_focus();
@@ -328,13 +333,13 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, rate: fi
     ui.add_space(6.0);
     // Useful for multi-user projects: attribution belongs to the marker, not the current OS user.
     field_row(ui, tl!("Author"), |ui| {
-        let response = ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY));
+        let response = crate::widgets::accessible_name(ui.add(egui::TextEdit::singleline(&mut draft.author).desired_width(f32::INFINITY)), tl!("Author"));
         app.auto.add_response("markerProperties.author", &response, tl!("Author"));
     });
     ui.add_space(10.0);
     field_row_height(ui, tl!("Time"), ui.spacing().interact_size.y, |ui| {
         ui.horizontal_wrapped(|ui| {
-            let response = timecode_field(ui, &mut draft.time, rate);
+            let response = timecode_field(ui, &mut draft.time, rate, tl!("Time"));
             app.auto.add_response("markerProperties.time", &response, tl!("Time"));
             ui.add_space(16.0);
             let response = ui.checkbox(&mut draft.range, tl!("Duration")).on_hover_text(tl!("Range marker"));
@@ -342,14 +347,17 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, rate: fi
             if response.changed() && draft.range && draft.original_duration == filmcraft_time::Tick::ZERO && draft.duration == draft.initial_duration {
                 draft.duration = filmcraft_time::format_timecode_frames(1, rate, false);
             }
-            let response = ui.add_enabled(draft.range, |ui: &mut egui::Ui| timecode_field(ui, &mut draft.duration, rate));
+            let response = ui.add_enabled(draft.range, |ui: &mut egui::Ui| timecode_field(ui, &mut draft.duration, rate, tl!("Duration")));
             app.auto.add_response("markerProperties.duration", &response, tl!("Duration"));
         });
     });
     ui.add_space(10.0);
     field_row(ui, tl!("Notes"), |ui| {
         egui::ScrollArea::vertical().id_salt("marker-notes").max_height(120.0).auto_shrink([false, false]).show(ui, |ui| {
-            let mut response = ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8));
+            let mut response = crate::widgets::accessible_name(
+                ui.add(egui::TextEdit::multiline(&mut draft.comment).desired_width(f32::INFINITY).desired_rows(8)),
+                tl!("Notes"),
+            );
             // Register the visible editor area so automation can still focus a long scrolled note.
             response.rect = response.rect.intersect(ui.clip_rect());
             app.auto.add_response("markerProperties.comment", &response, tl!("Notes"));
@@ -421,7 +429,7 @@ fn fields(app: &mut FilmcraftApp, ui: &mut egui::Ui, draft: &mut Draft, rate: fi
                         let address = filmcraft_project::marker_web_url(&draft.url);
                         let response = ui.add_enabled(address.is_some(), |ui: &mut egui::Ui| {
                             let response = ui.add_sized(vec2(24.0, 24.0), egui::Button::new(""));
-                            response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Open Link")));
+                            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Open Link")));
                             let color = ui.style().interact(&response).fg_stroke.color;
                             crate::icons::paint(ui.painter(), response.rect.shrink(4.0), crate::icons::Icon::ExternalLink, color);
                             response
@@ -532,7 +540,7 @@ fn color_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, draft: &mut Draft) 
     let Some(editor) = &mut draft.color_editor else { return };
     let mut add = false;
     let mut cancel = false;
-    let modal = egui::Modal::new(egui::Id::new("marker-custom-color")).show(ctx, |ui| {
+    let modal = egui::Modal::new(egui::Id::unique("marker-custom-color")).show(ctx, |ui| {
         ui.set_width(360.0);
         ui.heading(tl!("Add Custom Color"));
         color_picker::show(ui, &mut app.auto, &mut app.hooks, "markerColor", editor);
@@ -567,7 +575,7 @@ fn color_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, draft: &mut Draft) 
 
 fn add_color_swatch(ui: &mut egui::Ui) -> egui::Response {
     let (chip, response) = allocate_swatch(ui);
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Add custom color")));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Add custom color")));
     let visuals = ui.style().interact(&response);
     ui.painter().rect_filled(chip, 3.0, visuals.bg_fill);
     ui.painter().rect_stroke(chip, 3.0, Stroke::new(1.0, ui.visuals().text_color().gamma_multiply(0.5)), egui::StrokeKind::Outside);
