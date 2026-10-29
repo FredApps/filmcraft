@@ -3,7 +3,10 @@
 use crate::frame::{FrameBuf, Plane, RowBand};
 use crate::par::Pool;
 use crate::postfilter::bands;
-use crate::spec_tables::*;
+use crate::spec_tables::{
+    FILTER_BITS, RESTORE_NONE, RESTORE_SGRPROJ, RESTORE_WIENER, SGR_PARAMS, SGRPROJ_MTABLE_BITS, SGRPROJ_PRJ_BITS, SGRPROJ_RECIP_BITS, SGRPROJ_RST_BITS,
+    SGRPROJ_SGR_BITS, SUPERRES_EXTRA_BITS, SUPERRES_FILTER_OFFSET, SUPERRES_FILTER_TAPS, SUPERRES_SCALE_BITS, SUPERRES_SCALE_MASK, UPSCALE_FILTER,
+};
 use crate::state::FrameState;
 
 /// Upscale a frame horizontally from FrameWidth to UpscaledWidth (7.16).
@@ -239,7 +242,7 @@ impl LrPlane<'_> {
         let (w, h) = (xb - xa, yb - ya);
         for pass in 0..2 {
             if SGR_PARAMS[set][pass * 2] != 0 {
-                self.box_filter(ya, yb, xa, xb, set, pass, s);
+                self.box_filter((ya, yb), (xa, xb), set, pass, s);
             }
         }
         let xqd = self.sgr_xqd[ui];
@@ -267,8 +270,7 @@ impl LrPlane<'_> {
     /// Box filter process (7.17.3) for one pass over rows [ya, yb) and columns [xa, xb), into
     /// `s.flt[pass]`. A and B are computed for the rows and columns around the block once,
     /// from running box sums over the source rows.
-    #[allow(clippy::too_many_arguments)]
-    fn box_filter(&self, ya: usize, yb: usize, xa: usize, xb: usize, set: usize, pass: usize, s: &mut Scratch) {
+    fn box_filter(&self, (ya, yb): (usize, usize), (xa, xb): (usize, usize), set: usize, pass: usize, s: &mut Scratch) {
         let bd = self.bit_depth;
         let r = SGR_PARAMS[set][pass * 2] as usize;
         let eps = SGR_PARAMS[set][pass * 2 + 1] as i64;
