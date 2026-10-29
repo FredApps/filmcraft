@@ -40,13 +40,10 @@ fn marker_text_menu_commands_belong_to_each_field_not_the_timeline() {
         d.ok("ui.menu.invoke", json!({"id":"edit.selectAll"}));
         assert!(d.exec("sequence.inspect", json!({})) == before, "Select All in {field} must not select clips");
         d.ok("ui.menu.invoke", json!({"id":"edit.copy"}));
-        assert!(d.harness.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::RequestCopy)));
-        d.harness.input_mut().events.push(egui::Event::Copy);
+        // Main now forwards Copy/Cut directly as text events, including native floating windows.
         d.frames(1);
         assert!(d.harness.output().platform_output.commands.iter().any(|c| matches!(c, egui::OutputCommand::CopyText(s) if s == value)), "Copy {field}");
         d.ok("ui.menu.invoke", json!({"id":"edit.cut"}));
-        assert!(d.harness.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::RequestCut)));
-        d.harness.input_mut().events.push(egui::Event::Cut);
         d.frames(1);
         assert_eq!(marker_draft_text(&d, field), "");
         d.ok("ui.menu.invoke", json!({"id":"edit.paste"}));

@@ -146,6 +146,7 @@ pub const UI_COMMANDS: &[UiCommand] = &[
     uic!("help.reportIssue", "Report an Issue…", ["Help"], None),
     uic!("help.revealLogFiles", "Reveal Log Files…", ["Help"], None),
     uic!("help.systemCompatibilityReport", "System Compatibility Report…", ["Help"], None),
+    uic!("app.checkForUpdates", "Check for Updates…", ["Help"], None),
     uic!("app.about", "About FilmCraft", ["Help"], None),
     uic!("app.keyboardShortcuts", "Keyboard Shortcuts…", ["Edit"], Some("Cmd+Alt+K")),
     uic!("app.settings.general", "General…", ["Edit", "Preferences"], Some("Cmd+,")),
@@ -179,35 +180,25 @@ pub fn targets_source(app: &FilmcraftApp, params: &Value) -> bool {
     }
 }
 
-/// Execute a UI or engine command by id.
+/// Route menu editing to the focused text field; automation can explicitly invoke the engine.
 pub fn invoke(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: Value) -> Result<Value, String> {
-    if ctx.text_edit_focused() && text_edit_command(id) {
-        match id {
-            "edit.copy" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestCopy),
-            "edit.cut" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestCut),
-            "edit.paste" => ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste),
-            _ => {
-                let (key, shift) = match id {
-                    "edit.selectAll" => (egui::Key::A, false),
-                    "edit.undo" => (egui::Key::Z, false),
-                    "edit.redo" => (egui::Key::Z, true),
-                    _ => (egui::Key::Delete, false),
-                };
-                let modifiers = if id == "edit.clear" { egui::Modifiers::NONE } else { egui::Modifiers { shift, ..egui::Modifiers::COMMAND } };
-                app.synthetic.push(egui::Event::ModifiersChanged(modifiers));
-                for pressed in [true, false] {
-                    app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers });
-                }
-                app.synthetic.push(egui::Event::ModifiersChanged(egui::Modifiers::NONE));
-            }
-        }
-        ctx.request_repaint();
-        return Ok(Value::Null);
+    if text_field_window(ctx).is_some() && edits_text(id) {
+        return activate_native(app, ctx, id);
     }
     invoke_command(app, ctx, id, params)
 }
 
-/// Explicit commands from automation keep their engine semantics regardless of text focus.
+pub(crate) fn menu_items_with_focus(app: &FilmcraftApp, ctx: &egui::Context) -> Vec<MenuItem> {
+    let mut items = menu_items(app);
+    if text_field_window(ctx).is_some() {
+        for item in items.iter_mut().filter(|item| edits_text(&item.id)) {
+            item.enabled = true;
+        }
+    }
+    items
+}
+
+/// Execute a UI or engine command by id.
 pub fn invoke_command(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut params: Value) -> Result<Value, String> {
     if id == "edit.selectAll" && (crate::panels::graphics::select_all_edited_text(app) || crate::panels::effect_controls::select_all_keyframes(app)) {
         return Ok(Value::Null);
@@ -472,6 +463,10 @@ pub fn invoke_command(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut
             app.ui.mode = Mode::Export;
             return Ok(Value::Null);
         }
+        "app.checkForUpdates" => {
+            let _ = crate::updates_ui::check(app);
+            return Ok(serde_json::Value::Null);
+        }
         "app.about" => {
             app.dialog = Some(crate::Dialog::About);
             return Ok(Value::Null);
@@ -647,6 +642,66 @@ pub fn invoke_command(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, mut
     r
 }
 
+/// Run the command `id` chosen in the native menu bar, which takes the Edit menu's key
+/// equivalents (⌘C, ⌘X, ⌘V, ⌘A, ⌘Z, ⇧⌘Z) before any window sees them: while a text field has
+/// the keyboard, in the main window or a floating panel's own window, the field gets the key
+/// and the project command does not run.
+pub fn activate_native(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str) -> Result<Value, String> {
+    let (Some(window), Some(text)) = (text_field_window(ctx), text_command(id, ctx.os().is_mac())) else {
+        return invoke_command(app, ctx, id, json!({}));
+    };
+    match text {
+        TextCommand::Paste => ctx.send_viewport_cmd_to(window, egui::ViewportCommand::RequestPaste),
+        TextCommand::Events(events) if window == egui::ViewportId::ROOT => {
+            app.synthetic.extend(events);
+            ctx.request_repaint();
+        }
+        TextCommand::Events(events) => craft_ui::docking::send_keys(ctx, window, events),
+    }
+    Ok(Value::Null)
+}
+
+/// The window whose text field has the keyboard: a floating panel's own OS window, or the main
+/// window.
+pub fn text_field_window(ctx: &egui::Context) -> Option<egui::ViewportId> {
+    craft_ui::docking::typing_window(ctx).or_else(|| ctx.text_edit_focused().then_some(egui::ViewportId::ROOT))
+}
+
+/// Whether a focused text field takes the menu command `id` ([`activate_native`]): the native
+/// menu keeps such items enabled while one has the keyboard, whatever the project allows.
+pub fn edits_text(id: &str) -> bool {
+    text_command(id, false).is_some()
+}
+
+/// What a focused text field does for an Edit menu command.
+#[derive(Debug, PartialEq)]
+enum TextCommand {
+    /// The clipboard text, which the window asks for and receives as `Paste`.
+    Paste,
+    Events(Vec<egui::Event>),
+}
+
+fn text_command(id: &str, mac: bool) -> Option<TextCommand> {
+    let key = |key, shift| {
+        let modifiers = egui::Modifiers { mac_cmd: mac, ctrl: !mac, command: true, shift, alt: false };
+        TextCommand::Events([true, false].map(|pressed| egui::Event::Key { key, physical_key: None, pressed, repeat: false, modifiers }).into())
+    };
+    Some(match id {
+        "edit.clear" => TextCommand::Events(
+            [true, false]
+                .map(|pressed| egui::Event::Key { key: egui::Key::Delete, physical_key: None, pressed, repeat: false, modifiers: egui::Modifiers::NONE })
+                .into(),
+        ),
+        "edit.copy" => TextCommand::Events(vec![egui::Event::Copy]),
+        "edit.cut" => TextCommand::Events(vec![egui::Event::Cut]),
+        "edit.paste" => TextCommand::Paste,
+        "edit.undo" => key(egui::Key::Z, false),
+        "edit.redo" => key(egui::Key::Z, true),
+        "edit.selectAll" => key(egui::Key::A, false),
+        _ => return None,
+    })
+}
+
 /// Snapshot OS files/image present at Copy/Cut. Many platforms keep a previous file list after
 /// `copy_text`, so Paste would otherwise import those files instead of the clips (#697).
 fn remember_stale_clipboard_media(app: &mut FilmcraftApp) {
@@ -768,22 +823,6 @@ pub const MENUS: [&str; 9] = ["File", "Edit", "Clip", "Sequence", "Markers", "Gr
 /// Settings submenu and the predefined Hide, Hide Others and Quit items. They are translated through
 /// the catalogs like menu labels (`apps/filmcraft/src/native_menu.rs`).
 pub const NATIVE_APP_MENU: [&str; 4] = ["Settings", "Hide FilmCraft", "Hide Others", "Quit FilmCraft"];
-
-pub(crate) fn text_edit_command(id: &str) -> bool {
-    matches!(id, "edit.copy" | "edit.cut" | "edit.paste" | "edit.selectAll" | "edit.undo" | "edit.redo" | "edit.clear")
-}
-
-pub(crate) fn menu_items_with_focus(app: &FilmcraftApp, ctx: &egui::Context) -> Vec<MenuItem> {
-    let mut items = menu_items(app);
-    if ctx.text_edit_focused() {
-        for item in &mut items {
-            if text_edit_command(&item.id) {
-                item.enabled = true;
-            }
-        }
-    }
-    items
-}
 
 pub fn menu_items(app: &FilmcraftApp) -> Vec<MenuItem> {
     let mut v = menu_items_for(&app.session);
@@ -1229,14 +1268,9 @@ mod tests {
         use egui_kittest::{Harness, kittest::Queryable};
 
         let app = FilmcraftApp::new(filmcraft_engine::Session::default());
-        let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
-            |ui, app| {
-                // Use the app's font initialization before drawing platform shortcut glyphs.
-                app.logic_inner(ui.ctx());
-                menu_bar(app, ui);
-            },
-            app,
-        );
+        let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(|ui, app| menu_bar(app, ui), app);
+        // the app's fonts, which draw the macOS shortcut symbols (⇧⌘S) egui's default fonts lack
+        crate::theme::install(&harness.ctx, &harness.state().tokens);
         harness.run_steps(3);
         // Nothing open: hovering a title does not open it.
         harness.get_by_label("Edit").hover();

@@ -323,5 +323,4 @@ fn apply_results(s: &mut Session, seq_id: ItemId, apply: SceneApply, results: Ve
 }
 
 #[cfg(test)]
-#[path = "scene_detect_tests.rs"]
 mod tests;
