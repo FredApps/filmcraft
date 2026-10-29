@@ -3,7 +3,7 @@
 use crate::frame::{FrameBuf, Plane, RowBand};
 use crate::par::Pool;
 use crate::postfilter::bands;
-use crate::spec_tables::*;
+use crate::spec_tables::{CDEF_DIRECTIONS, CDEF_PRI_TAPS, CDEF_SEC_TAPS, CDEF_UV_DIR, DIV_TABLE};
 use crate::state::FrameState;
 
 /// Run CDEF on `fs.cur`; returns the CdefFrame, or None when no block is filtered (CdefFrame
@@ -94,7 +94,7 @@ fn cdef_fb(fs: &FrameState, out: &mut [RowBand; 3], r: usize, c: usize, mask: u6
             let dir = if y_pri == 0 { 0 } else { y_dir };
             let var_str = if (var >> 6) != 0 { (31 - ((var >> 6) as u32).leading_zeros()).min(12) as i32 } else { 0 };
             let pri = if var != 0 { (y_pri * (4 + var_str) + 8) >> 4 } else { 0 };
-            filter(fs, buf, out, 0, (r, c), k, pri, y_sec, damping, dir);
+            filter(fs, buf, out, 0, (r, c), k, Strength { pri, sec: y_sec, damping, dir });
         }
     }
     if !chroma {
@@ -108,7 +108,7 @@ fn cdef_fb(fs: &FrameState, out: &mut [RowBand; 3], r: usize, c: usize, mask: u6
             let k = m.trailing_zeros() as usize;
             m &= m - 1;
             let dir = if uv_pri == 0 { 0 } else { CDEF_UV_DIR[fs.ssx][fs.ssy][dirs[k].0] as usize };
-            filter(fs, buf, out, plane, (r, c), k, uv_pri, uv_sec, damping, dir);
+            filter(fs, buf, out, plane, (r, c), k, Strength { pri: uv_pri, sec: uv_sec, damping, dir });
         }
     }
 }
@@ -224,21 +224,19 @@ fn constrain(diff: i32, threshold: i32, adj: u32) -> i32 {
     if diff < 0 { -mag } else { mag }
 }
 
-/// Filter the 8x8 block `k` (row `k >> 3`, column `k & 7`) of the filter block at `fb`, with
-/// `buf` filled for `plane` by [`fill`].
-#[allow(clippy::too_many_arguments)]
-fn filter(
-    fs: &FrameState,
-    buf: &[i16; BUF_LEN],
-    out: &mut [RowBand; 3],
-    plane: usize,
-    fb: (usize, usize),
-    k: usize,
+/// Primary/secondary strengths, damping and direction for one plane of one 8x8 block.
+#[derive(Clone, Copy)]
+struct Strength {
     pri: i32,
     sec: i32,
     damping: i32,
     dir: usize,
-) {
+}
+
+/// Filter the 8x8 block `k` (row `k >> 3`, column `k & 7`) of the filter block at `fb`, with
+/// `buf` filled for `plane` by [`fill`].
+fn filter(fs: &FrameState, buf: &[i16; BUF_LEN], out: &mut [RowBand; 3], plane: usize, fb: (usize, usize), k: usize, st: Strength) {
+    let Strength { pri, sec, damping, dir } = st;
     if pri == 0 && sec == 0 {
         // Every tap contributes 0 and the clamp to [min, max] keeps x: CdefFrame = CurrFrame.
         return;
