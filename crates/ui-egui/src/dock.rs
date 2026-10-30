@@ -848,7 +848,11 @@ mod tests {
             "floating": [{"root": {"Split": {"axis": "Vertical", "size": {"FixedFirst": 100.0},
                 "first": {"Tabs": {"panels": ["Info"], "active": 0}}, "second": {"Tabs": {"panels": ["Effects"], "active": 0}}}},
                 "rect": [10.0, 20.0, 300.0, 304.0]}]}, "hidden": []});
-        let prefs = WorkspacePrefs { saved: vec![SavedWorkspace { name: "Mine".into(), workspace, ..Default::default() }], current: "Mine".into(), ..Default::default() };
+        let prefs = WorkspacePrefs {
+            saved: vec![SavedWorkspace { name: "Mine".into(), workspace, ..Default::default() }],
+            current: "Mine".into(),
+            ..Default::default()
+        };
         let loaded = saved_docking(&prefs, "Mine");
         assert!(loaded.is_docked(PanelKind::Tools) && loaded.is_visible(PanelKind::Info) && loaded.is_visible(PanelKind::Effects), "{loaded:?}");
         let root = loaded.root.as_ref().unwrap();
