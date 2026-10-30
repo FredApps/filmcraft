@@ -5,6 +5,34 @@ impl FilmcraftApp {
         self.session.prefs_path.as_ref().and_then(|p| p.parent()).map(|d| d.join(dock::WORKSPACES_FILE))
     }
 
+    /// Keep unsaved panel changes for the next launch without replacing the saved layout.
+    pub fn remember_layout(&mut self) {
+        let Ok(last) = dock::SavedWorkspace::new(&self.ui.workspace, &self.ui.dock) else { return };
+        if self.workspaces.last.as_ref() == Some(&last) {
+            return;
+        }
+        let mut next = self.workspaces.clone();
+        next.current = self.ui.workspace.clone();
+        next.last = Some(last);
+        if let Err(e) = self.set_workspaces(next) {
+            log::warn!("{e}");
+        }
+    }
+
+    pub fn forget_remembered_layout(&mut self, workspace: &str) -> Result<(), String> {
+        if !self.workspaces.last.as_ref().is_some_and(|l| l.name == workspace) {
+            return Ok(());
+        }
+        let mut next = self.workspaces.clone();
+        next.last = None;
+        self.set_workspaces(next)
+    }
+
+    pub(super) fn restore_remembered_layout(&mut self, workspace: &str) {
+        let Some(saved) = self.workspaces.last.as_ref().filter(|l| l.name == workspace).and_then(dock::workspace_of) else { return };
+        self.ui.dock = saved.layout;
+    }
+
     /// Replace the saved workspaces and write them to the data directory.
     pub fn set_workspaces(&mut self, w: dock::WorkspacePrefs) -> Result<(), String> {
         self.workspaces = w;

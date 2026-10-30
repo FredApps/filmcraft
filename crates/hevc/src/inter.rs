@@ -135,10 +135,22 @@ fn h_taps<'a, P>(row: &'a [P]) -> impl Fn(usize) -> Option<&'a [P]> + Copy {
     move |k| row.get(k..)
 }
 
-/// The taps of a vertical filter: row `r + k` from sample `x` on.
+/// The taps of a vertical filter: row `r + k` of `rows` from sample `x` on.
 #[inline(always)]
-fn v_taps<'a, P>(rows: &'a [&'a [P]], r: usize, x: usize) -> impl Fn(usize) -> Option<&'a [P]> + Copy {
-    move |k| rows.get(r + k).and_then(|row| row.get(x..))
+fn v_taps<'a, P: 'a>(rows: impl Fn(usize) -> Option<&'a [P]> + Copy, r: usize, x: usize) -> impl Fn(usize) -> Option<&'a [P]> + Copy {
+    move |k| rows(r + k).and_then(|row| row.get(x..))
+}
+
+/// The rows of a window stored with stride `stride` in `buf`.
+#[inline(always)]
+fn strided<'a, P>(buf: &'a [P], stride: usize) -> impl Fn(usize) -> Option<&'a [P]> + Copy {
+    move |r| buf.get(r * stride..)
+}
+
+/// The rows of a window listed in `rows`.
+#[inline(always)]
+fn listed<'a, P>(rows: &'a [&'a [P]]) -> impl Fn(usize) -> Option<&'a [P]> + Copy {
+    move |r| rows.get(r).copied()
 }
 
 /// Parameters of one [`interpolate`] call: the fractional sample position (`fx`, `fy`), the
@@ -155,11 +167,11 @@ struct Interp<'a, const T: usize> {
     shift3: u32,
 }
 
-/// Separable sub-sample interpolation of a w x h block from the window `rows` (h + T - 1 rows of
-/// at least w + T - 1 samples; the block's top-left sample at (m, m) for a T-tap filter with
-/// m = T / 2 - 1). The window rows are the reference picture's own lines when the window lies
-/// inside it horizontally, or lines of an edge-replicated copy.
-fn interpolate<P: Px, const T: usize>(rows: &[&[P]], tmp: &mut [i16], k: &Interp<T>, out: &mut [i16]) {
+/// Separable sub-sample interpolation of a w x h block from the window whose row `r` is `rows(r)`
+/// (h + T - 1 rows of at least w + T - 1 samples; the block's top-left sample at (m, m) for a
+/// T-tap filter with m = T / 2 - 1). The window rows are the reference picture's own lines when
+/// the window lies inside it horizontally, or lines of an edge-replicated copy.
+fn interpolate<'a, P: Px + 'a, const T: usize>(rows: impl Fn(usize) -> Option<&'a [P]> + Copy, tmp: &mut [i16], k: &Interp<T>, out: &mut [i16]) {
     let Interp { fx, fy, hf, vf, w, h, shift1, shift3 } = *k;
     let m = T / 2 - 1;
     // 8-bit samples: first passes in 16-bit lanes (see filt16_w)
@@ -167,14 +179,14 @@ fn interpolate<P: Px, const T: usize>(rows: &[&[P]], tmp: &mut [i16], k: &Interp
     let out_rows = out.chunks_mut(w).take(h);
     if fx == 0 && fy == 0 {
         for (r, o) in out_rows.enumerate() {
-            let Some(src) = rows.get(r + m).and_then(|row| row.get(m..)) else { return };
+            let Some(src) = rows(r + m).and_then(|row| row.get(m..)) else { return };
             for (o, &s) in o.iter_mut().zip(src) {
                 *o = s.w16() << shift3;
             }
         }
     } else if fy == 0 {
         for (r, o) in out_rows.enumerate() {
-            let Some(row) = rows.get(r + m) else { return };
+            let Some(row) = rows(r + m) else { return };
             filt(h_taps(row), hf, shift1, o, w, narrow);
         }
     } else if fx == 0 {
@@ -182,15 +194,13 @@ fn interpolate<P: Px, const T: usize>(rows: &[&[P]], tmp: &mut [i16], k: &Interp
             filt(v_taps(rows, r, m), vf, shift1, o, w, narrow);
         }
     } else {
-        for (row, t) in rows.iter().take(h + T - 1).zip(tmp.chunks_mut(WIN)) {
+        for (r, t) in tmp.chunks_mut(WIN).take(h + T - 1).enumerate() {
+            let Some(row) = rows(r) else { return };
             filt(h_taps(row), hf, shift1, t, w, narrow);
         }
-        let mut trows: [&[i16]; WIN] = [&[]; WIN];
-        for (t, row) in trows.iter_mut().zip(tmp.chunks(WIN)).take(h + T - 1) {
-            *t = row;
-        }
+        let tmp = strided(tmp, WIN);
         for (r, o) in out_rows.enumerate() {
-            filt(v_taps(&trows, r, 0), vf, 6, o, w, false);
+            filt(v_taps(tmp, r, 0), vf, 6, o, w, false);
         }
     }
 }
@@ -201,11 +211,17 @@ fn interpolate<P: Px, const T: usize>(rows: &[&[P]], tmp: &mut [i16], k: &Interp
 fn predict_block<S: Sample, const T: usize>(f: &Frame, c: usize, (x0, y0): (i32, i32), k: &Interp<T>, out: &mut [i16], sc: &mut McScratch) {
     let (ww, wh) = (k.w + T - 1, k.h + T - 1);
     let McScratch { win, tmp } = sc;
-    let mut rows: [&[S]; WIN] = [&[]; WIN];
-    if let Some(rows) = rows.get_mut(..wh)
-        && f.window_rows(c, x0, y0, ww, rows)
-    {
-        interpolate::<S, T>(rows, tmp, k, out);
+    // The in-place window as an array of exactly its wh rows (prediction block heights are fixed
+    // sizes), so setting it up costs no more than filling it.
+    macro_rules! by_rows {
+        ($($n:literal)*) => {
+            match wh {
+                $($n => in_place::<S, T, $n>(f, c, (x0, y0), k, out, tmp),)*
+                _ => in_place::<S, T, WIN>(f, c, (x0, y0), k, out, tmp),
+            }
+        };
+    }
+    if by_rows!(5 7 9 11 15 19 23 27 31 35 39 55) {
         return;
     }
     if c == 0 {
@@ -213,11 +229,20 @@ fn predict_block<S: Sample, const T: usize>(f: &Frame, c: usize, (x0, y0): (i32,
     } else {
         f.chroma_window::<S>(c - 1, (x0, y0), (ww, wh), win, WIN);
     }
-    let mut wrows: [&[i16]; WIN] = [&[]; WIN];
-    for (r, row) in wrows.iter_mut().zip(win.chunks(WIN)).take(wh) {
-        *r = row;
+    interpolate::<i16, T>(strided(win, WIN), tmp, k, out);
+}
+
+/// [`predict_block`] from the reference lines in place, with a window of `N` >= h + T - 1 rows.
+/// False when the window is not inside the picture horizontally.
+#[inline(always)]
+fn in_place<S: Sample, const T: usize, const N: usize>(f: &Frame, c: usize, (x0, y0): (i32, i32), k: &Interp<T>, out: &mut [i16], tmp: &mut [i16]) -> bool {
+    let mut rows: [&[S]; N] = [&[]; N];
+    let Some(rows) = rows.get_mut(..k.h + T - 1) else { return false };
+    if !f.window_rows(c, x0, y0, k.w + T - 1, rows) {
+        return false;
     }
-    interpolate::<i16, T>(&wrows[..wh.min(WIN)], tmp, k, out);
+    interpolate::<S, T>(listed(rows), tmp, k, out);
+    true
 }
 
 /// Luma prediction samples (14-bit intermediate precision) of a w x h block at (x, y) displaced by the
@@ -233,17 +258,26 @@ pub fn mc_luma<S: Sample>(f: &Frame, (x, y): (i32, i32), mv: [i16; 2], (w, h): (
     predict_block::<S, 8>(f, 0, (xi - 3, yi - 3), &k, out, sc);
 }
 
-/// Chroma prediction samples of a w x h chroma block at chroma position (x, y) with a 1/8-sample
-/// vector (4:2:0).
-pub fn mc_chroma<S: Sample>(f: &Frame, c: usize, (x, y): (i32, i32), mv: [i16; 2], (w, h): (usize, usize), out: &mut [i16], sc: &mut McScratch) {
+/// Chroma prediction samples of a w x h chroma block at chroma position (x, y) displaced by the
+/// chroma motion vector `mv` in units of 1/8 chroma sample (mvCLX of 8.5.3.2.10: the luma vector
+/// times 2 / SubWidthC horizontally and 2 / SubHeightC vertically; see [`chroma_mv`]).
+pub fn mc_chroma<S: Sample>(f: &Frame, c: usize, (x, y): (i32, i32), mv: [i32; 2], (w, h): (usize, usize), out: &mut [i16], sc: &mut McScratch) {
     let bd = f.bit_depth_c;
     let (fx, fy) = ((mv[0] & 7) as usize, (mv[1] & 7) as usize);
-    let xi = x + (mv[0] as i32 >> 3);
-    let yi = y + (mv[1] as i32 >> 3);
+    let xi = x + (mv[0] >> 3);
+    let yi = y + (mv[1] >> 3);
     let shift1 = bd.min(12) - 8;
     let shift3 = 14 - bd;
     let k = Interp { fx, fy, hf: &CHROMA_FILTER[fx], vf: &CHROMA_FILTER[fy], w, h, shift1, shift3 };
     predict_block::<S, 4>(f, c + 1, (xi - 1, yi - 1), &k, out, sc);
+}
+
+/// The chroma motion vector in 1/8 chroma sample units (8-228 / 8-229 of 8.5.3.2.10) of the luma
+/// quarter-sample vector `mv` for chroma shifts `(sx, sy)` = (log2 SubWidthC, log2 SubHeightC):
+/// `mv * 2 / SubWidthC` horizontally, `mv * 2 / SubHeightC` vertically (both exact).
+#[inline(always)]
+pub fn chroma_mv(mv: [i16; 2], (sx, sy): (u32, u32)) -> [i32; 2] {
+    [(mv[0] as i32 * 2) >> sx, (mv[1] as i32 * 2) >> sy]
 }
 
 /// Calls `$f::<_, W>(args)` with `W` the prediction block width `$w` as a constant (block widths are
@@ -352,6 +386,7 @@ pub fn put_weighted_bi<S: Sample>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ChromaFormat;
 
     struct Rng(u64);
     impl Rng {
@@ -491,36 +526,40 @@ mod tests {
         }
     }
 
-    fn frame(rng: &mut Rng, w: usize, h: usize, bd: u32) -> Frame {
-        let like = Frame::new(0, 0, w, h, 4, bd, bd);
+    fn frame(rng: &mut Rng, w: usize, h: usize, chroma: ChromaFormat, bd: u32) -> Frame {
+        let like = Frame::new(0, 0, w, h, chroma, 4, bd, bd);
         let max = (1i32 << bd) - 1;
+        let n = (w >> chroma.shifts().0) * (h >> chroma.shifts().1);
         let y: Vec<u16> = (0..w * h).map(|_| rng.range(0, max) as u16).collect();
-        let c: Vec<u16> = (0..w * h / 4).map(|_| rng.range(0, max) as u16).collect();
-        let c2: Vec<u16> = (0..w * h / 4).map(|_| rng.range(0, max) as u16).collect();
+        let c: Vec<u16> = (0..n).map(|_| rng.range(0, max) as u16).collect();
+        let c2: Vec<u16> = (0..n).map(|_| rng.range(0, max) as u16).collect();
         Frame::from_planes(1, 0, &like, &y, &c, &c2)
     }
 
     /// Interpolation from the reference lines in place gives the same prediction samples as from
-    /// an edge-replicated copy of the window, for every fractional position, block size and bit
-    /// depth, inside the picture and next to its edges (where in-place reads are used for windows
-    /// that cross only the top or bottom edge).
+    /// an edge-replicated copy of the window, for every fractional position, block size, chroma
+    /// format and bit depth, inside the picture and next to its edges (where in-place reads are
+    /// used for windows that cross only the top or bottom edge).
     #[test]
     fn in_place_window_matches_the_copied_window() {
-        fn check<S: Sample>(rng: &mut Rng, bd: u32) {
+        fn check<S: Sample>(rng: &mut Rng, chroma: ChromaFormat, bd: u32) {
             let mut sc = McScratch::default();
-            let f = frame(rng, 96, 64, bd);
+            let f = frame(rng, 96, 64, chroma, bd);
+            let (sx, sy) = chroma.shifts();
             let (mut in_place, mut copied) = (0, 0);
             for _ in 0..2000 {
                 let c = rng.range(0, 2) as usize;
                 let (w, h) = ([4usize, 8, 12, 16, 24, 32][rng.range(0, 5) as usize], [4usize, 8, 16, 32][rng.range(0, 3) as usize]);
-                let (w, h) = if c == 0 { (w, h) } else { (w / 2, h / 2) };
+                let (w, h) = if c == 0 { (w, h) } else { (w >> sx, h >> sy) };
                 let (x, y) = (rng.range(-12, 100), rng.range(-12, 70));
                 let mv = [rng.range(-64, 64) as i16, rng.range(-64, 64) as i16];
+                let mvc = chroma_mv(mv, (sx, sy));
                 let mut a = vec![0i16; w * h];
                 let mut b = vec![0i16; w * h];
                 let (t, frac, unit) = if c == 0 { (8usize, 3, 2) } else { (4, 7, 3) };
-                let (fx, fy) = ((mv[0] & frac) as usize, (mv[1] & frac) as usize);
-                let (x0, y0) = (x + (mv[0] as i32 >> unit) - (t as i32 / 2 - 1), y + (mv[1] as i32 >> unit) - (t as i32 / 2 - 1));
+                let mvu = if c == 0 { [mv[0] as i32, mv[1] as i32] } else { mvc };
+                let (fx, fy) = ((mvu[0] & frac) as usize, (mvu[1] & frac) as usize);
+                let (x0, y0) = (x + (mvu[0] >> unit) - (t as i32 / 2 - 1), y + (mvu[1] >> unit) - (t as i32 / 2 - 1));
                 let (shift1, shift3) = (bd - 8, 14 - bd);
                 let mut rows: Vec<&[S]> = vec![&[]; h + t - 1];
                 if f.window_rows(c, x0, y0, w + t - 1, &mut rows) {
@@ -536,23 +575,34 @@ mod tests {
                 } else {
                     f.chroma_window::<S>(c - 1, (x0, y0), (w + t - 1, h + t - 1), &mut win, WIN);
                 }
-                let wrows: Vec<&[i16]> = win.chunks(WIN).take(h + t - 1).collect();
                 if c == 0 {
                     mc_luma::<S>(&f, (x, y), mv, (w, h), &mut a, &mut sc);
                     let k = Interp { fx, fy, hf: &LUMA_FILTER[fx], vf: &LUMA_FILTER[fy], w, h, shift1, shift3 };
-                    interpolate::<i16, 8>(&wrows, &mut tmp, &k, &mut b);
+                    interpolate::<i16, 8>(strided(&win, WIN), &mut tmp, &k, &mut b);
                 } else {
-                    mc_chroma::<S>(&f, c - 1, (x, y), mv, (w, h), &mut a, &mut sc);
+                    mc_chroma::<S>(&f, c - 1, (x, y), mvc, (w, h), &mut a, &mut sc);
                     let k = Interp { fx, fy, hf: &CHROMA_FILTER[fx], vf: &CHROMA_FILTER[fy], w, h, shift1, shift3 };
-                    interpolate::<i16, 4>(&wrows, &mut tmp, &k, &mut b);
+                    interpolate::<i16, 4>(strided(&win, WIN), &mut tmp, &k, &mut b);
                 }
-                assert_eq!(a, b, "plane {c} bd {bd} at ({x}, {y}) mv {mv:?} {w}x{h}");
+                assert_eq!(a, b, "plane {c} {chroma:?} bd {bd} at ({x}, {y}) mv {mv:?} {w}x{h}");
             }
             assert!(in_place > 500 && copied > 100, "{in_place} in place, {copied} copied");
         }
         let mut rng = Rng(0x5851_f42d_4c95_7f2d);
-        check::<u8>(&mut rng, 8);
-        check::<u16>(&mut rng, 10);
+        for chroma in [ChromaFormat::C420, ChromaFormat::C422] {
+            check::<u8>(&mut rng, chroma, 8);
+            check::<u16>(&mut rng, chroma, 10);
+        }
+    }
+
+    /// The chroma vector of 8-228 / 8-229: the luma vector in 4:2:0 (1/8 chroma sample units),
+    /// doubled vertically in 4:2:2 (only even vertical fractions).
+    #[test]
+    fn chroma_vectors_follow_the_subsampling() {
+        assert_eq!(chroma_mv([5, -7], ChromaFormat::C420.shifts()), [5, -7]);
+        assert_eq!(chroma_mv([5, -7], ChromaFormat::C422.shifts()), [5, -14]);
+        assert_eq!(chroma_mv([i16::MIN, i16::MAX], ChromaFormat::C422.shifts()), [i16::MIN as i32, i16::MAX as i32 * 2]);
+        assert_eq!(chroma_mv([i16::MIN, i16::MAX], ChromaFormat::C420.shifts()), [i16::MIN as i32, i16::MAX as i32]);
     }
 
     /// The full-sample uni-prediction shortcut (`Frame::copy_block`) gives what interpolation and
@@ -560,9 +610,10 @@ mod tests {
     /// ones as `u16`).
     #[test]
     fn full_sample_copy_matches_interpolation() {
-        fn check<S: Sample>(rng: &mut Rng, bd: u32) {
+        fn check<S: Sample>(rng: &mut Rng, chroma: ChromaFormat, bd: u32) {
             let mut sc = McScratch::default();
-            let f = frame(rng, 48, 40, bd);
+            let f = frame(rng, 48, 40, chroma, bd);
+            let (sx, sy) = chroma.shifts();
             for _ in 0..300 {
                 let (w, h) = ([4usize, 8, 12, 16, 24, 32][rng.range(0, 5) as usize], [4usize, 8, 16][rng.range(0, 2) as usize]);
                 let (x, y) = (rng.range(-40, 80), rng.range(-40, 70));
@@ -575,17 +626,19 @@ mod tests {
                 // (the window really was read: not all samples equal the default)
                 assert!(a.iter().any(|&v| v != S::default()) || w * h < 8);
                 for c in 1..3 {
-                    let (cw, ch) = (w / 2, h / 2);
-                    mc_chroma::<S>(&f, c - 1, (0, 0), [(x * 8) as i16, (y * 8) as i16], (cw, ch), &mut pred, &mut sc);
+                    let (cw, ch) = (w >> sx, h >> sy);
+                    mc_chroma::<S>(&f, c - 1, (0, 0), [x * 8, y * 8], (cw, ch), &mut pred, &mut sc);
                     let (mut a, mut b) = (vec![S::default(); cw * ch], vec![S::default(); cw * ch]);
                     put_uni(&pred, cw, ch, bd, &mut a, cw);
                     f.copy_block(c, (x, y), (cw, ch), &mut b, cw);
-                    assert_eq!(a, b, "chroma {c} bd {bd} at ({x}, {y}) {cw}x{ch}");
+                    assert_eq!(a, b, "chroma {c} {chroma:?} bd {bd} at ({x}, {y}) {cw}x{ch}");
                 }
             }
         }
         let mut rng = Rng(0x0123_4567_89ab_cdef);
-        check::<u8>(&mut rng, 8);
-        check::<u16>(&mut rng, 10);
+        for chroma in [ChromaFormat::C420, ChromaFormat::C422] {
+            check::<u8>(&mut rng, chroma, 8);
+            check::<u16>(&mut rng, chroma, 10);
+        }
     }
 }
