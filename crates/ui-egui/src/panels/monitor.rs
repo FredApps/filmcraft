@@ -268,8 +268,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     let prefix = if which == Which::Program { "program" } else { "source" };
     let mv = monitor_view::view(app, which).clone();
     let display = mv.display_mode().unwrap_or(DisplayMode::Composite);
-    // Multi-Camera view: the angle grid on the left, the program on the right
-    let multicam = which == Which::Program && mv.multicam;
+    // Multi-Camera view: the angle grid on the left, the program on the right (bypassed in cinema)
+    let multicam = !cinema && which == Which::Program && mv.multicam;
     // without the preview monitor the grid takes the whole picture area
     let grid_only = multicam && !app.session.state.multicam_view.show_preview;
     let (grid_area, video_area) = if grid_only {
@@ -316,8 +316,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         (None, video_area)
     };
     let picture_area = video_area;
-    // Comparison View: the reference frame on the left, the current frame on the right.
-    let compare = which == Which::Program && show_picture && display == DisplayMode::Comparison;
+    // Comparison View: the reference frame on the left, the current frame on the right (bypassed in cinema).
+    let compare = !cinema && which == Which::Program && show_picture && display == DisplayMode::Comparison;
     let (ref_area, video_area) = if compare {
         let mid = video_area.center().x;
         let bar_h = 22.0;
@@ -331,7 +331,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     // ---- picture, at its display aspect (non-square pixels are stretched on screen)
     let ppp = ctx.pixels_per_point();
     let display_w = (frame_size.0 as f64 * monitor_view::pixel_aspect(app, which)) as f32;
-    let pic = if compare {
+    let pic = if compare || cinema {
         fit(video_area, display_w, frame_size.1 as f32)
     } else if show_picture {
         monitor_view::picture_rect(video_area, display_w, frame_size.1 as f32, &mv, ppp)
@@ -339,7 +339,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         video_area
     };
     let saved_clip = ui.clip_rect();
-    ui.set_clip_rect(saved_clip.intersect(if mv.zoom.is_some() && !compare { video_area } else { picture_area.expand(12.0) }));
+    ui.set_clip_rect(saved_clip.intersect(if mv.zoom.is_some() && !compare && !cinema { video_area } else { picture_area.expand(12.0) }));
     if show_picture {
         draw_picture(app, ui, which, &mv, PictureCtx { target, frame_size, rate, time, duration, drop_frame, compare, ref_area, pic, video_area, prefix });
     }
