@@ -275,11 +275,12 @@ level 4 High tier, which many hardware decoders refuse; it is now level 4.1 Main
 `register()` installs `thread_priority::lower_current_thread` as the export crate's
 background-thread hook (`filmcraft_export::register_background_thread_start`). Each thread of an
 export's, the export queue's, Render Previews' or a proxy job's pool
-(`filmcraft_export::on_own_threads`) runs it as it starts and drops to the utility QoS class, so
-the monitors' frame workers (default class) and the main thread (user-interactive) get the cores
-first while the machine is busy. Threads those threads create start at the default class again, so
-decoders an export opens keep their priority when the monitors share them later. Windows and Linux
-are not covered yet ([ADR 0002](../../docs/adr/0002-background-thread-priority.md)).
+(`filmcraft_export::on_own_threads`) runs it as it starts and drops to the lowest relative
+priority (−15) of the default QoS class, so the monitors' frame workers (default class at 0) and
+the main thread (user-interactive) get the cores first while the machine is busy. Not the utility
+class: macOS runs that on the efficiency cores first, which made an export 15 % slower on an idle
+machine. Threads those threads create start at the default class at 0 again, so decoders an export
+opens keep their priority. Windows and Linux are not covered yet ([ADR 0002](../../docs/adr/0002-background-thread-priority.md)).
 
 ## Guarantees
 

@@ -9,11 +9,13 @@ An export renders on every core. Exports, the export queue, Render Previews and 
 same priority as everything else, so when the machine was busy the operating system could not know
 that the export can wait and the monitors cannot.
 
-Measured on an M4 Max (2026-10-30, release builds, a 4K60 H.264 export while the Program monitor
-played another 4K60 clip): with the job's threads at the default priority the monitor's decode p95
-was 17–22 ms; at the utility class 3.6 ms. Playback dropped no frames either way on that machine,
-which had cores to spare; on a busier or smaller one the difference is frames. An export alone took
-about the same time (89.4–90.9 s at the default priority, 90.4–94.5 s at utility).
+Measured on an M4 Max (2026-10-30, release builds, a one-minute 4K60 H.264 export of a phone
+footage sequence with effects): while it ran, 12 s of Program-monitor playback elsewhere in the
+sequence showed 4 and 17 frames (the rest dropped) with the job's threads at the default priority,
+and 713–715 of 716 with them lowered. Lowering them to the utility class cost the export 15 % on
+the idle machine (373 → 429 s): macOS runs utility threads on the efficiency cores first. The
+default class with the lowest relative priority gives playback the same frames and costs the
+export about 1 % (377, 380 s).
 
 Two things the monitors shared with background jobs are fixed without any `unsafe`: the rendering
 threads (background jobs run on a pool of their own, `filmcraft_export::on_own_threads`) and the
@@ -33,10 +35,11 @@ block, a safe public API, nothing that can unwind across the boundary).
   it starts (`filmcraft_export::register_background_thread_start`); `filmcraft_platform::register`
   installs `thread_priority::lower_current_thread` there. Lower layers do not depend on the
   platform crate, and without it (tests, the browser) nothing changes.
-- **macOS:** the utility quality-of-service class. The monitors' frame workers stay at the default
-  class and the main thread at user-interactive. A thread a utility thread creates starts at the
-  default class again (macOS does not pass the class on; tested), so decoders an export opens,
-  which the monitors later share, keep their priority.
+- **macOS:** the default quality-of-service class at the lowest relative priority (−15). The
+  monitors' frame workers stay at the default class at 0 and the main thread at user-interactive.
+  Not the utility class, which macOS runs on the efficiency cores first. A thread these threads
+  create starts at the default class at 0 again (macOS does not pass the class on; tested), so
+  decoders an export opens keep their priority.
 - **Windows and Linux** follow as their own changes under this decision. Windows thread priorities
   are not inherited either (`SetThreadPriority`). Linux `nice` values are inherited by new threads,
   so a Linux version must also keep the pools of decoders an export opens at normal priority.
