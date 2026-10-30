@@ -72,7 +72,7 @@ pub use registry::{
 use registry::{audio_factories, video_factories};
 #[cfg(test)]
 use run::gif_delay_cs;
-pub use run::{export, export_range, frame_span, validate_range};
+pub use run::{export, export_range, frame_span, on_own_threads, validate_range};
 pub(crate) use stats::note_lock_wait;
 pub use stats::{
     GpuRenderStats, HwEncodeStats, Stage, export_lock_wait, gpu_render_stats, hw_encode_stats, note_gpu_fallback, note_gpu_frame, note_hw_encode_declined,

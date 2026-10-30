@@ -376,6 +376,16 @@ fn max_threads_does_not_change_the_file() {
 }
 
 #[test]
+fn own_threads_are_a_pool_of_their_own() {
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let (n, name) = on_own_threads(0, || (rayon::current_num_threads(), std::thread::current().name().map(str::to_owned)));
+    assert_eq!(n, cores, "one thread per core unless asked");
+    assert!(name.as_deref().is_some_and(|n| n.starts_with("filmcraft-export-")), "{name:?}");
+    assert_eq!(on_own_threads(2, rayon::current_num_threads), 2.min(cores));
+    assert_eq!(on_own_threads(u32::MAX, rayon::current_num_threads), cores, "never more threads than cores");
+}
+
+#[test]
 fn max_threads_is_a_setting_of_the_json_interface() {
     let s: ExportSettings = serde_json::from_str(r#"{"format":"mjpeg","maxThreads":2}"#).unwrap();
     assert_eq!(s.max_threads, 2);
