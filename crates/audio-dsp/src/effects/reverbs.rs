@@ -339,6 +339,8 @@ impl ConvolutionReverb {
         let [l, r] = &self.ir;
         let split = len.min(HEAD_LEN);
         self.head.set_impulse([&l[..split], &r[..split]]);
+        // output the tails queued with the old impulse would play over the new one
+        self.tail_ring.iter_mut().for_each(|c| c.iter_mut().for_each(|v| *v = 0.0));
         for t in &mut self.tails {
             let (from, to) = (t.offset.min(len), (t.offset + t.capacity).min(len));
             t.stage.set_impulse([&l[from..to], &r[from..to]]);
@@ -645,6 +647,21 @@ mod tests {
             // and nothing after the impulse response ends
             assert!(l[lat + len..].iter().all(|v| v.abs() < 1e-5), "impulse {index} at {at}: tail past the end");
         }
+    }
+
+    /// A new impulse (or size, or damping) takes over completely: the tail output queued with the
+    /// old impulse must not be heard after the change.
+    #[test]
+    fn changing_the_impulse_drops_the_queued_tail_of_the_old_one() {
+        let mut e = reverb(3);
+        let mut rng = Prng::new(9);
+        let noise: Vec<f32> = (0..30_000).map(|_| rng.uniform() * 0.5).collect();
+        process(&mut e, &noise);
+        // Vocal Booth at 10% room size: about 1000 samples long, all in the head stage
+        assert!(e.set_param("impulse", 6.0) && e.set_param("room_size", 10.0));
+        let [l, r] = process(&mut e, &vec![0.0; 20_000]);
+        let late = |x: &[f32]| x[1_700..].iter().fold(0.0f32, |m, v| m.max(v.abs()));
+        assert!(late(&l) < 1e-6 && late(&r) < 1e-6, "old tail still audible: {} {}", late(&l), late(&r));
     }
 
     /// Noise through the staged convolution equals the direct convolution with the impulse, at
