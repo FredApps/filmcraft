@@ -344,6 +344,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         draw_picture(app, ui, which, &mv, PictureCtx { target, frame_size, rate, time, duration, drop_frame, compare, ref_area, pic, video_area, prefix });
     }
     drop_indicator(app, ui, video_area, which, &t);
+    if cinema {
+        ui.set_clip_rect(saved_clip);
+        ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+        return;
+    }
     // A click on the Program monitor around the picture lets go of what is selected on it (#683;
     // in the picture the overlays do that). Under the picture and the overlays, so they come first.
     if which == Which::Program && show_picture && ui.interact(video_area, egui::Id::unique((prefix, "background")), Sense::click()).clicked() {
@@ -356,7 +361,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if show_picture && !compare {
         monitor_view::zoom_pan_input(app, ui, which, video_area, pic, display_w, ppp);
     }
-    if which == Which::Program && show_picture && !cinema {
+    if which == Which::Program && show_picture {
         // an armed eyedropper owns clicks on the picture: the overlays would sit on top and take
         // them (the selected clip's transform handles cover it, #1023)
         if app.ui.eyedropper.is_some() {
@@ -380,11 +385,6 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if pic_resp.double_clicked() && which == Which::Source {
         // (Premiere opens the clip's settings; we show info)
         app.ui.status = name.clone();
-    }
-
-    if cinema {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-        return;
     }
 
     // ---- controls row: timecode | zoom | res | wrench | duration
