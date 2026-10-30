@@ -19,13 +19,14 @@ Using it needs FFI into C / Objective-C APIs, which is `unsafe` Rust. The bindin
 
 Allow `unsafe` in exactly one crate, `crates/platform` (`filmcraft-platform`, layer L5), for one
 job: OS media FFI (hardware decoding, and hardware encoding through NVENC). Audio output, dialogs, menus
-and other OS integration do not go in it.
+and other OS integration do not go in it. [ADR 0002](0002-background-thread-priority.md) adds one
+more use under the same rules: lowering the scheduling priority of background job threads.
 
 Containment rules:
 
 1. The crate does not use `lints.workspace = true`. Its own `[lints]` table copies the workspace
    lints except `unsafe_code = "deny"` (not `forbid`), and adds
-   `clippy::undocumented_unsafe_blocks = "deny"`. Only the FFI modules (`videotoolbox`, `media_foundation::gpu` / `media_foundation::mft`,
+   `clippy::undocumented_unsafe_blocks = "deny"`. Only the FFI modules (`videotoolbox`, `thread_priority` (ADR 0002), `media_foundation::gpu` / `media_foundation::mft`,
    `nvenc::ffi` / `nvenc::session` / `nvenc::device` on Windows and 64-bit Linux, and `vaapi::va` on Linux) carry `#[allow(unsafe_code)]`; the rest of the crate
    (the fallback logic in `hybrid`, the decoder logic in `media_foundation`, `annexb`, `biplanar`,
    the encoder logic in `nvenc`, H.264 and H.265 alike) has no `unsafe`. NVENC's H.265 support

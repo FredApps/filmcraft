@@ -386,6 +386,19 @@ fn own_threads_are_a_pool_of_their_own() {
 }
 
 #[test]
+fn own_threads_run_the_background_hook_as_they_start() {
+    static STARTED: std::sync::Mutex<Vec<std::thread::ThreadId>> = std::sync::Mutex::new(Vec::new());
+    fn note() {
+        STARTED.lock().unwrap().push(std::thread::current().id());
+    }
+    crate::register_background_thread_start(note);
+    let workers: std::collections::HashSet<_> = on_own_threads(2, || (0..64).into_par_iter().map(|_| std::thread::current().id()).collect());
+    let started = STARTED.lock().unwrap();
+    assert!(!workers.is_empty() && workers.iter().all(|w| started.contains(w)), "every thread of the pool ran the hook");
+    assert!(!started.contains(&std::thread::current().id()), "the calling thread keeps its priority");
+}
+
+#[test]
 fn max_threads_is_a_setting_of_the_json_interface() {
     let s: ExportSettings = serde_json::from_str(r#"{"format":"mjpeg","maxThreads":2}"#).unwrap();
     assert_eq!(s.max_threads, 2);
