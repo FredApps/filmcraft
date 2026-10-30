@@ -472,6 +472,9 @@ pub struct UiState {
     pub dark: bool,
     /// Lumetri scopes visible in the Program monitor area.
     pub show_scopes: bool,
+    /// Cinema mode: the Program monitor fills the whole window and the cursor is hidden.
+    #[serde(default)]
+    pub fullscreen_program: bool,
     /// Transient status line shown in the footer.
     pub status: String,
     /// A link the web browser couldn't open, shown with its address until closed
@@ -1040,6 +1043,7 @@ impl Default for UiState {
             keys: Default::default(),
             project_panel: Default::default(),
             media_browser: Default::default(),
+            fullscreen_program: false,
         }
     }
 }

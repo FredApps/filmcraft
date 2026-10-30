@@ -184,14 +184,22 @@ fn draw_picture(app: &mut FilmcraftApp, ui: &mut egui::Ui, which: Which, mv: &cr
     }
 }
 
+fn drop_indicator(app: &FilmcraftApp, ui: &mut egui::Ui, video_area: Rect, which: Which, t: &Tokens) {
+    if which == Which::Program && app.playback.playing {
+        let c = if app.playback.meter.counts().1 > 0 { t.render_yellow } else { t.render_green };
+        ui.painter().circle_filled(pos2(video_area.min.x + 10.0, video_area.min.y + 10.0), 4.0, c);
+    }
+}
+
 pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
     let t = app.tokens;
     let ctx = ui.ctx().clone();
     let stacked_controls = rect.width() < 540.0;
     let separate_source_drag = which == Which::Source && stacked_controls && rect.width() < 310.0;
     let source_drag_h = if separate_source_drag { 26.0 } else { 0.0 };
-    let controls_h = 28.0 + 24.0 + 15.0 + 36.0 + if stacked_controls { 26.0 } else { 0.0 } + source_drag_h;
-    let video_area = Rect::from_min_max(rect.min + vec2(4.0, 4.0), pos2(rect.max.x - 4.0, rect.max.y - controls_h));
+    let cinema = app.ui.fullscreen_program && which == Which::Program;
+    let (controls_h, pad) = if cinema { (0.0, 0.0) } else { (28.0 + 24.0 + 15.0 + 36.0 + if stacked_controls { 26.0 } else { 0.0 } + source_drag_h, 4.0) };
+    let video_area = Rect::from_min_max(rect.min + vec2(pad, pad), pos2(rect.max.x - pad, rect.max.y - controls_h));
     // the Source monitor's time ruler starts at `origin` (a subclip restricted to its range)
     let mut origin = Tick::ZERO;
     let (target, frame_size, rate, time, duration, drop_frame, mark_in, mark_out, name) = match which {
@@ -335,11 +343,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if show_picture {
         draw_picture(app, ui, which, &mv, PictureCtx { target, frame_size, rate, time, duration, drop_frame, compare, ref_area, pic, video_area, prefix });
     }
-    // Dropped-frame indicator (Program only)
-    if which == Which::Program && app.playback.playing {
-        let c = if app.playback.meter.counts().1 > 0 { t.render_yellow } else { t.render_green };
-        ui.painter().circle_filled(pos2(video_area.min.x + 10.0, video_area.min.y + 10.0), 4.0, c);
-    }
+    drop_indicator(app, ui, video_area, which, &t);
     // A click on the Program monitor around the picture lets go of what is selected on it (#683;
     // in the picture the overlays do that). Under the picture and the overlays, so they come first.
     if which == Which::Program && show_picture && ui.interact(video_area, egui::Id::unique((prefix, "background")), Sense::click()).clicked() {
@@ -376,6 +380,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if pic_resp.double_clicked() && which == Which::Source {
         // (Premiere opens the clip's settings; we show info)
         app.ui.status = name.clone();
+    }
+
+    if cinema {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+        return;
     }
 
     // ---- controls row: timecode | zoom | res | wrench | duration
