@@ -55,7 +55,7 @@ impl Builder {
         let id = self.p.add_item(
             &info.name.clone(),
             Label::Iris,
-            ItemKind::Media(MediaClip {
+            ItemKind::Media(Box::new(MediaClip {
                 media: MediaRef::Generator(src.generator.clone()),
                 info,
                 interpret: Default::default(),
@@ -65,7 +65,7 @@ impl Builder {
                 offline: false,
                 proxy: None,
                 identity: None,
-            }),
+            })),
             None,
         );
         self.map.0.insert(id, Arc::new(src) as SharedSource);
@@ -744,6 +744,7 @@ fn scenes_are_distinct() {
 fn device(context: &str, require_float_target: bool) -> Option<(wgpu::Device, wgpu::Queue)> {
     let instance = wgpu::Instance::default();
     let Some(adapter) = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).ok() else {
+        assert!(std::env::var_os("FILMCRAFT_REQUIRE_GPU").is_none(), "{context}: required GPU adapter unavailable");
         eprintln!("SKIPPED ({context}): no GPU adapter");
         return None;
     };
@@ -752,12 +753,14 @@ fn device(context: &str, require_float_target: bool) -> Option<(wgpu::Device, wg
     let name = info.name;
     let renderable = adapter.get_texture_format_features(wgpu::TextureFormat::Rgba32Float).allowed_usages.contains(wgpu::TextureUsages::RENDER_ATTACHMENT);
     if require_float_target && !renderable {
+        assert!(std::env::var_os("FILMCRAFT_REQUIRE_GPU").is_none(), "{context}: required GPU float target unavailable");
         eprintln!("SKIPPED ({context}): adapter {name} cannot render to Rgba32Float");
         return None;
     }
     match pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())) {
         Ok(device) => Some(device),
         Err(_) => {
+            assert!(std::env::var_os("FILMCRAFT_REQUIRE_GPU").is_none(), "{context}: required GPU device creation failed");
             eprintln!("SKIPPED ({context}): adapter {name} refused a device");
             None
         }
