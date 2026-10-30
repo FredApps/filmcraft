@@ -311,12 +311,12 @@ mod tests {
         let mut joint = src.clone();
         {
             let mut chans: Vec<&mut [f32]> = joint.iter_mut().map(|c| c.as_mut_slice()).collect();
-            stream(&mut stft, &mut spec, &mut chans, len, hop, scale, Pairing::Full, &mut gain);
+            stream(&mut stft, &mut spec, &mut chans, len, (hop, scale), Pairing::Full, &mut gain);
         }
         for ch in 0..3 {
             let mut single = vec![StftChannel::new(n)];
             let mut y = src[ch].clone();
-            stream(&mut single, &mut spec, &mut [&mut y], len, hop, scale, Pairing::Full, &mut |_, first, re, im| gain(ch, first, re, im));
+            stream(&mut single, &mut spec, &mut [&mut y], len, (hop, scale), Pairing::Full, &mut |_, first, re, im| gain(ch, first, re, im));
             let peak = y.iter().fold(0.0f32, |a, v| a.max(v.abs()));
             let dev = y.iter().zip(&joint[ch]).fold(0.0f32, |a, (p, q)| a.max((p - q).abs()));
             assert!(peak > 0.1 && dev < 1e-5 * peak, "channel {ch}: deviation {dev}");
