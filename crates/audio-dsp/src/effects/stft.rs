@@ -81,8 +81,7 @@ pub(crate) fn stream(
     spec: &mut Spectral,
     channels: &mut [&mut [f32]],
     len: usize,
-    hop: usize,
-    scale: f32,
+    (hop, scale): (usize, f32),
     pairing: Pairing,
     bins: &mut impl FnMut(usize, bool, &mut [f32], &mut [f32]),
 ) {

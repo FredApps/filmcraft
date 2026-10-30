@@ -182,7 +182,7 @@ impl AudioEffect for PitchShifter {
         let (state, sc, target_ratio) = (&mut self.state, &mut self.scratch, self.target_ratio);
         let mut ratio = self.ratio;
         let mut frame_ratio = ratio;
-        stream(&mut self.stft, &mut self.spec, channels, len, hop, scale, Pairing::SynthesisOnly, &mut |ch, first, re, im| {
+        stream(&mut self.stft, &mut self.spec, channels, len, (hop, scale), Pairing::SynthesisOnly, &mut |ch, first, re, im| {
             if first {
                 frame_ratio = ratio;
                 ratio += (target_ratio - ratio) * 0.5;
