@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use filmcraft_color::{ColorInfo, ColorPipeline, Matrix, Primaries, Range, Transfer, WorkingSpace};
-use filmcraft_export::{ExportSettings, Format, GpuRendering, Progress, export, rgbf_to_yuv420_10};
+use filmcraft_export::{ExportSettings, Format, GpuRendering, Matrix as YuvMatrix, Progress, export, rgbf_to_yuv420_10};
 use filmcraft_frame::{AudioBuffer, Chroma, PixelData, VideoFrame};
 use filmcraft_media::generators::GeneratorSource;
 use filmcraft_media::{FrameRequest, Generator, MediaInfo, MediaSource};
@@ -40,7 +40,7 @@ fn project() -> (Project, ItemId, ItemId, SourceMap) {
     let patches = [[0.0; 3], [0.25; 3], [0.5; 3], [0.75; 3], [1.0; 3], [0.8, 0.4, 0.2], [0.2, 0.9, 0.4], [0.2, 0.4, 0.8]];
     let rgb: Vec<f32> = (0..W * H).flat_map(|i| patches[(i % W / 32) as usize]).collect();
     let (mut y, mut cb, mut cr) = (Vec::new(), Vec::new(), Vec::new());
-    rgbf_to_yuv420_10(&rgb, W as usize, H as usize, 0.2627, 0.0593, &mut y, &mut cb, &mut cr).unwrap();
+    rgbf_to_yuv420_10(&rgb, W as usize, H as usize, YuvMatrix::new(0.2627, 0.0593), &mut y, &mut cb, &mut cr).unwrap();
     let color = ColorInfo { matrix: Matrix::Bt2020Ncl, transfer: Transfer::Hlg, primaries: Primaries::Bt2020, range: Range::Limited };
     let frame = Arc::new(VideoFrame {
         width: W,
@@ -60,7 +60,7 @@ fn project() -> (Project, ItemId, ItemId, SourceMap) {
     let item = p.add_item(
         "HLG patches",
         Label::Iris,
-        ItemKind::Media(MediaClip {
+        ItemKind::Media(Box::new(MediaClip {
             media: MediaRef::Generator(generator),
             info: info.clone(),
             interpret: Default::default(),
@@ -70,7 +70,7 @@ fn project() -> (Project, ItemId, ItemId, SourceMap) {
             offline: false,
             proxy: None,
             identity: None,
-        }),
+        })),
         None,
     );
     let seq = p.new_sequence("SDR", SequenceSettings { width: W, height: H, frame_rate: rate, ..Default::default() }, 1, 0, None);
