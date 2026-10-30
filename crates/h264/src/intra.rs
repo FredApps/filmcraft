@@ -584,7 +584,8 @@ mod tests {
             let a = Avail { left: bits & 1 != 0, top: bits & 2 != 0, top_left: bits & 4 != 0, top_right: bits & 8 != 0 };
             for mode in 0..9 {
                 let (mut got, mut want) = (base.clone(), base.clone());
-                if iter % 2 == 0 {
+                // Choose size independently of availability: both sizes see all 16 masks.
+                if (iter / 16) % 2 == 0 {
                     pred4x4(&mut got, s, 8, 8, mode, a);
                     reference::pred4x4(&mut want, s, 8, 8, mode, a);
                 } else {
