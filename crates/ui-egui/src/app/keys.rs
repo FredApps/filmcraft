@@ -12,6 +12,16 @@ impl FilmcraftApp {
             self.bindings = menus::bindings(self);
             self.bindings_rev = self.session.shortcuts.revision;
         }
+        // Esc exits cinema mode unconditionally, even when a dialog or text field has focus.
+        if self.ui.fullscreen_program && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            self.ui.fullscreen_program = false;
+            let restore = self.ui.cinema_was_fullscreen;
+            if let Some(prev) = self.ui.cinema_prev_focus.take() {
+                self.ui.focused = prev;
+            }
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(restore));
+            return;
+        }
         // A focused dock divider or floating-window grip takes the arrow keys to nudge it, but no
         // other key: Space and the other shortcuts keep working (#1482).
         let divider_focused = self.divider_focused(ctx);
@@ -24,12 +34,6 @@ impl FilmcraftApp {
         // out, so it still reports the previous pass, and it is true for any focused widget, which
         // would leave the editor without its single-key tool shortcuts while a slider has focus.
         let text_focused = ctx.text_edit_focused();
-        // Esc exits cinema mode (full-screen Program monitor)
-        if self.ui.fullscreen_program && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
-            self.ui.fullscreen_program = false;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
-            return;
-        }
         // Esc cancels a dynamic trim in progress
         if self.session.trim_play.dynamic.is_some() && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
             let _ = self.session.execute("trim.cancelDynamic", json!({}));

@@ -283,7 +283,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if let Some(g) = grid_area {
         crate::panels::multicam::grid(app, ui, g);
     }
-    ui.painter().rect_filled(video_area, 0.0, t.panel_bg);
+    ui.painter().rect_filled(video_area, 0.0, if cinema { egui::Color32::BLACK } else { t.panel_bg });
     let has_video = frame_size.0 > 0;
     // Source waveform modes: Audio Waveform (or an audio-only clip) and the video/waveform split.
     let source_item = if which == Which::Source { app.session.state.source_item } else { None };
@@ -356,7 +356,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if show_picture && !compare {
         monitor_view::zoom_pan_input(app, ui, which, video_area, pic, display_w, ppp);
     }
-    if which == Which::Program && show_picture {
+    if which == Which::Program && show_picture && !cinema {
         // an armed eyedropper owns clicks on the picture: the overlays would sit on top and take
         // them (the selected clip's transform handles cover it, #1023)
         if app.ui.eyedropper.is_some() {
