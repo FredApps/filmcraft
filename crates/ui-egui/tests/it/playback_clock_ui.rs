@@ -92,3 +92,79 @@ fn a_fallback_note_from_the_audio_device_reaches_the_status_bar() {
     }
     assert_eq!(h.state_mut().ui.status, note, "the note survives while playback runs");
 }
+
+/// A 1080p25 long-GOP H.264 clip with AAC sound (one keyframe in 250 frames), made with ffmpeg;
+/// `None` without ffmpeg.
+fn long_gop_clip() -> Option<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/fixtures");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("play-start-1080p.mp4");
+    if !path.exists() {
+        let tmp = dir.join(format!("play-start-{}.tmp.mp4", std::process::id()));
+        let ok = std::process::Command::new("ffmpeg")
+            .args([
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=1920x1080:rate=25:duration=12",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=12",
+            ])
+            .args(["-c:v", "libx264", "-preset", "veryfast", "-g", "250", "-bf", "2", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest"])
+            .arg(&tmp)
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            return None;
+        }
+        std::fs::rename(&tmp, &path).ok()?;
+    }
+    Some(path)
+}
+
+/// Real seconds from `play` to the clock starting, on the long-GOP clip played from the middle of
+/// its group of pictures after `idle_frames` UI frames of the paused picture; `None` without ffmpeg.
+fn play_start_wait(idle_frames: usize) -> Option<f64> {
+    let clip = long_gop_clip()?;
+    let mut s = Session::default();
+    let r = s.execute("file.import", json!({"paths": [clip.to_string_lossy()]})).unwrap();
+    let item = r["items"][0].as_u64().unwrap();
+    s.execute("file.newSequenceFromClip", json!({"items": [item]})).unwrap();
+    s.set_playhead(Tick::from_seconds_f64(6.0));
+    let mut app = FilmcraftApp::new(s);
+    app.audio = Some(Box::new(FakeOut { played: Arc::new(AtomicU64::new(0)), per_poll: 800, started: false, note: None }));
+    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 800.0)).with_step_dt(1.0 / 60.0).build_eframe(move |_cc| app);
+    let step = |h: &mut Harness<'_, FilmcraftApp>| {
+        std::thread::sleep(std::time::Duration::from_millis(16));
+        h.step();
+    };
+    // the paused frame is on screen
+    for _ in 0..idle_frames {
+        step(&mut h);
+    }
+    h.state_mut().play(1.0);
+    let t0 = std::time::Instant::now();
+    while h.state_mut().playback.preroll.is_some() && t0.elapsed().as_secs_f64() < 3.0 {
+        step(&mut h);
+    }
+    Some(t0.elapsed().as_secs_f64())
+}
+
+/// #3600: Play starts the clock (and the sound) without a long wait: soon after the key press when
+/// the next frames are ready, and after at most a short timeout when the decoder is still seeking
+/// (it waited half a second, then a first block of sound).
+#[test]
+fn play_starts_within_a_fraction_of_a_second() {
+    let (Some(warm), Some(cold)) = (play_start_wait(90), play_start_wait(3)) else {
+        eprintln!("SKIPPED (play_starts_within_a_fraction_of_a_second): ffmpeg not found");
+        return;
+    };
+    eprintln!("Play waited {warm:.3} s after the picture settled, {cold:.3} s right after the seek");
+    assert!(warm < 0.2, "Play waited {warm:.2} s with the picture settled");
+    assert!(cold < 0.25, "Play waited {cold:.2} s right after the seek");
+}
