@@ -16,6 +16,8 @@ struct GlobalPoolHeld(Arc<(Mutex<bool>, Condvar)>);
 impl GlobalPoolHeld {
     fn new() -> Self {
         let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        // made first, so a failed start below unwinds through its drop and lets the threads go
+        let held = Self(gate.clone());
         let started = Arc::new(AtomicUsize::new(0));
         let (g, n) = (gate.clone(), started.clone());
         rayon::spawn_broadcast(move |_| {
@@ -31,7 +33,7 @@ impl GlobalPoolHeld {
             assert!(t0.elapsed() < Duration::from_secs(10), "the global pool's threads did not all start");
             std::thread::sleep(Duration::from_millis(1));
         }
-        Self(gate)
+        held
     }
 }
 

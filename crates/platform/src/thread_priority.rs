@@ -12,14 +12,12 @@
 const RELATIVE_PRIORITY: i32 = -15;
 
 /// Lower the calling thread below the default class's other threads. A thread the system refuses
-/// stays as it was.
-pub fn lower_current_thread() {
+/// stays as it was, and the error says why.
+pub fn lower_current_thread() -> std::io::Result<()> {
     // SAFETY: `pthread_set_qos_class_self_np` changes only the calling thread's own scheduling
     // class; it takes two plain integers and has no memory-safety preconditions.
     let r = unsafe { libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_DEFAULT, RELATIVE_PRIORITY) };
-    if r != 0 {
-        log::debug!("could not lower a background thread's priority (error {r})");
-    }
+    if r == 0 { Ok(()) } else { Err(std::io::Error::from_raw_os_error(r)) }
 }
 
 #[cfg(test)]
@@ -42,7 +40,7 @@ mod tests {
         let default = libc::qos_class_t::QOS_CLASS_DEFAULT as u32;
         std::thread::spawn(move || {
             assert_eq!(class(), (default, 0));
-            lower_current_thread();
+            lower_current_thread().unwrap();
             assert_eq!(class(), (default, RELATIVE_PRIORITY));
             // a thread it creates is not lowered with it
             let child = std::thread::spawn(class).join().unwrap();
