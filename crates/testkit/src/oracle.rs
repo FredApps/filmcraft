@@ -11,6 +11,7 @@
 //! `FILMCRAFT_REQUIRE_ORACLES=1` is set (CI), which turns every skip into a failure.
 
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 /// Environment variable that makes missing oracles a hard failure.
@@ -116,6 +117,19 @@ pub fn ffmpeg_or_skip(context: &str) -> Option<PathBuf> {
     tool_or_skip("ffmpeg", ffmpeg(), context)
 }
 
+/// Whether `ffmpeg -encoders` lists `encoder` (e.g. `libx265`): lets a test tell "this ffmpeg lacks the encoder"
+/// (skip) from "the encoder is there but failed" (a real failure).
+pub fn ffmpeg_has_encoder(ffmpeg: &Path, encoder: &str) -> bool {
+    let Ok(out) = Command::new(ffmpeg).args(["-hide_banner", "-encoders"]).stdin(Stdio::null()).output() else { return false };
+    encoders_output_lists(&String::from_utf8_lossy(&out.stdout), encoder)
+}
+
+/// Pure function of the `ffmpeg -encoders` output: whether `encoder` is one of the listed names.
+fn encoders_output_lists(output: &str, encoder: &str) -> bool {
+    // rows look like ` V....D libx264   libx264 H.264 …`; the name is the second whitespace-separated token
+    output.lines().any(|line| line.split_whitespace().nth(1) == Some(encoder))
+}
+
 /// ffprobe, or `None` after reporting a skip (see [`skip`]).
 pub fn ffprobe_or_skip(context: &str) -> Option<PathBuf> {
     tool_or_skip("ffprobe", ffprobe(), context)
@@ -160,6 +174,32 @@ pub fn ffmpeg_version(ff: &Path) -> Option<String> {
     ffmpeg_version_in(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// The (major, minor) version in an ffmpeg version string (`4.4.2-0ubuntu0.22.04.1` -> (4, 4),
+/// `n7.1` -> (7, 1), `8` -> (8, 0)); `None` for a git snapshot (`N-113000-g1234abcd`) or anything
+/// else without a leading number.
+fn ffmpeg_major_minor(version: &str) -> Option<(u32, u32)> {
+    let v = version.strip_prefix(['n', 'N']).filter(|r| r.starts_with(|c: char| c.is_ascii_digit())).unwrap_or(version);
+    let mut parts = v.split('.').map(|p| p.chars().take_while(char::is_ascii_digit).collect::<String>());
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().and_then(|m| m.parse().ok()).unwrap_or(0);
+    Some((major, minor))
+}
+
+/// The passthrough arguments for an ffmpeg reporting `version` (see [`fps_passthrough_args`]).
+fn passthrough_args_for(version: Option<&str>) -> [&'static str; 2] {
+    match version.and_then(ffmpeg_major_minor) {
+        Some(v) if v < (5, 1) => ["-vsync", "passthrough"],
+        _ => ["-fps_mode", "passthrough"],
+    }
+}
+
+/// The ffmpeg arguments that pass every decoded frame through unchanged (no frame
+/// duplication or dropping to a constant rate): `-fps_mode passthrough` since ffmpeg 5.1, the
+/// older `-vsync passthrough` before (Ubuntu 22.04 ships 4.4; 5.0 has no `-fps_mode` either).
+pub fn fps_passthrough_args(ff: &Path) -> [&'static str; 2] {
+    passthrough_args_for(ffmpeg_version(ff).as_deref())
+}
+
 /// ffmpeg that can read `format_name`, or `None` after reporting a skip (see
 /// [`skip`]). An ffmpeg predating the format (APV needs 8.0+) skips with its
 /// detected version named, exactly like a missing tool — and fails under
@@ -177,12 +217,45 @@ pub fn ffmpeg_with_format_or_skip(context: &str, format_name: &str, min_version:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn encoder_lookup_matches_the_name_column_only() {
+        let out = " V....D libx264              libx264 H.264 / AVC\n V....D libx265              libx265 H.265 / HEVC (libx265)\n A....D aac                  AAC (libx264 inside)\n";
+        assert!(encoders_output_lists(out, "libx264"));
+        assert!(encoders_output_lists(out, "libx265"));
+        assert!(!encoders_output_lists(out, "libsvtav1"));
+        assert!(!encoders_output_lists(out, "H.264"));
+    }
     use std::ffi::OsString;
 
-    fn tmpdir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("filmcraft-testkit-{tag}-{}", std::process::id()));
-        std::fs::create_dir_all(&d).unwrap();
-        d
+    #[test]
+    fn version_is_the_leading_major_and_minor() {
+        assert_eq!(ffmpeg_major_minor("4.4.2-0ubuntu0.22.04.1"), Some((4, 4)));
+        assert_eq!(ffmpeg_major_minor("5.0.3"), Some((5, 0)));
+        assert_eq!(ffmpeg_major_minor("6.1.1-3ubuntu5"), Some((6, 1)));
+        assert_eq!(ffmpeg_major_minor("n7.1"), Some((7, 1)));
+        assert_eq!(ffmpeg_major_minor("8"), Some((8, 0)));
+        assert_eq!(ffmpeg_major_minor("N-113000-g1234abcd"), None);
+        assert_eq!(ffmpeg_major_minor(""), None);
+    }
+
+    #[test]
+    fn passthrough_needs_fps_mode_from_ffmpeg_5_1() {
+        let vsync = ["-vsync", "passthrough"];
+        let fps_mode = ["-fps_mode", "passthrough"];
+        assert_eq!(passthrough_args_for(Some("4.4.2-0ubuntu0.22.04.1")), vsync);
+        // 5.0 has no -fps_mode (added in 5.1)
+        assert_eq!(passthrough_args_for(Some("5.0.3")), vsync);
+        assert_eq!(passthrough_args_for(Some("n5.0")), vsync);
+        assert_eq!(passthrough_args_for(Some("5.1.4")), fps_mode);
+        assert_eq!(passthrough_args_for(Some("7.1")), fps_mode);
+        // a git snapshot or an unknown version: current ffmpeg
+        assert_eq!(passthrough_args_for(Some("N-113000-g1234abcd")), fps_mode);
+        assert_eq!(passthrough_args_for(None), fps_mode);
+    }
+
+    fn tmpdir(_tag: &str) -> PathBuf {
+        tempfile::tempdir().unwrap().keep()
     }
 
     #[test]

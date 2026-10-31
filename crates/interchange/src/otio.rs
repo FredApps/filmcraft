@@ -11,7 +11,7 @@
 //! state, sequence settings, media info, generators) round-trip through `metadata.filmcraft`.
 //! Nested sequences are `Stack` items inside tracks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use filmcraft_media::{Generator, MediaInfo};
 use filmcraft_project::{
@@ -22,8 +22,8 @@ use filmcraft_time::{FrameRate, TICKS_PER_SECOND, Tick};
 use serde_json::{Value, json};
 
 use crate::common::{
-    Builder, MediaSpec, base_item, empty_sequence, file_name, generator_of, item_media, path_to_file_url, rate_from_f64, relative_path, resolve_path,
-    settings_for, transition_effect, transition_name,
+    Builder, MAX_RATE, MediaSpec, base_item, empty_sequence, file_name, generator_of, item_media, media_info, path_to_file_url, rate_from_f64, relative_path,
+    relative_url, resolve_path, resolve_url, settings_for, transition_effect, transition_name,
 };
 use crate::{Error, ExportOptions, Format, ImportOptions, Imported, Report, Result};
 
@@ -50,6 +50,15 @@ fn read_rt(v: &Value) -> Option<Tick> {
         return Some(Tick::from_rational(value as i64, r.den, r.num));
     }
     Some(Tick((value * TICKS_PER_SECOND as f64 * r.den as f64 / r.num as f64).round() as i64))
+}
+
+/// Whether any `rate` in the document is beyond what [`rate_from_f64`] accepts.
+fn has_absurd_rate(v: &Value) -> bool {
+    match v {
+        Value::Object(m) => m.iter().any(|(k, x)| if k == "rate" { x.as_f64().is_some_and(|r| r > MAX_RATE as f64) } else { has_absurd_rate(x) }),
+        Value::Array(a) => a.iter().any(has_absurd_rate),
+        _ => false,
+    }
 }
 
 fn read_rate(v: &Value) -> Option<FrameRate> {
@@ -113,17 +122,27 @@ fn color_label(s: &str) -> Label {
 // Export
 // ---------------------------------------------------------------------------------------------
 
+/// Most clips an export writes inside nested sequences. OTIO has no references: every use of a nested
+/// sequence is written in full, so a compound clip that holds three uses of another, nested ten deep,
+/// is 3^10 copies, and a 3 KB document made the export run for minutes and grow to gigabytes. Each
+/// clip is about 10 KB of JSON, so this bounds the extra output near 250 MB; real projects use a
+/// few thousand. Past it, further nested sequences are written as gaps, with a warning.
+const MAX_NESTED_ITEMS: usize = 25_000;
+
 struct Exp<'a, 'r> {
     p: &'a Project,
     opts: &'a ExportOptions,
     report: &'r mut Report,
     stack: Vec<ItemId>,
+    /// Clips written inside nested sequences so far, and the limit for it (see [`MAX_NESTED_ITEMS`]).
+    nested_items: usize,
+    nested_limit: usize,
 }
 
 pub(crate) fn export(p: &Project, seq_id: ItemId, opts: &ExportOptions, report: &mut Report) -> Result<String> {
     let seq = p.sequence(seq_id).ok_or(Error::NoSequence(seq_id))?;
     let rate = seq.settings.frame_rate;
-    let mut x = Exp { p, opts, report, stack: vec![seq_id] };
+    let mut x = Exp { p, opts, report, stack: vec![seq_id], nested_items: 0, nested_limit: MAX_NESTED_ITEMS };
     let name = opts.name.clone().unwrap_or_else(|| p.item(seq_id).map(|i| i.name.clone()).unwrap_or_default());
     let stack = x.stack_json(seq_id, &name, None);
     let tl = json!({
@@ -238,7 +257,7 @@ impl Exp<'_, '_> {
             }),
             MediaRef::File { path } => {
                 let url = match &self.opts.relative_to {
-                    Some(base) => relative_path(path, base).unwrap_or_else(|| abs_url(path)),
+                    Some(base) => relative_path(path, base).map(|r| relative_url(&r)).unwrap_or_else(|| abs_url(path)),
                     None => abs_url(path),
                 };
                 json!({"OTIO_SCHEMA": "ExternalReference.1", "name": name, "target_url": url, "available_range": avail, "available_image_bounds": null, "metadata": meta})
@@ -247,6 +266,9 @@ impl Exp<'_, '_> {
     }
 
     fn item_json(&mut self, it: &TrackItem, kind: TrackKind, rate: FrameRate) -> Value {
+        if self.stack.len() > 1 {
+            self.nested_items = self.nested_items.saturating_add(1);
+        }
         let base = base_item(self.p, it.item);
         let mut effects = Vec::new();
         if let Some(h) = it.frame_hold {
@@ -267,6 +289,17 @@ impl Exp<'_, '_> {
         if matches!(self.p.item(base).map(|i| &i.kind), Some(ItemKind::Sequence(_))) {
             if self.stack.contains(&base) {
                 self.report.warn("recursive nested sequence skipped");
+                return json!({"OTIO_SCHEMA": "Gap.1", "name": "", "source_range": tr(Tick::ZERO, it.duration, rate), "effects": [], "markers": [], "enabled": true, "metadata": {}});
+            }
+            if self.nested_items >= self.nested_limit {
+                // once: later nested sequences hit this too, and the message would repeat
+                if self.nested_items < usize::MAX {
+                    self.nested_items = usize::MAX;
+                    self.report.warn(format!(
+                        "more than {} clips written inside nested sequences: the rest are gaps (OTIO repeats a nested sequence for every use)",
+                        self.nested_limit
+                    ));
+                }
                 return json!({"OTIO_SCHEMA": "Gap.1", "name": "", "source_range": tr(Tick::ZERO, it.duration, rate), "effects": [], "markers": [], "enabled": true, "metadata": {}});
             }
             self.stack.push(base);
@@ -369,8 +402,10 @@ struct Imp<'a, 'r> {
     report: &'r mut Report,
     links: HashMap<u64, u64>,
     groups: HashMap<u64, u64>,
+    explicit_dimensions: HashSet<ItemId>,
 }
 
+/// Imports OTIO timelines into one project while preserving supported source metadata.
 pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> Result<Imported> {
     let v: Value = serde_json::from_str(text).map_err(|e| Error::parse(Format::Otio, e.to_string()))?;
     let mut timelines = Vec::new();
@@ -378,7 +413,12 @@ pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> R
     if timelines.is_empty() {
         return Err(Error::parse(Format::Otio, format!("no Timeline in a {} document", schema(&v))));
     }
-    let mut imp = Imp { b: Builder::new(&name_of(&v)), opts, report, links: HashMap::new(), groups: HashMap::new() };
+    if has_absurd_rate(&v) {
+        report.warn(format!(
+            "an OTIO rate above {MAX_RATE} per second is not a frame rate; the default 24 fps was used (this includes audio sample rates above it, such as DSD)"
+        ));
+    }
+    let mut imp = Imp { b: Builder::new(&name_of(&v)), opts, report, links: HashMap::new(), groups: HashMap::new(), explicit_dimensions: HashSet::new() };
     if imp.b.p.name.is_empty() {
         imp.b.p.name = "Imported OTIO".into();
     }
@@ -389,6 +429,7 @@ pub(crate) fn import(text: &str, opts: &ImportOptions, report: &mut Report) -> R
     Ok(imp.b.finish())
 }
 
+/// Collects importable timelines, stacks and standalone tracks from an OTIO document.
 fn collect_timelines<'v>(v: &'v Value, out: &mut Vec<&'v Value>) {
     match schema_name(v) {
         "Timeline" | "Stack" => out.push(v),
@@ -402,11 +443,105 @@ fn collect_timelines<'v>(v: &'v Value, out: &mut Vec<&'v Value>) {
     }
 }
 
+/// Finds the first source-range frame rate while walking a timeline's children.
 fn first_rate(v: &Value) -> Option<FrameRate> {
     if let Some(sr) = v.get("source_range").filter(|s| !s.is_null()) {
         return sr.get("duration").and_then(read_rate);
     }
     v.get("children").and_then(Value::as_array).into_iter().flatten().find_map(first_rate)
+}
+
+/// Converts a positive integral JSON number within the u32 dimension range.
+fn frame_dimension(value: &Value) -> Option<u32> {
+    if let Some(integer) = value.as_u64() {
+        let dimension = u32::try_from(integer).ok()?;
+        return (dimension > 0).then_some(dimension);
+    }
+    frame_dimension_number(value.as_f64()?)
+}
+
+/// Converts a finite, positive integral float within the frame-size integer range.
+fn frame_dimension_number(value: f64) -> Option<u32> {
+    if !value.is_finite() || value.fract() != 0.0 || value <= 0.0 || value > f64::from(u32::MAX) {
+        return None;
+    }
+    Some(value as u32)
+}
+
+/// Reads and validates dimensions from media metadata or an OTIO image bounds box.
+fn image_dimensions(v: &Value) -> Option<(u32, u32)> {
+    let (width, height) = if let (Some(width), Some(height)) = (v.get("width"), v.get("height")) {
+        (frame_dimension(width)?, frame_dimension(height)?)
+    } else {
+        let min = v.get("min")?;
+        let max = v.get("max")?;
+        let width = max.get("x")?.as_f64()? - min.get("x")?.as_f64()?;
+        let height = max.get("y")?.as_f64()? - min.get("y")?.as_f64()?;
+        (frame_dimension_number(width)?, frame_dimension_number(height)?)
+    };
+    filmcraft_project::validate_frame_size(width, height).ok()?;
+    Some((width, height))
+}
+
+/// Prefers FilmCraft media info, then OTIO metadata, then available image bounds.
+fn reference_dimensions(reference: &Value) -> Option<(u32, u32)> {
+    let metadata = reference.get("metadata");
+    let filmcraft = metadata.and_then(|m| m.get("filmcraft"));
+    filmcraft
+        .and_then(|m| m.get("info"))
+        .and_then(|i| i.get("video"))
+        .and_then(image_dimensions)
+        .or_else(|| metadata.and_then(image_dimensions))
+        .or_else(|| reference.get("available_image_bounds").and_then(image_dimensions))
+}
+
+/// Selects the active OTIO media reference, falling back to the first one if needed.
+fn active_media_reference(clip: &Value) -> Option<&Value> {
+    let refs = clip.get("media_references");
+    let key = clip.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
+    match refs {
+        Some(refs) => refs.get(key).or_else(|| refs.as_object().and_then(|o| o.values().next())),
+        None => clip.get("media_reference"),
+    }
+}
+
+/// Returns dimensions only for a clip import() will retain (positive source duration).
+fn media_reference_dimensions(clip: &Value) -> Option<(u32, u32)> {
+    let reference = active_media_reference(clip)?;
+    let available = reference.get("available_range").and_then(read_tr);
+    let (_, duration) = clip.get("source_range").and_then(read_tr).or(available)?;
+    if duration <= Tick::ZERO {
+        return None;
+    }
+    reference_dimensions(reference)
+}
+
+/// Finds dimensions from the first importable video clip, respecting nested stacks.
+fn first_video_dimensions_at(stack: &Value, depth: usize) -> Option<(u32, u32)> {
+    if depth >= 64 {
+        return None;
+    }
+    for track in stack.get("children").and_then(Value::as_array).into_iter().flatten() {
+        if schema_name(track) != "Track" || track.get("kind").and_then(Value::as_str) == Some("Audio") {
+            continue;
+        }
+        for child in track.get("children").and_then(Value::as_array).into_iter().flatten() {
+            let dimensions = match schema_name(child) {
+                "Clip" => media_reference_dimensions(child),
+                "Stack" => child.get("source_range").and_then(read_tr).and_then(|_| first_video_dimensions_at(child, depth + 1)),
+                _ => None,
+            };
+            if dimensions.is_some() {
+                return dimensions;
+            }
+        }
+    }
+    None
+}
+
+/// Returns the first usable video clip dimensions in a stack.
+fn first_video_dimensions(stack: &Value) -> Option<(u32, u32)> {
+    first_video_dimensions_at(stack, 0)
 }
 
 impl Imp<'_, '_> {
@@ -433,10 +568,17 @@ impl Imp<'_, '_> {
         id
     }
 
+    /// Imports a sequence, preferring explicit settings over inferred video dimensions.
     fn sequence(&mut self, stack: &Value, name: &str, meta: Option<&Value>, rate: FrameRate) -> ItemId {
-        let settings: SequenceSettings =
-            meta.and_then(|m| m.get("settings")).and_then(|s| serde_json::from_value(s.clone()).ok()).unwrap_or_else(|| settings_for(rate, 1920, 1080, false));
+        let explicit: Option<SequenceSettings> = meta.and_then(|m| m.get("settings")).and_then(|s| serde_json::from_value(s.clone()).ok());
+        let settings = explicit.clone().unwrap_or_else(|| {
+            let (width, height) = first_video_dimensions(stack).unwrap_or((1920, 1080));
+            settings_for(rate, width, height, false)
+        });
         let id = self.b.reserve_sequence(name, settings.clone(), None);
+        if explicit.is_none() {
+            self.b.source_size_sequences.push(id);
+        }
         if let Some(l) = meta.and_then(|m| m.get("label")).and_then(|l| serde_json::from_value::<Label>(l.clone()).ok())
             && let Some(it) = self.b.p.item_mut(id)
         {
@@ -618,16 +760,9 @@ impl Imp<'_, '_> {
         }
     }
 
+    /// Imports a positive-duration clip using the same reference selection as dimension discovery.
     fn clip(&mut self, c: &Value, kind: TrackKind, pos: Tick) -> Option<TrackItem> {
-        let mref = match c.get("media_references") {
-            Some(refs) => {
-                let key = c.get("active_media_reference_key").and_then(Value::as_str).unwrap_or("DEFAULT_MEDIA");
-                refs.get(key).or_else(|| refs.as_object().and_then(|o| o.values().next()))
-            }
-            None => c.get("media_reference"),
-        }
-        .cloned()
-        .unwrap_or(Value::Null);
+        let mref = active_media_reference(c).cloned().unwrap_or(Value::Null);
         let name = name_of(c);
         let avail = mref.get("available_range").and_then(read_tr);
         let (src_in, dur) = c.get("source_range").and_then(read_tr).or(avail)?;
@@ -674,6 +809,7 @@ impl Imp<'_, '_> {
         Some(ti)
     }
 
+    /// Registers a referenced media item with dimensions inferred from its reference metadata.
     fn media(&mut self, r: &Value, clip_name: &str, kind: TrackKind, avail: Option<(Tick, Tick)>) -> Option<ItemId> {
         let meta = fc(r);
         let info: Option<MediaInfo> = meta.and_then(|m| m.get("info")).and_then(|i| serde_json::from_value(i.clone()).ok());
@@ -681,9 +817,13 @@ impl Imp<'_, '_> {
             let n = name_of(r);
             if n.is_empty() { clip_name.to_string() } else { n }
         };
+        let dimensions = reference_dimensions(r);
         let spec = MediaSpec {
             duration: avail.map(|a| a.1),
-            video: (kind == TrackKind::Video).then(|| (1920, 1080, FrameRate::default())),
+            video: (kind == TrackKind::Video).then(|| {
+                let (width, height) = dimensions.unwrap_or((1920, 1080));
+                (width, height, FrameRate::default())
+            }),
             audio: (kind == TrackKind::Audio).then_some((48_000, 2)),
             start_tc: None,
             kind: None,
@@ -691,7 +831,7 @@ impl Imp<'_, '_> {
         let id = match schema_name(r) {
             "ExternalReference" | "ImageSequenceReference" => {
                 let url = r.get("target_url").and_then(Value::as_str).or_else(|| r.get("target_url_base").and_then(Value::as_str)).unwrap_or("");
-                let path = resolve_path(url, self.opts.base_dir.as_deref());
+                let path = resolve_url(url, self.opts.base_dir.as_deref());
                 let display = if name.is_empty() { file_name(&path).to_string() } else { name.clone() };
                 let key = format!("file:{path}");
                 let existed = self.b.find_media(&key);
@@ -745,12 +885,33 @@ impl Imp<'_, '_> {
                 id
             }
         };
+        if kind == TrackKind::Video
+            && let Some((width, height)) = dimensions
+            && !self.explicit_dimensions.contains(&id)
+            && let Some(media) = self.b.p.item_mut(id).and_then(|item| item.as_media_mut())
+        {
+            if let Some(video) = media.info.video.as_mut() {
+                video.width = width;
+                video.height = height;
+            } else {
+                media.info.video = media_info(&media.info.name, &spec).video;
+            }
+            if media.info.video.is_some() {
+                if media.info.kind == filmcraft_media::MediaKind::AudioOnly {
+                    media.info.kind = filmcraft_media::MediaKind::Movie;
+                }
+                self.explicit_dimensions.insert(id);
+            }
+        }
         Some(id)
     }
 
+    /// Applies FilmCraft media info and availability metadata to an imported media item.
     fn fill_media(&mut self, id: ItemId, info: Option<MediaInfo>, meta: Option<&Value>, kind: TrackKind) {
         let label = meta.and_then(|m| m.get("label")).and_then(|l| serde_json::from_value::<Label>(l.clone()).ok());
         let offline = meta.and_then(|m| m.get("offline")).and_then(Value::as_bool);
+        let explicit_video_dimensions =
+            info.as_ref().and_then(|i| i.video.as_ref()).is_some_and(|v| filmcraft_project::validate_frame_size(v.width, v.height).is_ok());
         let Some(it) = self.b.p.item_mut(id) else { return };
         if let Some(l) = label {
             it.label = l;
@@ -766,6 +927,9 @@ impl Imp<'_, '_> {
             if let Some(o) = offline {
                 m.offline = o;
             }
+        }
+        if explicit_video_dimensions {
+            self.explicit_dimensions.insert(id);
         }
     }
 
@@ -822,5 +986,59 @@ mod tests {
         let t = Tick(TICKS_PER_SECOND / 48_000 * 12_345);
         let back = read_rt(&rt(t, FrameRate::FPS_24)).unwrap();
         assert!((back - t).abs() <= Tick(1));
+    }
+
+    /// A tree of compound clips: `uses` uses of the next level in each, `levels` media levels deep, leaf clips in the last.
+    fn nested_tree(levels: usize, uses: usize) -> String {
+        let mut xml = String::from(
+            r#"<?xml version="1.0"?><fcpxml version="1.10"><resources><format id="f1" frameDuration="100/2500s" width="1920" height="1080"/>
+<asset id="a1" name="c" start="0s" duration="10s" hasVideo="1" format="f1"><media-rep kind="original-media" src="file:///tmp/c.mov"/></asset>"#,
+        );
+        for level in 0..levels {
+            let inner: String = (0..uses)
+                .map(|i| {
+                    if level + 1 < levels {
+                        format!(r#"<ref-clip ref="m{}" offset="{i}s" duration="1s"/>"#, level + 1)
+                    } else {
+                        format!(r#"<asset-clip ref="a1" offset="{i}s" duration="1s"/>"#)
+                    }
+                })
+                .collect();
+            xml.push_str(&format!(r#"<media id="m{level}" name="L{level}"><sequence format="f1" tcStart="0s"><spine>{inner}</spine></sequence></media>"#));
+        }
+        xml.push_str(r#"</resources><library><event name="E"><project name="P"><sequence format="f1" tcStart="0s"><spine><ref-clip ref="m0" offset="0s" duration="1s"/></spine></sequence></project></event></library></fcpxml>"#);
+        xml
+    }
+
+    /// OTIO repeats a nested sequence for every use, so 10 uses nested 3 deep is 111 copies and a 3 KB
+    /// document nested 12 deep made the export run for minutes and grow to gigabytes. Past the limit on clips
+    /// written inside nested sequences the rest are gaps, with one warning. The test lowers the limit so it
+    /// stays tiny: without the check all 112 stacks are written.
+    #[test]
+    fn nested_copies_stop_at_the_limit() {
+        let (imported, _) = crate::import(nested_tree(3, 10).as_bytes(), crate::Format::Fcpxml, None).expect("import succeeds");
+        let seq = imported.sequences[0];
+        let opts = ExportOptions::default();
+        let write = |limit: usize| {
+            let mut report = Report::default();
+            let mut x = Exp { p: &imported.project, opts: &opts, report: &mut report, stack: vec![seq], nested_items: 0, nested_limit: limit };
+            let stacks = x.stack_json(seq, "t", None).to_string().matches("\"Stack.1\"").count();
+            (stacks, report)
+        };
+        let (all, report) = write(usize::MAX - 1);
+        assert_eq!(all, 112);
+        assert!(!report.mentions("nested sequences"), "{report}");
+        let (capped, report) = write(200);
+        assert!(capped < 60, "{capped} stacks");
+        assert!(report.mentions("clips written inside nested sequences"), "{report}");
+        assert_eq!(report.warnings().filter(|w| w.message.contains("inside nested sequences")).map(|w| w.count).sum::<u32>(), 1);
+    }
+
+    /// An ordinary project with nested sequences is far below the real limit and exports untouched.
+    #[test]
+    fn ordinary_nesting_is_not_capped() {
+        let (imported, _) = crate::import(nested_tree(3, 4).as_bytes(), crate::Format::Fcpxml, None).expect("import succeeds");
+        let (_, report) = crate::export(&imported.project, imported.sequences[0], crate::Format::Otio, &ExportOptions::default()).expect("export succeeds");
+        assert!(!report.mentions("inside nested sequences"), "{report}");
     }
 }

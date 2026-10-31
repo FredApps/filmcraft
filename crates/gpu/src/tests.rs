@@ -4,7 +4,7 @@ use filmcraft_render::Blend;
 use filmcraft_render::plan::execute_cpu;
 
 fn device() -> Option<(wgpu::Device, wgpu::Queue)> {
-    let instance = wgpu::Instance::default();
+    let instance = crate::adapter::native_instance();
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).ok()?;
     pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()
 }
@@ -116,7 +116,8 @@ fn gpu_matches_cpu_plan() {
         1.0,
         24,
         filmcraft_time::FrameRate::FPS_24,
-    );
+    )
+    .unwrap();
     let rgba = Arc::new(VideoFrame::rgba8(320, 180, pixels));
     let (w, h) = (320usize, 180usize);
     let plan = FramePlan::Layers {
@@ -464,7 +465,8 @@ fn gpu_draws_yuv_alpha_plane_like_the_cpu() {
         1.0,
         24,
         filmcraft_time::FrameRate::FPS_24,
-    );
+    )
+    .unwrap();
     let background = Arc::new(VideoFrame::rgba8(320, 180, pixels));
     for bits in [8, 10, 12] {
         let mut c = GpuCompositor::new(&dev, &q);
@@ -507,7 +509,7 @@ fn fast_half_float_conversion_matches_the_reference_for_every_value() {
 }
 
 /// HDR and wide-gamut Y'CbCr on a Rec. 709 sequence (#965): the shader's colour management
-/// (curve, HLG OOTF, BT.2020 → 709 matrix, BT.2390 tone mapping, desaturation) matches the CPU
+/// (curve, HLG OOTF, BT.2446 A / BT.2390 tone mapping, BT.2020 → 709, desaturation) matches the CPU
 /// running the same `InputTransform`.
 #[test]
 fn hdr_input_gpu_matches_cpu() {
@@ -523,15 +525,22 @@ fn hdr_input_gpu_matches_cpu() {
     let y: Vec<u16> = (0..h).flat_map(|_| (0..w).map(|x| (64 + x * 876 / 255) as u16)).collect();
     let cb: Vec<u16> = (0..h).flat_map(|r| std::iter::repeat_n(chroma[r as usize].0, w as usize)).collect();
     let cr: Vec<u16> = (0..h).flat_map(|r| std::iter::repeat_n(chroma[r as usize].1, w as usize)).collect();
-    let data = PixelData::Yuv16 { planes: [Arc::new(y), Arc::new(cb), Arc::new(cr)], chroma: Chroma::C444, bits: 10, alpha: None };
+    let data = PixelData::Yuv16 { planes: [Arc::new(y), Arc::new(cb.clone()), Arc::new(cr.clone())], chroma: Chroma::C444, bits: 10, alpha: None };
     let hdr = |transfer| ColorInfo { matrix: Matrix::Bt2020Ncl, transfer, primaries: Primaries::Bt2020, range: Range::Limited };
     let cases = [
         ("HLG", hdr(Transfer::Hlg), None),
+        ("HLG full range", ColorInfo { range: Range::Full, ..hdr(Transfer::Hlg) }, None),
         ("PQ", hdr(Transfer::Pq), None),
         ("PQ 4000 cd/m²", hdr(Transfer::Pq), Some(4000.0)),
         ("BT.2020 SDR", ColorInfo { primaries: Primaries::Bt2020, ..ColorInfo::REC709 }, None),
     ];
     for (name, color, peak) in cases {
+        let data = if color.range == Range::Full {
+            let y = (0..h).flat_map(|_| (0..w).map(|x| (x * 1023 / 255) as u16)).collect();
+            PixelData::Yuv16 { planes: [Arc::new(y), Arc::new(cb.clone()), Arc::new(cr.clone())], chroma: Chroma::C444, bits: 10, alpha: None }
+        } else {
+            data.clone()
+        };
         let frame = Arc::new(VideoFrame { width: w, height: h, data: data.clone(), color, par: (1, 1), pts: Default::default() });
         let cs = ColorSpace::from_info(&color);
         let t = Arc::new(InputTransform::new(cs, color.range, &ColorPipeline::REC709, peak));
@@ -542,6 +551,8 @@ fn hdr_input_gpu_matches_cpu() {
         c.composite(&plan);
         let (_, _, gpu) = c.read_output().expect("readback");
         let error = cpu.iter().zip(&gpu).map(|(a, b)| a.abs_diff(*b)).max().unwrap_or(0);
+        c.composite_prepared(&plan, Some(&prepare(&plan)));
+        assert_eq!(c.read_output().expect("prepared readback").2, gpu, "{name}: prepared matches inline upload");
         // and the stage does something: the default decode of the same frame is far off
         let plain = FramePlan::Layers { width: w as usize, height: h as usize, layers: vec![PlanLayer::new(frame, Affine::IDENTITY, 1.0, Blend::Normal)] };
         c.composite(&plain);
@@ -551,4 +562,177 @@ fn hdr_input_gpu_matches_cpu() {
         assert!(error <= 2, "{name}: GPU differs from the CPU by up to {error} codes");
         assert!(apart > 20, "{name}: colour management changed nothing ({apart})");
     }
+}
+
+/// Regression for #3418: several threads creating instances and devices, using them and dropping
+/// them at once deadlocked inside the NVIDIA driver (Vulkan loader critical section in
+/// `vkDestroyDevice` against other devices' `create_texture`/`submit`, plus WGL threads started by
+/// GL-enabled instances). Each thread makes its own instance and device, as concurrent windows and exports do.
+#[test]
+fn many_threads_create_use_and_drop_devices_at_once() {
+    const CHILD: &str = "FILMCRAFT_GPU_STRESS_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        device_stress();
+        return;
+    }
+    // A driver deadlock can also block process teardown after the assertion fires. Keep the
+    // original stress in an isolated process so its failure cannot hang later GPU tests.
+    let mut child = std::process::Command::new(std::env::current_exe().expect("test executable"))
+        .args(["--exact", "tests::many_threads_create_use_and_drop_devices_at_once", "--nocapture", "--test-threads=1"])
+        .env(CHILD, "1")
+        .spawn()
+        .expect("start isolated GPU stress");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(150);
+    loop {
+        if let Some(status) = child.try_wait().expect("wait for isolated GPU stress") {
+            assert!(status.success(), "isolated GPU stress failed: {status}");
+            return;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("isolated GPU stress exceeded its 150 s process deadline");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+fn device_stress() {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    const THREADS: usize = 16;
+    const ROUNDS: usize = 4;
+    let (tx, rx) = mpsc::channel();
+    for _ in 0..THREADS {
+        let tx = tx.clone();
+        std::thread::spawn(move || {
+            let mut used = 0usize;
+            for _ in 0..ROUNDS {
+                let Some((device, queue)) = device() else { break };
+                let tex = device.create_texture(&wgpu::TextureDescriptor {
+                    label: None,
+                    size: wgpu::Extent3d { width: 64, height: 64, depth_or_array_layers: 1 },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                    view_formats: &[],
+                });
+                let view = tex.create_view(&wgpu::TextureViewDescriptor::default());
+                let mut enc = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+                drop(enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::RED), store: wgpu::StoreOp::Store },
+                    })],
+                    ..Default::default()
+                }));
+                queue.submit([enc.finish()]);
+                let _ = device.poll(wgpu::PollType::wait_indefinitely());
+                used += 1;
+                drop((view, tex, queue, device));
+            }
+            let _ = tx.send(used);
+        });
+    }
+    drop(tx);
+    let deadline = Instant::now() + Duration::from_secs(120);
+    for i in 0..THREADS {
+        let left = deadline.saturating_duration_since(Instant::now());
+        let used = rx.recv_timeout(left).unwrap_or_else(|_| panic!("only {i} of {THREADS} threads finished within 120 s: device setup deadlocked"));
+        if std::env::var_os("FILMCRAFT_REQUIRE_GPU").is_some() {
+            assert_eq!(used, ROUNDS, "required GPU device was unavailable during stress");
+        }
+    }
+}
+
+/// Require an adapter for the explicit lifecycle regressions; absence is not a passing skip.
+fn retained_readback_compositor() -> GpuCompositor {
+    let (dev, q) = device().expect("GPU adapter required for explicit readback regression");
+    let mut compositor = GpuCompositor::new(&dev, &q);
+    compositor.accum_readback_buf = Some((
+        dev.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("readback-cleanup-regression"),
+            size: 256,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        }),
+        256,
+    ));
+    compositor
+}
+
+/// Failed buffers must leave the cache; a new copy must recreate usable staging storage.
+fn assert_readback_retired_and_rendering_recovers(compositor: &mut GpuCompositor) {
+    assert!(compositor.accum_readback_buf.is_none(), "failed staging buffer remained cached");
+    let plan = FramePlan::Layers { width: 1, height: 1, layers: vec![] };
+    let (width, height, rgba) = compositor.render_export_prepared(&plan, None).expect("readback recovers with new staging storage");
+    assert_eq!((width, height, rgba.len()), (1, 1, 4));
+    assert!(compositor.accum_readback_buf.is_some(), "successful readback must retain its cache");
+    let again = compositor.read_accumulator().expect("successful staging storage remains reusable");
+    assert_eq!(again, (width, height, rgba));
+}
+
+/// A wait failure after a real completed map must not retain the failed staging storage.
+#[test]
+#[ignore = "requires a working GPU adapter for staging-buffer lifecycle verification"]
+fn accumulator_readback_retires_after_failed_wait() {
+    let mut compositor = retained_readback_compositor();
+    assert!(
+        compositor
+            .map_accumulator_with_wait((1, 1, 256), |device, rx| {
+                assert!(wait_mapped(device, rx).is_some());
+                None
+            })
+            .is_none()
+    );
+    assert_readback_retired_and_rendering_recovers(&mut compositor);
+}
+
+/// Reject hostile conversion dimensions without retaining a successfully mapped buffer.
+#[test]
+#[ignore = "requires a working GPU adapter for staging-buffer lifecycle verification"]
+fn accumulator_readback_retires_after_rejected_conversion() {
+    let mut compositor = retained_readback_compositor();
+    assert!(compositor.map_accumulator((u32::MAX, u32::MAX, 256)).is_none());
+    assert_readback_retired_and_rendering_recovers(&mut compositor);
+}
+
+/// Retire a still-pending map before the next copy/readback attempt uses the cache.
+#[test]
+#[ignore = "requires a working GPU adapter for staging-buffer lifecycle verification"]
+fn accumulator_readback_retires_pending_map_after_failed_wait() {
+    let mut compositor = retained_readback_compositor();
+    assert!(compositor.map_accumulator_with_wait((1, 1, 256), |_, _| None).is_none());
+    assert_readback_retired_and_rendering_recovers(&mut compositor);
+}
+
+/// Real callback rejection may already leave native storage unmapped; do not unmap it twice.
+#[test]
+#[ignore = "requires a working GPU adapter for staging-buffer lifecycle verification"]
+fn accumulator_readback_retires_rejected_native_map() {
+    let mut compositor = retained_readback_compositor();
+    let errors = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let observed = errors.clone();
+    compositor.device.on_uncaptured_error(Arc::new(move |error| {
+        observed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(format!("{error}"));
+    }));
+    compositor.accum_readback_buf.as_ref().unwrap().0.destroy();
+    assert!(
+        compositor
+            .map_accumulator_with_wait((1, 1, 256), |device, rx| {
+                device.poll(wgpu::PollType::Wait { submission_index: None, timeout: Some(MAP_TIMEOUT) }).unwrap();
+                assert!(matches!(rx.recv_timeout(MAP_TIMEOUT), Ok(Err(_))), "expected an actual rejected map callback");
+                None
+            })
+            .is_none()
+    );
+    assert_readback_retired_and_rendering_recovers(&mut compositor);
+    assert!(
+        !errors.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().any(|error| error.contains("Buffer is not mapped")),
+        "cleanup attempted to unmap an already rejected mapping"
+    );
 }

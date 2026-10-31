@@ -240,7 +240,9 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   flag), so relinking and undo take effect at once. Media that can't be opened renders the offline
   slate (`render::offline`) instead of failing. With proxies enabled, an item with a proxy reads
   it through `ProxySource`, which reports the original's size. Export always uses
-  `MediaPool::full_res_provider`. See [project-files.md](project-files.md#media-offline-relinking-proxies-ingest).
+  `MediaPool::full_res_provider`. Background jobs (exports, Render Previews, proxies) open their
+  own copy of each file they can stream (`MediaPool::own_source`, `PoolProvider::own_sources`),
+  so they never take turns with the monitors on one decoder. See [project-files.md](project-files.md#media-offline-relinking-proxies-ingest).
 - **Seeking.** `codecs::Mp4Source` seeks to the preceding sync sample and decodes forward, caching
   every frame of the GOP. Sequential playback reuses the decoder. Decoders implement
   `codecs::VideoDecoder`. `register_video_decoder` puts a factory in front of the built-in ones, so a
@@ -298,6 +300,12 @@ file ──► codecs (MP4/MOV, MKV, audio)        demux + decode, GOP-aware see
   `filmcraft_export::register_format_probe`, so the H.265 format exists where an HEVC encoder does,
   and choosing it is the opt-in (the Hardware encoding toggle governs H.264 only). With no software
   H.265 encoder, what NVENC declines is counted and ends the export with an error that says why.
+  On macOS, `platform::hardware_encode` (VideoToolbox H.264, opt-in the same way, and H.265) is
+  registered likewise. It too takes the RGBA pictures as they are (`32BGRA` buffers tagged BT.709)
+  and VideoToolbox converts them to 4:2:0, so the encode thread only copies: converting on the CPU
+  there competed with the render of the next frames for the thread pool and cost more than the
+  hardware encode (20 ms a 1080p frame). A VideoToolbox that refuses RGB input on the first picture
+  gets the CPU's conversion into NV12 instead, and the export goes on.
 - **Compositor.** `render` is the reference for monitors, thumbnails and export. `render::plan`
   turns a frame into GPU layers, each with its opacity and blend mode. All 27 blend modes run on the
   GPU (`filmcraft-gpu`): Normal and Dissolve with fixed-function "over" blending, the others by
@@ -534,7 +542,8 @@ with different vertex counts hold). Feather, Opacity and Expansion are ordinary 
   removeVertex / toggleVertexSmooth / roundCorners / select / list; `masks.add` takes a
   `cornerRadius` for a rounded rectangle); keyframe commands take `"mask": n`. The
   Program monitor overlay drags vertices, Bézier handles, the whole mask and the feather /
-  expansion handles; drags merge into one undo step.
+  expansion handles; a marquee from outside the shape or Shift-click selects several vertices,
+  which move together (`masks.moveVertex` `vertices`); drags merge into one undo step.
 - **Tracking** (`render::track`, `masks.track`): Shi–Tomasi features inside the mask, pyramidal
   Lucas–Kanade (4 levels, 15×15 window) with a forward–backward check, then RANSAC + least squares
   for Position / Position & Rotation / Position, Scale & Rotation (2D Procrustes). Each frame's
@@ -546,8 +555,9 @@ with different vertex counts hold). Feather, Opacity and Expansion are ordinary 
 
 ```text
 frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage override, else VUI/colr/MKV Colour
-  ─► decode table (sRGB/BT.709, PQ, HLG scene light, camera log) ─► HLG OOTF ─► 3×3 to working gamut
-  ─► BT.2390 tone map (HDR/log into an SDR sequence, Auto Tone Map Media) ─► gamut compression
+  ─► decode table (sRGB/BT.709, PQ, HLG scene light, camera log) ─► HLG OOTF
+  ─► BT.2446 A (HLG into SDR, Auto Tone Map Media) ─► 3×3 to working gamut
+  ─► BT.2390 (PQ into SDR, Auto Tone Map Media) ─► gamut mapping
   ─► effects + compositing in working linear (1.0 = reference white = SDR white = 203 cd/m²)
   ─► monitors: working → SDR BT.709 (tone map from HDR, gamut map from BT.2020)
   ─► HDR export: working → PQ/HLG BT.2020 R'G'B' → Y'CbCr (BT.2020 NCL) + VUI/colr/mdcv/clli/SEI
@@ -560,9 +570,16 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
 - **Maths** in `filmcraft-color` (`transform`, `log`, `spaces`; formulas and sources in
   [crates/color/README.md](../crates/color/README.md)); the renderer side is `render::colorman`.
 - **Fast path.** A Rec. 709 sequence without wide gamut and media whose metadata says Rec. 709 /
-  sRGB decodes exactly as before, and its layers stay on the GPU. Log, HDR or wide-gamut media,
-  and every layer of an HDR/wide-gamut sequence, are converted on the CPU (the GPU path draws them
-  as pre-rendered images, like layers with effects).
+  sRGB decodes exactly as before, and its layers stay on the GPU. Display-referred HDR/wide-gamut
+  Y'CbCr on a plain Rec. 709 sequence also stays on the GPU: `GpuInputParams` carries the curve,
+  HLG OOTF, tone-map method, gamut matrix and desaturation. BT.2446 A runs in BT.2020 before the
+  matrix; BT.2390 retains its post-matrix stage. Log and HDR/wide-gamut sequences are converted
+  on the CPU and drawn as pre-rendered images.
+- **HLG → SDR.** BT.2446-1 Method A (§4.1, 1000 → 100 cd/m²) with its chroma correction is
+  shared by Source, automatic HLG input into an SDR sequence, HLG sequence monitoring and SDR
+  export. SDR output is relative linear BT.709 before sRGB display encoding. The HDR working
+  scale remains 203 cd/m² = 1, and HDR export bypasses SDR conversion. Existing automatic HLG
+  conversions adopt the corrected appearance; there is no project schema or command change.
 - **Outputs.** `RenderOptions::working_output` returns working-space pixels (HDR exports,
   scopes); otherwise the top-level render is converted for an SDR monitor. The other colour
   effects work on display-encoded values clamped to 0..1 (they clip HDR highlights above
@@ -590,8 +607,9 @@ frame (Y'CbCr/RGB + metadata) ─► source colour space: Interpret Footage over
   exports the tone-mapped SDR picture instead; render previews always do.
 - **Monitors / display colour management.** The monitors are SDR (sRGB-encoded RGBA8 textures):
   HDR sequences are shown tone mapped. macOS EDR (extended-range `CAMetalLayer` output) is not
-  wired up: there is no `platform` crate yet and eframe/wgpu do not expose an EDR surface, so HDR
-  values above SDR white are never sent to the display. The scopes of an HDR sequence show the
+  wired up: HDR values above SDR white are never sent to the display. Dolby Vision per-frame
+  metadata is not processed, so HLG SDR conversion need not match QuickTime HDR playback.
+  The scopes of an HDR sequence show the
   working-space values (waveform in cd/m² on a PQ scale, BT.2020 vectorscope).
 - **LUTs.** Lumetri Input LUT and Creative Look reference `lib:<id>` (the project's LUT library,
   `Project::luts`, embedded `.cube`/`.3dl` text) or `builtin:<id>` (code-generated camera
@@ -691,7 +709,8 @@ file.exportMedia {path, preset?, settings?, format?, range?, …}     export.qui
 - **Presets.** `export::presets::builtin_presets()` are our own definitions (Match Source adaptive
   H.264 at 0.2 / 0.1 / 0.05 bits per pixel, 1080p / 2160p delivery, vertical 1080×1920, ProRes,
   DNxHR, MXF OP1a (DNxHR HQ / ProRes 422 HQ / H.264) and OP-Atom (DNxHR, Avid), image sequences, GIF, WAV / AIFF). User presets and favourites persist in
-  `<data dir>/export-presets.json` (`export.presets.*`).
+  `<data dir>/export-presets.json` (`export.presets.*`). A `bitrateKbps` in `settings` turns the
+  adaptive bitrate off, as the flat parameter does, unless `adaptiveBitrate` comes with it.
 - **Queue.** `export.queue.add` snapshots the project and the resolved settings (several sequences
   or ranges add several items); `export.queue.start` encodes ready items one after another as
   ordinary jobs, advanced by `Session::poll_persistence` / `pump_jobs` (or synchronously with
@@ -770,4 +789,4 @@ native menus) in `apps/filmcraft`. [roadmap.md](roadmap.md) has the milestone st
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-10 | trivial | Status line and revision history added (craftrules progress-docs standard); milestone link points at docs/roadmap.md |
+| 2026-10-10 | trivial | Status line and revision history added; milestone link points at docs/roadmap.md |

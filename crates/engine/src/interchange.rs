@@ -3,14 +3,18 @@
 use serde_json::{Value, json};
 
 use filmcraft_interchange::{ExportOptions, Format, ImportOptions};
-use filmcraft_project::{ItemId, ItemKind, MediaRef};
+use filmcraft_project::{BinId, ItemId, ItemKind, MediaRef};
 
 use crate::{EngineError, Result, Session};
+
+/// File extensions of the interchange documents `file.import` reads (lower case). The Media
+/// Browser lists the same set.
+pub const EXTENSIONS: [&str; 7] = ["edl", "xml", "fcpxml", "otio", "aaf", "omf", "omfi"];
 
 /// The interchange format of a file, if it is one (by content, with the extension as a hint).
 pub fn detect(path: &str, bytes: &[u8]) -> Option<Format> {
     let ext = std::path::Path::new(path).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
-    if !matches!(ext.as_deref(), Some("edl" | "xml" | "fcpxml" | "otio" | "aaf" | "omf" | "omfi")) {
+    if !ext.as_deref().is_some_and(|e| EXTENSIONS.contains(&e)) {
         return None;
     }
     filmcraft_interchange::detect(bytes, ext.as_deref())
@@ -24,9 +28,33 @@ fn is_file_media(item: &filmcraft_project::ProjectItem) -> bool {
     matches!(&item.kind, ItemKind::Media(m) if matches!(m.media, MediaRef::File { .. }))
 }
 
+/// Write embedded audio without replacing an occupied path; return the path used. A numbered
+/// name changes only the file name: the folder keeps its separators as written (`/` or `\`).
+fn write_embedded_audio(s: &Session, path: &str, wav: &[u8]) -> Result<String> {
+    let (folder, name) = path.split_at(path.rfind(['/', '\\']).map_or(0, |i| i + 1));
+    if matches!(name, "" | "." | "..") {
+        return Err(EngineError::Other(format!("{path}: missing audio file name")));
+    }
+    let (stem, extension) = match name.rfind('.') {
+        Some(i) if i > 0 => name.split_at(i),
+        _ => (name, ""),
+    };
+    for number in 1..=1_000 {
+        let candidate = if number == 1 { path.to_owned() } else { format!("{folder}{stem} ({number}){extension}") };
+        match s.services.write_file_new(&candidate, wav) {
+            Ok(()) => return Ok(candidate),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(EngineError::Other(format!("{candidate}: {e}"))),
+        }
+    }
+    Err(EngineError::Other(format!("{path}: no unused embedded-audio filename after 1000 attempts")))
+}
+
 /// Import a document: merge its bins, media and sequences into the project (one undo step), then
-/// link each media file that exists on disk. Returns the new sequences.
-pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format) -> Result<Value> {
+/// link each media file that exists on disk. Returns the new sequences. The document's items go
+/// into `bin` (the Project panel's current bin, as for media files); the root when it is `None`
+/// or no longer exists.
+pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format, bin: Option<BinId>) -> Result<Value> {
     let p = std::path::Path::new(path);
     let opts = ImportOptions {
         base_dir: p.parent().map(|d| d.to_string_lossy().to_string()),
@@ -37,27 +65,59 @@ pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format) -> Resu
         // AAF / OMF may embed audio: write it next to the document (the media items point there)
         Format::Aaf | Format::Omf => {
             let r = if format == Format::Aaf { filmcraft_interchange::aaf::import(bytes, &opts) } else { filmcraft_interchange::omf::import(bytes, &opts) };
-            let (fragment, extracted, report) = r.map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+            let (mut fragment, extracted, report) = r.map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
             for m in extracted {
-                if let Some(dir) = std::path::Path::new(&m.path).parent().filter(|_| !s.services.export_in_memory()) {
-                    let _ = std::fs::create_dir_all(dir);
+                let media = fragment
+                    .project
+                    .item_mut(m.item)
+                    .and_then(|item| item.as_media_mut())
+                    .ok_or_else(|| EngineError::Other(format!("{}: embedded audio has no media item", m.path)))?;
+                let written_path = write_embedded_audio(s, &m.path, &m.wav)?;
+                if written_path != m.path {
+                    media.media = MediaRef::File { path: written_path };
                 }
-                s.services.write_file(&m.path, &m.wav).map_err(|e| EngineError::Other(format!("{}: {e}", m.path)))?;
             }
             (fragment, report)
         }
         _ => filmcraft_interchange::import_with(bytes, format, &opts).map_err(|e| EngineError::Other(format!("{path}: {e}")))?,
     };
-    let before: std::collections::HashSet<ItemId> = s.project.items.keys().copied().collect();
+    for item in fragment.project.items.values() {
+        if let ItemKind::Sequence(sequence) = &item.kind {
+            sequence.settings.validate().map_err(|e| EngineError::Other(format!("{path}: invalid imported sequence settings: {e}")))?;
+        }
+    }
     let name = opts.name.clone().unwrap_or_else(|| format.name().to_string());
-    let seqs = s.edit(&format!("Import {name}"), |proj, _| {
-        let seqs = filmcraft_interchange::merge_into(proj, fragment, None);
+    let infer_size = !fragment.source_size_sequences.is_empty();
+    let apply = |session: &mut Session| import_fragment(session, path, fragment, report, format, &name, bin);
+    if infer_size {
+        // Sizing and its auto-points must undo with the import, never expose a half-sized cut.
+        s.edit_group("Import OTIO", apply)
+    } else {
+        apply(s)
+    }
+}
+
+fn import_fragment(
+    s: &mut Session,
+    path: &str,
+    fragment: filmcraft_interchange::Imported,
+    report: filmcraft_interchange::Report,
+    format: Format,
+    name: &str,
+    bin: Option<BinId>,
+) -> Result<Value> {
+    let before: std::collections::HashSet<ItemId> = s.project.items.keys().copied().collect();
+    let (seqs, source_size_sequences) = s.edit(&format!("Import {name}"), |proj, _| {
+        let (seqs, source_size_sequences) = filmcraft_interchange::merge_with_provenance(proj, fragment, bin);
         // A document that sets only some Motion parameters leaves the others at their "auto"
         // (NaN) defaults. Resolve them as placing a clip does, for every format. A media file's
         // picture size is only what the document says so far (an EDL says nothing: the importer
         // assumes the sequence size), so its clips' anchors wait for Link Media below.
-        proj.resolve_placed_auto_points(|seq| !before.contains(&seq), |source| !is_file_media(source));
-        Ok(seqs)
+        proj.resolve_placed_auto_points(
+            |seq| !before.contains(&seq) && !source_size_sequences.contains(&seq),
+            |source| !is_file_media(source) && !source_size_sequences.contains(&source.id),
+        );
+        Ok((seqs, source_size_sequences))
     })?;
     // Link media: probe each new file-backed item that exists, through the host's reader as a
     // direct import does (only the container index is read now, not the whole file: #461).
@@ -77,6 +137,7 @@ pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format) -> Resu
     // The document's media paths are opened as stored paths of the document.
     s.media.add_stored_paths(new_media.iter().map(|(_, p)| p.clone()), Some(path));
     let mut linked = 0;
+    let mut linked_items = std::collections::HashSet::new();
     let mut offline = Vec::new();
     for (id, mpath) in new_media {
         let file = match s.media.follow(&mpath) {
@@ -105,14 +166,36 @@ pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format) -> Resu
                         }
                     }
                     // the picture size is now the file's own: centre the anchors of its clips in it
-                    proj.resolve_placed_auto_points(|seq| !before.contains(&seq), |source| source.id == id);
+                    proj.resolve_placed_auto_points(|seq| !before.contains(&seq) && !source_size_sequences.contains(&seq), |source| source.id == id);
                     Ok(())
                 })?;
                 s.media.insert_file(id, &mpath, src);
                 linked += 1;
+                linked_items.insert(id);
             }
             None => offline.push(mpath),
         }
+    }
+    if !source_size_sequences.is_empty() {
+        s.edit("Size imported sequences", |proj, _| {
+            let sizes: Vec<_> = source_size_sequences
+                .iter()
+                .filter_map(|&id| first_linked_picture(proj, id, &source_size_sequences, &linked_items).map(|size| (id, size)))
+                .collect();
+            for (id, (width, height)) in sizes {
+                if let Some(sequence) = proj.sequence_mut(id) {
+                    let mut settings = sequence.settings.clone();
+                    settings.width = width;
+                    settings.height = height;
+                    settings.preset = format!("Custom {width}x{height} {}", settings.frame_rate.label());
+                    if settings.validate().is_ok() {
+                        sequence.settings = settings;
+                    }
+                }
+            }
+            proj.resolve_placed_auto_points(|seq| !before.contains(&seq), |_| true);
+            Ok(())
+        })?;
     }
     if let Some(&first) = seqs.first() {
         s.state.active_sequence = Some(first);
@@ -127,6 +210,46 @@ pub fn import(s: &mut Session, path: &str, bytes: &[u8], format: Format) -> Resu
         "offlineMedia": offline,
         "report": report_json(&report),
     }))
+}
+
+// Choose the earliest picture in each video track, visiting tracks in document order.
+// Only successfully linked files provide dimensions; parser placeholders are not evidence.
+fn first_linked_picture(
+    project: &filmcraft_project::Project,
+    root: ItemId,
+    source_size_sequences: &[ItemId],
+    linked: &std::collections::HashSet<ItemId>,
+) -> Option<(u32, u32)> {
+    let mut visited = std::collections::HashSet::new();
+    let mut pending = vec![root];
+    while let Some(id) = pending.pop() {
+        if !visited.insert(id) {
+            continue;
+        }
+        let Some(item) = project.item(id) else { continue };
+        match &item.kind {
+            ItemKind::Media(media) if linked.contains(&id) => {
+                if let Some(video) = &media.info.video
+                    && filmcraft_project::validate_frame_size(video.width, video.height).is_ok()
+                {
+                    return Some((video.width, video.height));
+                }
+            }
+            ItemKind::Subclip { parent, .. } => pending.push(*parent),
+            ItemKind::Sequence(sequence) => {
+                if !source_size_sequences.contains(&id) {
+                    return Some((sequence.settings.width, sequence.settings.height));
+                }
+                for track in sequence.video_tracks.iter().rev() {
+                    let mut clips: Vec<_> = track.items.iter().collect();
+                    clips.sort_by_key(|clip| clip.start);
+                    pending.extend(clips.into_iter().rev().map(|clip| clip.item));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// `file.exportInterchange {format: "edl"|"xml"|"fcpxml"|"otio"|"aaf"|"omf" = "xml", path, sequence?}`
@@ -151,4 +274,64 @@ pub fn export(s: &mut Session, p: &Value) -> Result<Value> {
     let (bytes, report) = filmcraft_interchange::export(&s.project, seq, format, &opts).map_err(|e| EngineError::Other(e.to_string()))?;
     s.services.write_file(&path, &bytes).map_err(|e| EngineError::Other(e.to_string()))?;
     Ok(json!({"path": path, "bytes": bytes.len(), "report": report_json(&report)}))
+}
+
+#[cfg(test)]
+mod embedded_audio_tests {
+    use std::collections::HashMap;
+    use std::io;
+    use std::sync::{Arc, Mutex};
+
+    use crate::{Services, Session};
+
+    use super::write_embedded_audio;
+
+    #[derive(Default)]
+    struct VirtualFiles(Mutex<HashMap<String, Vec<u8>>>);
+
+    impl Services for VirtualFiles {
+        fn read_file(&self, path: &str) -> io::Result<Vec<u8>> {
+            self.0.lock().unwrap().get(path).cloned().ok_or_else(|| io::ErrorKind::NotFound.into())
+        }
+
+        fn write_file(&self, path: &str, data: &[u8]) -> io::Result<()> {
+            self.0.lock().unwrap().insert(path.to_owned(), data.to_vec());
+            Ok(())
+        }
+
+        fn write_file_new(&self, path: &str, data: &[u8]) -> io::Result<()> {
+            let mut files = self.0.lock().unwrap();
+            if files.contains_key(path) {
+                return Err(io::ErrorKind::AlreadyExists.into());
+            }
+            files.insert(path.to_owned(), data.to_vec());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn virtual_extraction_keeps_existing_media() {
+        let files = Arc::new(VirtualFiles::default());
+        files.0.lock().unwrap().insert("/files/cut Audio.wav".into(), b"first".to_vec());
+        files.0.lock().unwrap().insert("/files/cut Audio (2).wav".into(), b"second".to_vec());
+        let session = Session::new(files.clone());
+        let path = write_embedded_audio(&session, "/files/cut Audio.wav", b"new audio").unwrap();
+        assert_eq!(path, "/files/cut Audio (3).wav");
+        let stored = files.0.lock().unwrap();
+        assert_eq!(stored["/files/cut Audio.wav"], b"first");
+        assert_eq!(stored["/files/cut Audio (2).wav"], b"second");
+        assert_eq!(stored["/files/cut Audio (3).wav"], b"new audio");
+    }
+
+    #[test]
+    fn numbered_names_keep_the_path_separators() {
+        for path in ["C:/files/cut Audio.wav", "C:\\files\\cut Audio.wav"] {
+            let files = Arc::new(VirtualFiles::default());
+            files.0.lock().unwrap().insert(path.into(), b"first".to_vec());
+            let session = Session::new(files.clone());
+            let numbered = write_embedded_audio(&session, path, b"new audio").unwrap();
+            assert_eq!(numbered, path.replace("cut Audio.wav", "cut Audio (2).wav"));
+            assert_eq!(files.0.lock().unwrap()[path], b"first");
+        }
+    }
 }
