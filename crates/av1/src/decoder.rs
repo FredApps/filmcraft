@@ -56,7 +56,6 @@ pub(crate) struct RefFrame {
     pub segment_ids: Vec<u8>,
     pub mi_cols: usize,
     pub mi_rows: usize,
-    pub film_grain_present: bool,
     pub color: (u8, u8, u8, bool),
     /// SavedRefFrames / SavedMvs (MfRefFrames / MfMvs of 7.19), mi units.
     pub saved_ref_frames: Vec<i8>,
@@ -93,6 +92,17 @@ impl<T: Clone> Slot<T> {
             g = self.cv.wait(g).unwrap_or_else(|e| e.into_inner());
         }
     }
+
+    /// [`Slot::wait`] for the slot's only consumer: moves the value out instead of cloning it.
+    fn take(&self) -> Result<T> {
+        let mut g = self.value.lock().unwrap_or_else(|e| e.into_inner());
+        loop {
+            if let Some(v) = g.take() {
+                return v;
+            }
+            g = self.cv.wait(g).unwrap_or_else(|e| e.into_inner());
+        }
+    }
 }
 
 type FrameSlot = Slot<Arc<RefFrame>>;
@@ -110,16 +120,18 @@ struct FrameJob {
     tile_covered: Vec<bool>,
     slot: Arc<FrameSlot>,
     /// The output picture, when the frame is shown.
-    picture: Option<Arc<Slot<Arc<Picture>>>>,
+    picture: Option<Arc<Slot<Picture>>>,
     pts: i64,
     apply_film_grain: bool,
     /// Draft mode: the frame refreshes no reference slot, so its in-loop filters are skipped.
     draft: bool,
+    #[cfg(test)]
+    force_panic: bool,
 }
 
 /// A shown picture in output order.
 enum Output {
-    Decoded(Arc<Slot<Arc<Picture>>>),
+    Decoded(Arc<Slot<Picture>>),
     /// show_existing_frame: built from the reference slot when it is finished.
     Existing(Box<ExistingOutput>),
 }
@@ -145,7 +157,7 @@ impl Output {
 
     fn take(self) -> Result<Picture> {
         match self {
-            Output::Decoded(s) => s.wait().map(|p| Arc::try_unwrap(p).unwrap_or_else(|p| (*p).clone())),
+            Output::Decoded(s) => s.take(),
             Output::Existing(e) => {
                 let ExistingOutput { slot, seq, width, height, grain, apply_film_grain, pts } = *e;
                 let rf = slot.wait()?;
@@ -218,7 +230,6 @@ pub struct Decoder {
     pub apply_film_grain: bool,
     draft: bool,
     stats: Arc<Mutex<DecodeStats>>,
-    threads: usize,
     pool: Pool,
     #[cfg(all(feature = "threads", not(target_arch = "wasm32")))]
     workers: Option<Workers>,
@@ -229,6 +240,9 @@ pub struct Decoder {
     out: VecDeque<Output>,
     /// pts of the temporal unit being decoded.
     pts: i64,
+    /// Make every frame job panic (tests of the worker panic handling).
+    #[cfg(test)]
+    force_panic: bool,
 }
 
 fn default_threads() -> usize {
@@ -281,7 +295,6 @@ impl Decoder {
             apply_film_grain: true,
             draft: false,
             stats,
-            threads,
             pool,
             #[cfg(all(feature = "threads", not(target_arch = "wasm32")))]
             workers,
@@ -289,6 +302,8 @@ impl Decoder {
             max_in_flight: fthreads + 2,
             out: VecDeque::new(),
             pts: 0,
+            #[cfg(test)]
+            force_panic: false,
         }
     }
 
@@ -552,6 +567,8 @@ impl Decoder {
             pts: self.pts,
             apply_film_grain: self.apply_film_grain,
             draft,
+            #[cfg(test)]
+            force_panic: self.force_panic,
         }));
         Ok(None)
     }
@@ -658,13 +675,16 @@ impl Decoder {
     }
 }
 
-/// Decode a frame job and publish its results.
+/// Decode a frame job and publish its results. A panic while decoding (a decoder bug hit by
+/// hostile input) becomes an error in both slots: otherwise a frame worker would die with its
+/// slots unset and every later `wait` on them would block forever.
 fn run_job(job: FrameJob, pool: &Pool, stats: &Mutex<DecodeStats>) {
     let mut st = DecodeStats::default();
-    match decode_frame(&job, pool, &mut st) {
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_frame(&job, pool, &mut st)));
+    match res.unwrap_or(Err(Error::Invalid("decoder panicked"))) {
         Ok((rf, pic)) => {
             if let Some(ps) = &job.picture {
-                ps.set(pic.map(Arc::new).ok_or(Error::Invalid("shown frame without picture")));
+                ps.set(pic.ok_or(Error::Invalid("shown frame without picture")));
             }
             job.slot.set(Ok(rf));
         }
@@ -683,6 +703,8 @@ fn run_job(job: FrameJob, pool: &Pool, stats: &Mutex<DecodeStats>) {
 /// The whole decoding process of one frame: setup, tiles, post-filters, motion vector storage
 /// and the output picture.
 fn decode_frame(job: &FrameJob, pool: &Pool, stats: &mut DecodeStats) -> Result<(Arc<RefFrame>, Option<Picture>)> {
+    #[cfg(test)]
+    assert!(!job.force_panic, "forced frame job panic");
     let fh = &job.fh;
     let seq = &job.seq;
     // Wait for the reference frames this frame reads.
@@ -708,13 +730,14 @@ fn decode_frame(job: &FrameJob, pool: &Pool, stats: &mut DecodeStats) -> Result<
     fs.ref_info = job.ref_info.clone();
     if fh.primary_ref_frame != PRIMARY_REF_NONE {
         // load_previous_segment_ids( )
-        if let Some(rf) = &fs.refs[fh.ref_frame_idx[fh.primary_ref_frame]]
+        let (mi_cols, mi_rows) = (fs.mi.cols, fs.mi.rows);
+        let sh = &mut fs.sh;
+        if let Some(rf) = &sh.refs[fh.ref_frame_idx[fh.primary_ref_frame]]
             && fh.seg.enabled
-            && rf.mi_cols == fs.mi.cols
-            && rf.mi_rows == fs.mi.rows
+            && rf.mi_cols == mi_cols
+            && rf.mi_rows == mi_rows
         {
-            let ids = rf.segment_ids.clone();
-            fs.prev_segment_ids.copy_from_slice(&ids);
+            sh.prev_segment_ids.copy_from_slice(&rf.segment_ids);
         }
     }
     if fh.use_ref_frame_mvs {
@@ -756,7 +779,6 @@ fn decode_frame(job: &FrameJob, pool: &Pool, stats: &mut DecodeStats) -> Result<
         segment_ids: std::mem::take(&mut fs.mi.segment_id),
         mi_cols: fs.mi.cols,
         mi_rows: fs.mi.rows,
-        film_grain_present: seq.film_grain_params_present,
         color: (seq.color.color_primaries, seq.color.transfer_characteristics, seq.color.matrix_coefficients, seq.color.color_range),
         saved_ref_frames: mf_refs,
         saved_mvs: mf_mvs,
@@ -892,23 +914,21 @@ fn motion_field_estimation(fs: &mut FrameState) {
     for r in LAST_FRAME..=ALTREF_FRAME {
         fs.motion_field[r] = vec![[crate::mvpred::INVALID_MV, crate::mvpred::INVALID_MV]; w8 * h8];
     }
-    let fh = fs.fh.clone();
-    let seq = fs.seq.clone();
-    let rd = |a: u32, b: u32| crate::header::relative_dist(&seq, a, b);
-    let last_idx = fh.ref_frame_idx[0];
-    let cur_gold = fh.order_hints[GOLDEN_FRAME];
-    let last_alt = fs.ref_info[last_idx].saved_order_hints[ALTREF_FRAME];
-    if last_alt != cur_gold {
+    let (fh, seq) = (&fs.fh, &fs.seq);
+    let after_cur = |r: usize| crate::header::relative_dist(seq, fh.order_hints[r], fh.order_hint) > 0;
+    let (bwd, alt2, alt) = (after_cur(BWDREF_FRAME), after_cur(ALTREF2_FRAME), after_cur(ALTREF_FRAME));
+    let last_alt = fs.ref_info[fh.ref_frame_idx[0]].saved_order_hints[ALTREF_FRAME];
+    if last_alt != fh.order_hints[GOLDEN_FRAME] {
         project(fs, LAST_FRAME, -1);
     }
     let mut ref_stamp = MFMV_STACK_SIZE as i32 - 2;
-    if rd(fh.order_hints[BWDREF_FRAME], fh.order_hint) > 0 && project(fs, BWDREF_FRAME, 1) {
+    if bwd && project(fs, BWDREF_FRAME, 1) {
         ref_stamp -= 1;
     }
-    if rd(fh.order_hints[ALTREF2_FRAME], fh.order_hint) > 0 && project(fs, ALTREF2_FRAME, 1) {
+    if alt2 && project(fs, ALTREF2_FRAME, 1) {
         ref_stamp -= 1;
     }
-    if rd(fh.order_hints[ALTREF_FRAME], fh.order_hint) > 0 && ref_stamp >= 0 && project(fs, ALTREF_FRAME, 1) {
+    if alt && ref_stamp >= 0 && project(fs, ALTREF_FRAME, 1) {
         ref_stamp -= 1;
     }
     if ref_stamp >= 0 {
@@ -936,17 +956,16 @@ fn project_pos(v8: i32, delta: i32, dst_sign: i32, max8: i32, max_off8: i32) -> 
 
 /// Projection process (7.9.2).
 fn project(fs: &mut FrameState, src: usize, dst_sign: i32) -> bool {
-    let fh = fs.fh.clone();
-    let seq = fs.seq.clone();
+    let FrameShared { seq, fh, refs, ref_info, motion_field, .. } = &mut fs.sh;
     let src_idx = fh.ref_frame_idx[src - LAST_FRAME];
     let w8 = fh.mi_cols as i32 >> 1;
     let h8 = fh.mi_rows as i32 >> 1;
-    let ri = fs.ref_info[src_idx].clone();
+    let ri = &ref_info[src_idx];
     if ri.mi_rows != fh.mi_rows || ri.mi_cols != fh.mi_cols || ri.frame_type == INTRA_ONLY_FRAME as u8 || ri.frame_type == KEY_FRAME as u8 {
         return false;
     }
-    let Some(rf) = fs.refs[src_idx].clone() else { return false };
-    let rd = |a: u32, b: u32| crate::header::relative_dist(&seq, a, b);
+    let Some(rf) = &refs[src_idx] else { return false };
+    let rd = |a: u32, b: u32| crate::header::relative_dist(seq, a, b);
     let mi_cols = fh.mi_cols as usize;
     for y8 in 0..h8 {
         for x8 in 0..w8 {
@@ -966,7 +985,7 @@ fn project(fs: &mut FrameState, src: usize, dst_sign: i32) -> bool {
                         for dst in LAST_FRAME..=ALTREF_FRAME {
                             let ref_to_dst = rd(fh.order_hint, fh.order_hints[dst]);
                             let pm = get_mv_projection(mv, ref_to_dst, ref_offset);
-                            fs.motion_field[dst][(py * w8 + px) as usize] = pm;
+                            motion_field[dst][(py * w8 + px) as usize] = pm;
                         }
                     }
                 }
@@ -978,7 +997,57 @@ fn project(fs: &mut FrameState, src: usize, dst_sign: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::frame_size_allowed;
+    use super::{Decoder, frame_size_allowed};
+    use crate::Error;
+
+    /// A 16x16 libaom key frame: temporal delimiter, sequence header, frame OBU.
+    const KEY_FRAME_16X16: &[u8] = &[
+        0x12, 0x00, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x01, 0x9f, 0xf9, 0xf5, 0xf3, 0x00, 0x80, 0x32, 0x0b, 0x10, 0x00, 0xc0, 0x00, 0x00, 0x02, 0x80, 0x00, 0x00,
+        0x00, 0x9c,
+    ];
+
+    fn decode_key_frame(threads: usize, force_panic: bool) -> crate::Result<usize> {
+        let mut dec = Decoder::with_threads(threads);
+        dec.force_panic = force_panic;
+        let mut n = dec.decode(KEY_FRAME_16X16)?.len();
+        n += dec.flush_result()?.len();
+        Ok(n)
+    }
+
+    /// `f()` on another thread; a hang fails the test instead of blocking it.
+    fn within_a_minute<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(f());
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(60)).expect("decoder hung after a frame job panicked")
+    }
+
+    #[test]
+    fn a_panicking_frame_job_is_an_error_not_a_hang() {
+        for threads in [1, 3] {
+            assert_eq!(decode_key_frame(threads, false), Ok(1), "threads {threads}");
+            assert_eq!(within_a_minute(move || decode_key_frame(threads, true)), Err(Error::Invalid("decoder panicked")), "threads {threads}");
+        }
+    }
+
+    #[test]
+    fn the_decoder_recovers_at_the_next_key_frame_after_a_panic() {
+        let n = within_a_minute(|| {
+            let mut dec = Decoder::with_threads(3);
+            dec.force_panic = true;
+            // The synchronous build reports the error from decode(); the threaded
+            // build may report it from decode() or from flush_result().
+            let first = dec.decode(KEY_FRAME_16X16).map(|_| ());
+            let second = dec.flush_result().map(|_| ());
+            assert!(first.is_err() || second.is_err(), "the panicking job reported no error");
+            dec.force_panic = false;
+            let mut pics = dec.decode(KEY_FRAME_16X16).expect("decode");
+            pics.extend(dec.flush_result().expect("flush"));
+            pics.len()
+        });
+        assert_eq!(n, 1);
+    }
 
     #[test]
     fn frames_up_to_the_level_6_3_limits_are_allowed() {

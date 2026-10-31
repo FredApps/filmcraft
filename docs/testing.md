@@ -17,6 +17,24 @@ changes process-wide state (a global switch, pool, panic hook or fault injection
 stays a binary of its own in `tests/`. Select one file's tests with its module path:
 `cargo test -p filmcraft-h264 --test it conformance::`.
 
+### Concurrent GPU device regression
+
+The concurrent-device stress keeps its 16 threads and four rounds per thread, but runs in an
+isolated child process with a 150-second outer deadline. Its original 120-second completion
+assertion still fails a deadlock; hung driver teardown cannot stall the remaining test process.
+Native offscreen instances honor `WGPU_BACKEND` before initializing drivers. For hardware
+verification, set the intended backend and `FILMCRAFT_REQUIRE_GPU=1`, which requires every
+stress round to obtain and use a device. Hosted software-GPU success is not NVIDIA sign-off.
+
+### Portable external-media fixtures
+
+HEVC four-slice x265 fixtures use `frame-threads=1:pools=1` for encoding only; decoder
+comparisons still cover frame threading. Reference decoding uses `-xerror -err_detect explode`
+and the `hevc-strict-v2` fixture cache, so invalid streams or previously concealed references
+cannot count as successful comparisons. AV1 hostile seeds use 64×64 for SVT-AV1 and retain
+64×48 coverage with libaom-av1, in both 8-bit and 10-bit formats. Required-oracle runs must
+provide both seed encoders; missing encoders remain visible failures rather than silent passes.
+
 ## 1. Kinds of tests
 
 | Kind | Where | Examples |

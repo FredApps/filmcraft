@@ -108,3 +108,11 @@ real_name = "Alexander Alber"
 
 [people.dylanmtaylor]
 sync_github_name = true
+
+[people.Wbunker]
+real_name = "Will Bunker"
+display_name = "Will Bunker"
+sync_github_name = false
+
+[people.justacalico]
+sync_github_name = true
