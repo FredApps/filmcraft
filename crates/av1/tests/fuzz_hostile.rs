@@ -84,14 +84,14 @@ fn ivf_frames(data: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
-fn make(ff: &std::path::Path, name: &str, args: &str, pix: &str) -> Option<Vec<Vec<u8>>> {
-    let out = filmcraft_testkit::fixtures_dir("av1").join(format!("{name}.ivf"));
+fn make(ff: &std::path::Path, seed: &Seed) -> Option<Vec<Vec<u8>>> {
+    let out = filmcraft_testkit::fixtures_dir("av1").join(format!("{}.ivf", seed.name));
     let p = filmcraft_testkit::fixtures::generate(&out, |tmp| {
-        let a: Vec<&str> = args.split_whitespace().collect();
+        let frames = seed.frames.to_string();
         matches!(
             Command::new(ff)
-                .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=64x48:rate=25", "-frames:v", "6", "-pix_fmt", pix])
-                .args(a)
+                .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", seed.lavfi, "-frames:v", &frames, "-pix_fmt", seed.pix, "-c:v", seed.encoder])
+                .args(seed.args.split_whitespace())
                 .args(["-f", "ivf"])
                 .arg(tmp)
                 .stdin(Stdio::null())
@@ -131,6 +131,19 @@ fn run_all(frames: &[Vec<u8>], label: &str) {
     assert!(res.is_ok() && PANICS.load(Ordering::SeqCst) == before, "panic: {label}");
 }
 
+/// The unmutated seed decodes without error, so the sweep starts from a stream that reaches every stage.
+fn decodes_cleanly(frames: &[Vec<u8>], name: &str) {
+    for threads in [1, 3] {
+        let mut dec = Decoder::with_threads(threads);
+        let mut shown = 0;
+        for (i, f) in frames.iter().enumerate() {
+            shown += dec.decode_pts(f, i as i64).unwrap_or_else(|e| panic!("{name} frame {i} ({threads} threads): {e}")).len();
+        }
+        shown += dec.flush_result().unwrap_or_else(|e| panic!("{name} flush ({threads} threads): {e}")).len();
+        assert!(shown > 0, "{name} shows no frame");
+    }
+}
+
 /// Random-mutation rounds per seed (raise with FILMCRAFT_FUZZ_ITERS for a long hunt).
 fn iters() -> usize {
     std::env::var("FILMCRAFT_FUZZ_ITERS").ok().and_then(|s| s.parse().ok()).unwrap_or(300)
@@ -146,18 +159,20 @@ fn hostile_streams_never_panic() {
 
 fn sweep() {
     let Some(ff) = filmcraft_testkit::ffmpeg_or_skip("AV1 fuzz") else { return };
-    for &(name, args, pix) in SEEDS {
-        if !filmcraft_testkit::ffmpeg_has_encoder(&ff, "libsvtav1") {
-            filmcraft_testkit::skip("AV1 fuzz", &format!("this ffmpeg has no libsvtav1 encoder (seed {name})"));
+    for s in SEEDS {
+        let name = s.name;
+        if !filmcraft_testkit::ffmpeg_has_encoder(&ff, s.encoder) {
+            filmcraft_testkit::skip("AV1 fuzz", &format!("this ffmpeg has no {} encoder (seed {name})", s.encoder));
             continue;
         }
-        let Some(seed) = make(&ff, name, args, pix) else {
-            panic!("ffmpeg has libsvtav1 but could not encode the {name} seed");
+        let Some(seed) = make(&ff, s) else {
+            panic!("ffmpeg has {} but could not encode the {name} seed", s.encoder);
         };
         if seed.is_empty() {
             filmcraft_testkit::skip("AV1 fuzz", &format!("the {name} seed has no frames"));
             continue;
         }
+        decodes_cleanly(&seed, name);
         // truncate each of the first frames at every length
         for fi in 0..seed.len().min(3) {
             let len = seed[fi].len();
