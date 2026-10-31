@@ -120,18 +120,23 @@ struct NalSetup {
 
 impl NalSetup {
     fn of(codec: &VCodec, extra: &[u8]) -> Self {
-        let record = match codec {
-            VCodec::H264 if extra.first() == Some(&1) => crate::hw::NalStreamInfo::from_avcc(extra),
-            VCodec::Hevc if extra.first() == Some(&1) => crate::hw::NalStreamInfo::from_hvcc(extra),
+        let (record, length_size) = match codec {
+            VCodec::H264 if extra.first() == Some(&1) => (crate::hw::NalStreamInfo::from_avcc(extra), crate::video::avcc_length_size(extra)),
+            VCodec::Hevc if extra.first() == Some(&1) => (crate::hw::NalStreamInfo::from_hvcc(extra), crate::video::hvcc_length_size_and_tid(extra).0),
             VCodec::H264 | VCodec::Hevc if extra.starts_with(&[0, 0, 1]) || extra.starts_with(&[0, 0, 0, 1]) => {
                 return Self { length_size: None, sets: extra.to_vec() };
             }
             _ => return Self::default(),
         };
-        record.map_or_else(
-            |_| Self::default(),
-            |r| Self { length_size: Some(r.length_size), sets: r.parameter_sets.iter().flat_map(|n| [0, 0, 0, 1].iter().chain(n)).copied().collect() },
-        )
+        // a record whose sets don't parse still frames the chunks; the decoder uses the in-band sets
+        let sets = record.map_or_else(
+            |e| {
+                log::warn!("AVI: the parameter sets in the stream header don't parse ({e}); using those in the chunks");
+                Vec::new()
+            },
+            |r| r.parameter_sets.iter().flat_map(|n| [0, 0, 0, 1].iter().chain(n)).copied().collect(),
+        );
+        Self { length_size: Some(length_size), sets }
     }
 
     /// A chunk as Annex B: length-prefixed NAL units get start codes (one cut short, as a partial
