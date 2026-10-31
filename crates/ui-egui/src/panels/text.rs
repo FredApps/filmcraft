@@ -749,8 +749,8 @@ fn caption_style_actions_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, track: 
         app.auto.add("text.captions.style.preset.openSave", save_as.rect, "Save current caption style as a preset");
         if save_as.clicked() {
             ui.ctx().data_mut(|d| {
-                d.insert_temp(egui::Id::new("caption-style-preset-save-open"), true);
-                d.insert_temp(egui::Id::new("caption-style-preset-name"), String::new());
+                d.insert_temp(egui::Id::unique("caption-style-preset-save-open"), true);
+                d.insert_temp(egui::Id::unique("caption-style-preset-name"), String::new());
             });
         }
         let presets = app.session.caption_style_presets.all().to_vec();
@@ -775,8 +775,8 @@ fn caption_style_actions_menu(app: &mut FilmcraftApp, ui: &mut egui::Ui, track: 
 }
 
 fn caption_style_preset_save_dialog(app: &mut FilmcraftApp, ctx: &egui::Context, track: u64, actions: &mut Vec<(String, Value)>) {
-    let open_id = egui::Id::new("caption-style-preset-save-open");
-    let name_id = egui::Id::new("caption-style-preset-name");
+    let open_id = egui::Id::unique("caption-style-preset-save-open");
+    let name_id = egui::Id::unique("caption-style-preset-name");
     let mut open = ctx.data(|d| d.get_temp::<bool>(open_id)).unwrap_or(false);
     if !open {
         return;
@@ -784,7 +784,7 @@ fn caption_style_preset_save_dialog(app: &mut FilmcraftApp, ctx: &egui::Context,
     let mut name = ctx.data(|d| d.get_temp::<String>(name_id)).unwrap_or_default();
     let mut close = false;
     egui::Window::new(tl!("Save Caption Style Preset"))
-        .id(egui::Id::new("caption-style-preset-save-window"))
+        .id(egui::Id::unique("caption-style-preset-save-window"))
         .collapsible(false)
         .resizable(false)
         .open(&mut open)
