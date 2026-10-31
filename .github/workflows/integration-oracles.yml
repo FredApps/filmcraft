@@ -1,0 +1,23 @@
+name: Integration FFmpeg validation
+on:
+  push:
+    branches: [validation/filmcraft-oracles-20261031]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oracle-tests:
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
+    with:
+      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+      timeout-minutes: 120
+      packages: >-
+        pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcursor-dev
+        libxrandr-dev libxi-dev libfontconfig1-dev libfreetype-dev mesa-vulkan-drivers
+        libasound2-dev ffmpeg
+      env: |
+        FILMCRAFT_REQUIRE_ORACLES=1
+      command: |
+        ffmpeg -version
+        ffprobe -version
+        cargo nextest run --workspace --lib --bins --tests --no-fail-fast
