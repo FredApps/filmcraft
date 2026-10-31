@@ -1,5 +1,5 @@
 //! #2639: public interchange exports use fit-relative Scale and clip-local Anchor.
-mod support;
+use crate::support;
 use filmcraft_geom::Vec2;
 use filmcraft_interchange::{ExportOptions, Format, export, import};
 use filmcraft_project::{Param, ParamValue, Project, TrackKind};
@@ -14,7 +14,7 @@ fn project(size: (u32, u32), frame: (u32, u32)) -> (Project, filmcraft_project::
     let s = sequence(&mut p, "cut", FrameRate::FPS_25, false);
     let settings = &mut p.sequence_mut(s).unwrap().settings;
     (settings.width, settings.height) = frame;
-    clip(&mut p, s, TrackKind::Video, 0, m, 0, 50, 0);
+    clip(&mut p, s, TrackKind::Video, 0, m, 0..50, 0);
     (p, s)
 }
 

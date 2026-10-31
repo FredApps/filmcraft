@@ -1139,8 +1139,8 @@ impl Exp<'_, '_> {
         let to_local = |t: Tick| -> Tick {
             if it.speed == 0.0 || it.frame_hold.is_some() { local } else { local + Tick(((t - it.source_in).0 as f64 / it.speed).round() as i64) }
         };
-        if kind == TrackKind::Video {
-            self.transform(it, seq, &to_local, &mut children);
+        if kind == TrackKind::Video && !r.is_empty() {
+            self.transform(it, base, seq, &to_local, &mut children);
         }
         if let Some(a) = audio.or((kind == TrackKind::Audio).then_some(it)) {
             if param_modified(a, "volume", "level") || a.gain_db != 0.0 {
@@ -1206,10 +1206,11 @@ impl Exp<'_, '_> {
         }
     }
 
-    fn transform(&mut self, it: &TrackItem, seq: &Sequence, to_local: &dyn Fn(Tick) -> Tick, out: &mut Vec<String>) {
+    fn transform(&mut self, it: &TrackItem, base: ItemId, seq: &Sequence, to_local: &dyn Fn(Tick) -> Tick, out: &mut Vec<String>) {
         let rate = seq.settings.frame_rate;
         let (fw, fh) = (f64::from(seq.settings.width), f64::from(seq.settings.height.max(1)));
-        let framing = Framing::new(self.p, it.item, (seq.settings.width, seq.settings.height), seq.settings.par);
+        let framing = Framing::new(self.p, it.item, (seq.settings.width, seq.settings.height), seq.settings.par)
+            .or_else(|| Framing::new(self.p, base, (seq.settings.width, seq.settings.height), seq.settings.par));
         let fit = framing.map_or(1.0, |f| f.fit);
         if framing.is_none() {
             self.framing_error = Some(format!(

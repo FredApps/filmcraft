@@ -1,5 +1,5 @@
 //! Public FCPXML round trips must preserve the renderer's source-to-frame placement.
-#[path = "../../interchange/tests/support/mod.rs"]
+#[path = "../../interchange/tests/it/support/mod.rs"]
 mod support;
 use filmcraft_geom::Vec2;
 use filmcraft_interchange::{ExportOptions, Format, export, import};
@@ -35,7 +35,7 @@ fn framing_roundtrip_preserves_rendered_corners_for_media_subclips_and_nests() {
                         let nest = sequence(&mut p, "nest", rate, false);
                         let q = p.sequence_mut(nest).unwrap();
                         (q.settings.width, q.settings.height, q.settings.par) = (size.0, size.1, source_par);
-                        clip(&mut p, nest, TrackKind::Video, 0, media, 0, 50, 0);
+                        clip(&mut p, nest, TrackKind::Video, 0, media, 0..50, 0);
                         nest
                     }
                     _ => media,
@@ -43,7 +43,7 @@ fn framing_roundtrip_preserves_rendered_corners_for_media_subclips_and_nests() {
                 let seq = sequence(&mut p, "outer", rate, false);
                 let q = p.sequence_mut(seq).unwrap();
                 (q.settings.width, q.settings.height, q.settings.par) = (frame.0, frame.1, frame_par);
-                clip(&mut p, seq, TrackKind::Video, 0, source, 0, 50, 0);
+                clip(&mut p, seq, TrackKind::Video, 0, source, 0..50, 0);
                 let it = &mut p.sequence_mut(seq).unwrap().video_tracks[0].items[0];
                 it.scale_to_frame = fitted;
                 let m = it.effect_mut("motion").unwrap();
