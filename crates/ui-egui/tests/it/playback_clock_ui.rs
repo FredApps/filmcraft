@@ -121,8 +121,8 @@ fn long_gop_clip() -> Option<std::path::PathBuf> {
 /// Play on the long-GOP clip from the middle of its group of pictures, after `idle_frames` UI
 /// frames of the paused picture, with `pause` of real time per UI frame (the UI clock advances
 /// 1/60 s per frame either way). Returns the UI frames and the real seconds until the clock
-/// started; `None` without ffmpeg.
-fn play_start(idle_frames: usize, pause: std::time::Duration) -> Option<(usize, f64)> {
+/// started, and whether the first frames were ready then (not a timeout); `None` without ffmpeg.
+fn play_start(idle_frames: usize, pause: std::time::Duration) -> Option<(usize, f64, bool)> {
     let clip = long_gop_clip()?;
     let mut s = Session::default();
     let r = s.execute("file.import", json!({"paths": [clip.to_string_lossy()]})).unwrap();
@@ -144,7 +144,8 @@ fn play_start(idle_frames: usize, pause: std::time::Duration) -> Option<(usize, 
         h.step();
         frames += 1;
     }
-    Some((frames, t0.elapsed().as_secs_f64()))
+    let ready = h.state_mut().playback.preroll_ready;
+    Some((frames, t0.elapsed().as_secs_f64(), ready))
 }
 
 /// #3600, wall clock: real seconds from Play to the clock starting on the long-GOP clip. Depends
@@ -155,11 +156,17 @@ fn play_start(idle_frames: usize, pause: std::time::Duration) -> Option<(usize, 
 #[ignore = "wall-clock timing: run on an idle machine (docs/testing.md §5)"]
 fn play_start_wait_in_real_time() {
     let frame = std::time::Duration::from_millis(16);
-    let (Some((_, warm)), Some((_, cold))) = (play_start(90, frame), play_start(3, frame)) else {
+    let (Some((warm_frames, warm, warm_ready)), Some((cold_frames, cold, cold_ready))) = (play_start(90, frame), play_start(3, frame)) else {
         eprintln!("SKIPPED (play_start_wait_in_real_time): ffmpeg not installed");
         return;
     };
     eprintln!("Play waited {warm:.3} s after the picture settled, {cold:.3} s right after the seek");
     assert!(warm < 0.2, "Play waited {warm:.2} s with the picture settled");
     assert!(cold < 0.25, "Play waited {cold:.2} s right after the seek");
+    // and it did wait for frames, or they were ready: a cap of 0 would start the clock on the first UI frame
+    // (the frames being ready sooner ends the wait sooner, which is fine)
+    assert!(
+        (warm_ready || warm_frames >= 4) && (cold_ready || cold_frames >= 4),
+        "Play started the clock early without the frames ready: {warm_frames} / {cold_frames} UI frames"
+    );
 }

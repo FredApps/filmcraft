@@ -1,11 +1,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::play_ahead;
-use super::{AUDIO_RETRY_S, AUDIO_STALL_S, FilmcraftApp, Tick, json, panels, shuttle};
+use super::{AUDIO_RETRY_S, AUDIO_STALL_S, FilmcraftApp, Tick, frames, json, panels, shuttle};
 
-/// How long Play waits for the first frames before it starts the clock and the sound anyway (s).
-/// Frames that are not ready then are dropped to keep to the clock, as they are during playback;
-/// waiting longer made Play feel like it lagged the key press (#3600).
-const PLAY_START_TIMEOUT_S: f64 = 0.1;
 #[cfg(test)]
 use filmcraft_engine::Session;
 
@@ -174,7 +170,7 @@ impl FilmcraftApp {
         if let Some(since) = self.playback.preroll {
             let since = if since < 0.0 { now } else { since };
             self.playback.preroll = Some(since);
-            if self.playback.preroll_ready || now - since >= PLAY_START_TIMEOUT_S {
+            if self.playback.preroll_ready || now - since >= frames::PREROLL_TIMEOUT_S {
                 self.end_preroll(now);
             } else {
                 ctx.request_repaint();
