@@ -104,7 +104,7 @@ fn make(ff: &std::path::Path, seed: &Seed) -> Option<Vec<Vec<u8>>> {
 
 static PANICS: AtomicUsize = AtomicUsize::new(0);
 
-/// Frame workers catch panics and turn them into decoding errors; count them so they still fail the test.
+/// Decoder worker threads may catch panics and turn them into errors; count them so they still fail the test.
 fn count_panics() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {

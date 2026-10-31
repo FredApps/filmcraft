@@ -351,6 +351,27 @@ fn upgrade_caption_to_graphic() {
 }
 
 #[test]
+fn caption_font_style_is_upgraded_listed_and_replaced() {
+    let mut s = demo("gt-caption-font");
+    s.execute("captions.add", json!({"text": "Styled", "seconds": 600, "durationSeconds": 2})).unwrap();
+    s.execute("captions.setStyle", json!({"font": "Inter", "fontStyle": "Medium"})).unwrap();
+    let used = s.execute("graphics.fonts.used", json!({})).unwrap().to_string();
+    assert!(used.contains("Medium"), "{used}");
+    // a style-specific replacement skips other styles and moves this one
+    s.execute("file.replaceFonts", json!({"from": {"family": "Inter", "style": "Bold"}, "to": "Noto Serif"})).unwrap();
+    assert_eq!(s.active_sequence().unwrap().caption_tracks[0].style.font, "Inter");
+    // upgrading carries the style onto the graphic's text
+    let r = s.execute("graphics.upgradeCaption", json!({})).unwrap();
+    let it = item(&s, ClipId(r["clips"][0].as_u64().unwrap()));
+    let e = it.effects.iter().find(|e| e.effect == "graphic_text").unwrap();
+    assert_eq!(e.param("font_style").unwrap().value, ParamValue::Text("Medium".into()));
+    s.execute("edit.undo", json!({})).unwrap();
+    s.execute("file.replaceFonts", json!({"from": {"family": "Inter", "style": "Medium"}, "to": {"family": "Noto Serif", "style": "Bold"}})).unwrap();
+    let st = &s.active_sequence().unwrap().caption_tracks[0].style;
+    assert_eq!((st.font.as_str(), st.font_style.as_str()), ("Noto Serif", "Bold"));
+}
+
+#[test]
 fn source_graphics_share_edits() {
     let mut s = demo("gt-source");
     let c = clip_of(&s.execute("graphics.newText", json!({"text": "Shared"})).unwrap());
@@ -477,4 +498,17 @@ fn character_style_merge_preserves_default_calls_and_separate_clips() {
         s.execute("graphics.setCharStyle", json!({"clip":b.0,"layer":layer,"start":0,"end":5,"style":{"size":150},"merge":true})).unwrap();
     }
     assert_eq!(s.history.undo.len(), n + 2, "distinct layers do not merge");
+}
+
+/// Issue #3094: a gradient stop set as `#rrggbbaa` keeps its opacity.
+#[test]
+fn gradient_stop_keeps_its_alpha() {
+    let mut s = demo("gt-gradient-alpha");
+    let c = clip_of(&s.execute("graphics.newText", json!({"text": "G"})).unwrap());
+    s.execute("graphics.set", json!({"clip": c.0, "props": {"gradient_start": "#ff000080", "gradient_end": "#0000ff"}})).unwrap();
+    let it = item(&s, c);
+    let col = |id: &str| it.effects.iter().find_map(|e| e.params.get(id)).and_then(|p| p.value.as_color());
+    let start = col("gradient_start").unwrap();
+    assert!((start[3] - 128.0 / 255.0).abs() < 1e-3, "{start:?}");
+    assert_eq!(col("gradient_end").unwrap()[3], 1.0);
 }
