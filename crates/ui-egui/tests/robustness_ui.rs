@@ -108,9 +108,9 @@ fn frame_worker_survives_a_panicking_job_and_keeps_rendering() {
         d.ok("engine.execute", json!({"command": "playhead.set", "params": {"seconds": f64::from(k) * 0.1}}));
         d.settle();
         st = d.frame_stats();
-        if d.harness.state().frames.queue_len() > 0 {
-            break; // no worker is taking jobs: the assertions below say so
-        }
+        // Reading perf.stats also steps the UI and can enqueue fresh frame work after
+        // settle returned. A nonempty queue here does not mean the workers died: keep
+        // driving positions until the completed-job counters prove recovery.
     }
     assert_eq!(st["failedJobs"].as_u64(), Some(faults), "{st}");
     let at_last_fault = at_last_fault.unwrap_or(u64::MAX);
