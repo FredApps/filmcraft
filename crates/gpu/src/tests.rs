@@ -570,6 +570,34 @@ fn hdr_input_gpu_matches_cpu() {
 /// GL-enabled instances). Each thread makes its own instance and device, as concurrent windows and exports do.
 #[test]
 fn many_threads_create_use_and_drop_devices_at_once() {
+    const CHILD: &str = "FILMCRAFT_GPU_STRESS_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        device_stress();
+        return;
+    }
+    // A driver deadlock can also block process teardown after the assertion fires. Keep the
+    // original stress in an isolated process so its failure cannot hang later GPU tests.
+    let mut child = std::process::Command::new(std::env::current_exe().expect("test executable"))
+        .args(["--exact", "tests::many_threads_create_use_and_drop_devices_at_once", "--nocapture", "--test-threads=1"])
+        .env(CHILD, "1")
+        .spawn()
+        .expect("start isolated GPU stress");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(150);
+    loop {
+        if let Some(status) = child.try_wait().expect("wait for isolated GPU stress") {
+            assert!(status.success(), "isolated GPU stress failed: {status}");
+            return;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("isolated GPU stress exceeded its 150 s process deadline");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+fn device_stress() {
     use std::sync::mpsc;
     use std::time::{Duration, Instant};
     const THREADS: usize = 16;
@@ -614,6 +642,9 @@ fn many_threads_create_use_and_drop_devices_at_once() {
     let deadline = Instant::now() + Duration::from_secs(120);
     for i in 0..THREADS {
         let left = deadline.saturating_duration_since(Instant::now());
-        assert!(rx.recv_timeout(left).is_ok(), "only {i} of {THREADS} threads finished within 120 s: device setup deadlocked");
+        let used = rx.recv_timeout(left).unwrap_or_else(|_| panic!("only {i} of {THREADS} threads finished within 120 s: device setup deadlocked"));
+        if std::env::var_os("FILMCRAFT_REQUIRE_GPU").is_some() {
+            assert_eq!(used, ROUNDS, "required GPU device was unavailable during stress");
+        }
     }
 }

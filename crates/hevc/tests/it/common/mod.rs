@@ -63,7 +63,7 @@ pub const FIXTURES: &[Fixture] = &[
     fx!("qp1_main10", "mandelbrot", 176, 144, 4, NOISE, 10, ["-x265-params", "qp=1:log-level=error"]),
     fx!("lossless", "testsrc2", 176, 144, 6, NOISE, 8, ["-x265-params", "lossless=1:log-level=error"]),
     fx!("cu_lossless", "testsrc2", 176, 144, 6, NOISE, 8, ["-x265-params", "cu-lossless=1:log-level=error"]),
-    fx!("slices4", "testsrc2", 352, 288, 12, NOISE, 8, ["-x265-params", "slices=4:log-level=error"]),
+    fx!("slices4", "testsrc2", 352, 288, 12, NOISE, 8, ["-x265-params", "slices=4:frame-threads=1:pools=1:log-level=error"]),
     fx!("scaling_list", "testsrc2", 352, 288, 12, NOISE, 8, ["-x265-params", "scaling-list=default:log-level=error"]),
     fx!("ctu16", "testsrc2", 352, 288, 12, NOISE, 8, ["-x265-params", "ctu=16:log-level=error"]),
     fx!("ctu32_tu4", "testsrc2", 352, 288, 12, NOISE, 8, ["-x265-params", "ctu=32:tu-intra-depth=4:tu-inter-depth=4:max-tu-size=16:log-level=error"]),
@@ -108,7 +108,7 @@ pub const FIXTURES: &[Fixture] = &[
     fx!("ctu16_422_10", "testsrc2", 352, 288, 8, NOISE, 10, 422, ["-x265-params", "ctu=16:log-level=error"]),
     fx!("scaling_list_422_10", "testsrc2", 352, 288, 8, NOISE, 10, 422, ["-x265-params", "scaling-list=default:log-level=error"]),
     fx!("constrained_intra_422_10", "testsrc2", 352, 288, 8, NOISE, 10, 422, ["-x265-params", "constrained-intra=1:log-level=error"]),
-    fx!("slices4_422_10", "testsrc2", 352, 288, 8, NOISE, 10, 422, ["-x265-params", "slices=4:log-level=error"]),
+    fx!("slices4_422_10", "testsrc2", 352, 288, 8, NOISE, 10, 422, ["-x265-params", "slices=4:frame-threads=1:pools=1:log-level=error"]),
     fx!("odd_1918x1078_422_10", "testsrc2", 1918, 1078, 3, NOISE, 10, 422, ["-preset", "veryfast", "-x265-params", "log-level=error"]),
     fx!("uhd_4k_422_10", "testsrc2", 3840, 2160, 2, "", 10, 422, ["-preset", "ultrafast", "-x265-params", "log-level=error"]),
     // performance reference streams (tests/it/perf.rs)
@@ -129,7 +129,8 @@ pub fn ffmpeg() -> Option<PathBuf> {
 }
 
 pub fn fixtures_dir() -> PathBuf {
-    filmcraft_testkit::fixtures_dir("hevc")
+    // Do not reuse references accepted by the old error-concealing decode, or parallel slice seeds.
+    filmcraft_testkit::fixtures_dir("hevc-strict-v2")
 }
 
 fn run(cmd: &mut Command) -> bool {
@@ -198,7 +199,7 @@ pub fn ensure(f: &Fixture) -> Option<(PathBuf, PathBuf)> {
     if !yuv.exists() {
         let tmp = filmcraft_testkit::temp_path(&yuv);
         let mut c = Command::new(&ff);
-        c.args(["-hide_banner", "-loglevel", "error", "-y", "-i"]).arg(&hevc);
+        c.args(["-hide_banner", "-loglevel", "error", "-xerror", "-err_detect", "explode", "-y", "-i"]).arg(&hevc);
         c.args(filmcraft_testkit::fps_passthrough_args(&ff));
         c.args(["-f", "rawvideo", "-pix_fmt", pix_fmt(f.bit_depth, f.chroma)]).arg(&tmp);
         assert!(run(&mut c), "reference decode failed for {}", f.name);

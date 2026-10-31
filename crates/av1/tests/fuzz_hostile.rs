@@ -20,8 +20,14 @@ impl Rng {
     }
 }
 
-/// (name, encoder args, pix_fmt)
-const SEEDS: &[(&str, &str, &str)] = &[("av1_fz_default", "-c:v libsvtav1 -g 4", "yuv420p"), ("av1_fz_10bit", "-c:v libsvtav1 -g 6", "yuv420p10le")];
+/// (name, encoder, encoder args, pix_fmt, height). SVT requires at least 64 pixels;
+/// libaom keeps the smaller-frame hostile coverage independently.
+const SEEDS: &[(&str, &str, &str, &str, u32)] = &[
+    ("av1_fz_svt_64_default", "libsvtav1", "-g 4", "yuv420p", 64),
+    ("av1_fz_svt_64_10bit", "libsvtav1", "-g 6", "yuv420p10le", 64),
+    ("av1_fz_aom_48_default", "libaom-av1", "-cpu-used 8 -threads 1 -g 4", "yuv420p", 48),
+    ("av1_fz_aom_48_10bit", "libaom-av1", "-cpu-used 8 -threads 1 -g 6", "yuv420p10le", 48),
+];
 
 fn ivf_frames(data: &[u8]) -> Vec<Vec<u8>> {
     let mut out = Vec::new();
@@ -37,13 +43,15 @@ fn ivf_frames(data: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
-fn make(ff: &std::path::Path, name: &str, args: &str, pix: &str) -> Option<Vec<Vec<u8>>> {
+fn make(ff: &std::path::Path, name: &str, encoder: &str, args: &str, pix: &str, height: u32) -> Option<Vec<Vec<u8>>> {
     let out = filmcraft_testkit::fixtures_dir("av1").join(format!("{name}.ivf"));
     let p = filmcraft_testkit::fixtures::generate(&out, |tmp| {
         let a: Vec<&str> = args.split_whitespace().collect();
+        let source = format!("testsrc2=size=64x{height}:rate=25");
         matches!(
             Command::new(ff)
-                .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=64x48:rate=25", "-frames:v", "6", "-pix_fmt", pix])
+                .args(["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", &source, "-frames:v", "6", "-pix_fmt", pix])
+                .args(["-c:v", encoder])
                 .args(a)
                 .args(["-f", "ivf"])
                 .arg(tmp)
@@ -99,13 +107,13 @@ fn hostile_streams_never_panic() {
 
 fn sweep() {
     let Some(ff) = filmcraft_testkit::ffmpeg_or_skip("AV1 fuzz") else { return };
-    for &(name, args, pix) in SEEDS {
-        if !filmcraft_testkit::ffmpeg_has_encoder(&ff, "libsvtav1") {
-            filmcraft_testkit::skip("AV1 fuzz", &format!("this ffmpeg has no libsvtav1 encoder (seed {name})"));
+    for &(name, encoder, args, pix, height) in SEEDS {
+        if !filmcraft_testkit::ffmpeg_has_encoder(&ff, encoder) {
+            filmcraft_testkit::skip("AV1 fuzz", &format!("this ffmpeg has no {encoder} encoder (seed {name})"));
             continue;
         }
-        let Some(seed) = make(&ff, name, args, pix) else {
-            panic!("ffmpeg has libsvtav1 but could not encode the {name} seed");
+        let Some(seed) = make(&ff, name, encoder, args, pix, height) else {
+            panic!("ffmpeg has {encoder} but could not encode the {name} seed");
         };
         if seed.is_empty() {
             filmcraft_testkit::skip("AV1 fuzz", &format!("the {name} seed has no frames"));
