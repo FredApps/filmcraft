@@ -122,8 +122,14 @@ fn wgpu_choice(candidates: &[Candidate], power: PowerPreference) -> Option<usize
 /// GL driver and its Vulkan ICD); instances created and devices dropped concurrently then deadlock
 /// in that driver (#3418). Elsewhere GL stays, for machines where it is the only working backend.
 pub(crate) fn native_instance() -> wgpu::Instance {
-    let backends = if cfg!(windows) { wgpu::Backends::PRIMARY } else { wgpu::Backends::PRIMARY | wgpu::Backends::GL };
+    let backends = native_backends(wgpu::Backends::from_env(), cfg!(windows));
     wgpu::Instance::new(wgpu::InstanceDescriptor { backends, ..wgpu::InstanceDescriptor::new_without_display_handle() })
+}
+
+/// Honor an explicit backend restriction before creating any driver contexts. In particular,
+/// WGPU_BACKEND=vulkan must not initialize OpenGL while diagnosing a concurrent-device hang.
+fn native_backends(requested: Option<wgpu::Backends>, windows: bool) -> wgpu::Backends {
+    requested.unwrap_or_else(|| if windows { wgpu::Backends::PRIMARY } else { wgpu::Backends::PRIMARY | wgpu::Backends::GL })
 }
 
 /// The index of the adapter to draw with: [`wgpu_choice`], or the entry exposing the most
@@ -166,6 +172,7 @@ pub fn pick(adapters: &[Adapter], surface: Option<&Surface<'_>>, power: PowerPre
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use wgpu::Backend::{Dx12, Gl, Vulkan};
     use wgpu::DeviceType::{Cpu, DiscreteGpu, IntegratedGpu, Other};
     use wgpu::PowerPreference::{HighPerformance, LowPower};
@@ -174,6 +181,17 @@ mod tests {
     const RX_6800M: u32 = 0x73df;
     const RADEON_IGPU: u32 = 0x1638;
     const POWERS: [PowerPreference; 3] = [PowerPreference::None, LowPower, HighPerformance];
+
+    #[test]
+    fn explicit_native_backend_restrictions_do_not_initialize_other_drivers() {
+        for windows in [false, true] {
+            for requested in [wgpu::Backends::VULKAN, wgpu::Backends::DX12, wgpu::Backends::GL, wgpu::Backends::empty()] {
+                assert_eq!(native_backends(Some(requested), windows), requested);
+            }
+        }
+        assert_eq!(native_backends(None, true), wgpu::Backends::PRIMARY);
+        assert_eq!(native_backends(None, false), wgpu::Backends::PRIMARY | wgpu::Backends::GL);
+    }
 
     #[expect(clippy::too_many_arguments, reason = "one line per adapter in the listings below")]
     fn gpu(
