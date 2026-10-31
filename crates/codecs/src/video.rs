@@ -342,10 +342,10 @@ impl VideoDecoder for H264Decoder {
         self.dec.flush().into_iter().map(Self::convert).collect()
     }
     fn reset(&mut self) {
-        if let Ok(d) = Self::make_inner(&self.avcc, self.threads) {
-            self.dec = d;
+        self.dec.reset();
+        if !self.avcc.is_empty() {
+            let _ = self.dec.configure_avcc(&self.avcc);
         }
-        self.dec.set_draft(self.draft);
     }
     fn name(&self) -> &str {
         "FilmCraft H.264"
@@ -364,8 +364,16 @@ impl VideoDecoder for H264Decoder {
         h264_disposable(sample, self.length_size)
     }
     fn is_random_access(&self, sample: &[u8]) -> Option<bool> {
-        // Annex B samples carry their parameter sets: an IDR access unit is a starting point.
-        (self.length_size == 0).then(|| filmcraft_bitstream::annexb_nals(sample).iter().any(|n| n.first().is_some_and(|h| h & 0x1f == 5)))
+        // Annex B samples carry their parameter sets: an IDR access unit is a starting point, and
+        // so is a non-IDR one with a recovery point SEI of recovery_frame_cnt 0 (open GOP), the
+        // same rule as the transport stream splitter's `key`.
+        (self.length_size == 0).then(|| {
+            filmcraft_bitstream::annexb_nals(sample).iter().any(|n| match n.first().map(|h| h & 0x1f) {
+                Some(5) => true,
+                Some(6) => filmcraft_mpegts::sei_has_recovery_point(n),
+                _ => false,
+            })
+        })
     }
 }
 
@@ -387,7 +395,7 @@ pub fn h264_factory(e: &SampleEntry) -> Option<Result<Box<dyn VideoDecoder>>> {
     }
 }
 
-/// Our pure-Rust HEVC decoder (Main / Main 10, frame-threaded).
+/// Our pure-Rust HEVC decoder (Main / Main 10 / Main 4:2:2 10, frame-threaded).
 pub struct HevcDecoder {
     hvcc: Vec<u8>,
     dec: filmcraft_hevc::Decoder,
@@ -417,15 +425,19 @@ impl HevcDecoder {
                 Plane::U8(v) => v.into_iter().map(u16::from).collect(),
             }
         };
+        let chroma = match p.chroma {
+            filmcraft_hevc::ChromaFormat::C420 => filmcraft_frame::Chroma::C420,
+            filmcraft_hevc::ChromaFormat::C422 => filmcraft_frame::Chroma::C422,
+        };
         let data = match (p.y, p.u, p.v) {
             (Plane::U8(y), Plane::U8(u), Plane::U8(v)) => filmcraft_frame::PixelData::Yuv8 {
                 planes: [Arc::new(tight_plane(y, ys, w, h)), Arc::new(tight_plane(u, uvs, cw, ch)), Arc::new(tight_plane(v, uvs, cw, ch))],
-                chroma: filmcraft_frame::Chroma::C420,
+                chroma,
                 alpha: None,
             },
             (y, u, v) => filmcraft_frame::PixelData::Yuv16 {
                 planes: [Arc::new(tight_plane(wide(y), ys, w, h)), Arc::new(tight_plane(wide(u), uvs, cw, ch)), Arc::new(tight_plane(wide(v), uvs, cw, ch))],
-                chroma: filmcraft_frame::Chroma::C420,
+                chroma,
                 bits: p.bit_depth,
                 alpha: None,
             },

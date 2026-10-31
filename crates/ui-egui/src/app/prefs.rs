@@ -135,6 +135,7 @@ impl FilmcraftApp {
             self.workspace_restored = true;
             if let Some(w) = dock::find(&self.workspaces, &self.workspaces.current) {
                 self.set_workspace(&w);
+                self.restore_remembered_layout(&w);
             }
         }
         self.applied_prefs = Some(p);

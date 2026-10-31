@@ -134,6 +134,96 @@ fn audio_source_outputs_sound_and_uses_the_device_clock() {
     h.state_mut().stop_source();
 }
 
+/// #1789: L / L-L in the Source monitor plays sound at 2× and 4×, as the Program monitor does,
+/// with and without Maintain Pitch While Shuttling; reverse stays silent.
+#[test]
+fn source_shuttle_forward_plays_sound() {
+    for (speed, maintain) in [(2.0, true), (4.0, false)] {
+        let fill = Arc::new(Mutex::new(None));
+        let mut app = app(11);
+        app.session.prefs.audio.maintain_pitch_shuttling = maintain;
+        app.audio = Some(Box::new(Out { frames: Arc::new(AtomicU64::new(0)), fill: fill.clone(), stalled: false }));
+        let mut h = Harness::builder().with_step_dt(0.25).with_size(egui::vec2(1280.0, 800.0)).build_eframe(move |_cc| app);
+        h.step();
+        h.state_mut().shuttle_source(speed).unwrap();
+        for _ in 0..4 {
+            h.step();
+        }
+        assert!(h.state().source_playback.clock.audio_clock, "{speed}× plays through the audio device");
+        let mut heard = false;
+        for _ in 0..200 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            let mut buffer = vec![0.0; 960];
+            if let Some(f) = fill.lock().unwrap().as_mut() {
+                f(&mut buffer, 2);
+            }
+            heard |= buffer.iter().any(|x| x.abs() > 0.001);
+            if heard {
+                break;
+            }
+        }
+        assert!(heard, "{speed}× (maintain pitch {maintain}) must produce non-silent source samples");
+        h.state_mut().stop_source();
+    }
+}
+
+/// The left channel the Source monitor sends the device at `speed`, after the play-ahead has started.
+fn shuttle_output(speed: f64, maintain: bool) -> Vec<f32> {
+    let fill = Arc::new(Mutex::new(None));
+    // a pure 440 Hz tone in the Source monitor
+    let mut session = Session::default();
+    let item = filmcraft_engine::demo::add_generator(
+        std::sync::Arc::make_mut(&mut session.project),
+        &session.media,
+        filmcraft_media::generators::GeneratorSource::new(
+            filmcraft_media::Generator::Tone { hz: 440.0, db: -6.0 },
+            0,
+            0,
+            filmcraft_time::FrameRate::FPS_24,
+            Tick::from_seconds_f64(30.0),
+        ),
+        "Tone",
+        filmcraft_project::Label::Iris,
+        None,
+    );
+    session.execute("source.open", json!({"item": item.0})).unwrap();
+    let mut app = FilmcraftApp::new(session);
+    app.session.prefs.audio.maintain_pitch_shuttling = maintain;
+    app.audio = Some(Box::new(Out { frames: Arc::new(AtomicU64::new(0)), fill: fill.clone(), stalled: false }));
+    let mut h = Harness::builder().with_step_dt(0.25).with_size(egui::vec2(1280.0, 800.0)).build_eframe(move |_cc| app);
+    h.step();
+    h.state_mut().shuttle_source(speed).unwrap();
+    h.step();
+    let mut out = Vec::new();
+    for _ in 0..400 {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let mut buffer = vec![0.0; 960];
+        if let Some(f) = fill.lock().unwrap().as_mut() {
+            f(&mut buffer, 2);
+        }
+        if out.is_empty() && buffer.iter().all(|x| x.abs() <= 0.001) {
+            continue;
+        }
+        out.extend(buffer.chunks(2).map(|c| c[0]));
+        if out.len() >= 24_000 {
+            break;
+        }
+    }
+    h.state_mut().stop_source();
+    out
+}
+
+/// Maintain Pitch While Shuttling keeps the pitch at 2×: without it the sound is an octave up,
+/// with twice the zero crossings.
+#[test]
+fn source_shuttle_keeps_the_pitch_when_asked() {
+    let crossings = |x: &[f32]| x.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count() as f64 / x.len().max(1) as f64;
+    let (kept, raised) = (shuttle_output(2.0, true), shuttle_output(2.0, false));
+    assert!(kept.len() >= 24_000 && raised.len() >= 24_000, "{} / {} samples", kept.len(), raised.len());
+    let ratio = crossings(&raised) / crossings(&kept);
+    assert!(ratio > 1.5, "zero-crossing ratio {ratio}");
+}
+
 #[test]
 fn stalled_source_audio_falls_back_to_wall_clock() {
     let mut app = app(11);
@@ -190,7 +280,12 @@ fn a_single_frame_source_range_starts_at_the_marked_last_frame() {
     h.state_mut().session.execute("project.setMarks", json!({"item":5,"in":last.0,"out":last.0})).unwrap();
     h.state_mut().play_source_range(false, false).unwrap();
     assert_eq!(h.state().session.state.source_playhead, last);
-    for _ in 0..4 {
+    // the one frame ends on the UI clock, which follows the wall clock: wait for it
+    for _ in 0..200 {
+        if !h.state().source_playback.clock.playing {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
         h.step();
     }
     assert!(!h.state().source_playback.clock.playing);
@@ -229,4 +324,51 @@ fn j_and_l_shuttle_the_source_both_ways_and_double_the_speed() {
     assert_eq!(h.state().session.playhead(), program);
     assert!(!h.state().playback.playing);
     assert_eq!(h.state().session.project.to_json(), before);
+}
+
+/// A Source monitor session of the demo project's active sequence, with `Out` as the audio device.
+fn sequence_in_source(prepare: impl FnOnce(&mut Session)) -> (FilmcraftApp, Arc<Mutex<Option<Fill>>>) {
+    let mut session = Session::default();
+    session.execute("file.openDemoProject", json!({})).unwrap();
+    prepare(&mut session);
+    let seq = session.state.active_sequence.expect("a sequence").0;
+    session.execute("source.open", json!({"item": seq})).unwrap();
+    let fill = Arc::new(Mutex::new(None));
+    let mut app = FilmcraftApp::new(session);
+    app.audio = Some(Box::new(Out { frames: Arc::new(AtomicU64::new(0)), fill: fill.clone(), stalled: false }));
+    (app, fill)
+}
+
+#[test]
+fn a_sequence_with_sound_plays_in_the_source_monitor_through_the_device() {
+    let (app, fill) = sequence_in_source(|_| {});
+    let mut h = Harness::builder().with_step_dt(0.25).with_size(egui::vec2(1280.0, 800.0)).build_eframe(move |_cc| app);
+    h.step();
+    h.state_mut().play_source().unwrap();
+    for _ in 0..4 {
+        h.step();
+    }
+    assert!(h.state().source_playback.clock.playing);
+    assert!(h.state().source_playback.clock.audio_clock, "the sequence's sound drives the clock");
+    assert!(fill.lock().unwrap().is_some(), "the sequence's sound reaches the output");
+    h.state_mut().stop_source();
+}
+
+#[test]
+fn a_sequence_without_sound_plays_in_the_source_monitor_without_starting_the_output() {
+    let (app, fill) = sequence_in_source(|s| {
+        s.execute("file.newSequence", json!({"name": "Silent", "width": 1280, "height": 720, "fps": 24})).unwrap();
+        let picture = s.project.items.values().find(|i| i.as_media().is_some_and(|m| m.info.video.is_some())).expect("a picture item").id.0;
+        s.execute("timeline.place", json!({"item": picture, "track": "V1", "time": 0, "insert": false, "audio": false})).unwrap();
+    });
+    let mut h = Harness::builder().with_step_dt(0.25).with_size(egui::vec2(1280.0, 800.0)).build_eframe(move |_cc| app);
+    h.step();
+    h.state_mut().play_source().unwrap();
+    for _ in 0..4 {
+        h.step();
+    }
+    assert!(h.state().source_playback.clock.playing);
+    assert!(!h.state().source_playback.clock.audio_clock);
+    assert!(fill.lock().unwrap().is_none(), "no sound, so no output stream");
+    h.state_mut().stop_source();
 }
