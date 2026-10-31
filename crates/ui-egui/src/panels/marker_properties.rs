@@ -303,7 +303,12 @@ fn parse_marker_timecode(value: &str, rate: filmcraft_time::FrameRate, drop: boo
 }
 
 fn valid_times(draft: &Draft, rate: filmcraft_time::FrameRate, drop: bool) -> bool {
-    parse_marker_timecode(&draft.time, rate, drop).is_ok() && (!draft.range || parse_marker_timecode(&draft.duration, rate, drop).is_ok_and(|f| f > 0))
+    // Imported timings can exceed the editable timecode width or contain subframes.
+    // Metadata-only edits retain those exact original ticks; edited fields stay strict.
+    (draft.time == draft.initial_time || parse_marker_timecode(&draft.time, rate, drop).is_ok())
+        && (!draft.range
+            || (draft.duration == draft.initial_duration && draft.original_duration > filmcraft_time::Tick::ZERO)
+            || parse_marker_timecode(&draft.duration, rate, drop).is_ok_and(|f| f > 0))
 }
 
 fn field_row(ui: &mut egui::Ui, label: &str, contents: impl FnOnce(&mut egui::Ui)) {

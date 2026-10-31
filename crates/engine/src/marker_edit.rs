@@ -67,7 +67,16 @@ pub(crate) fn run(s: &mut Session, p: &Value, delete: bool) -> Result<Value> {
         }
         None => frames(p, "frame", rate, id)?,
     };
-    let duration = frames(p, "durationFrames", rate, id)?;
+    // Match the established command contract: null leaves duration unchanged, and
+    // edited durations are bounded independently of a marker's imported original.
+    let duration = match p.get("durationFrames").filter(|v| !v.is_null()) {
+        None => None,
+        Some(value) => {
+            let frames =
+                value.as_i64().filter(|f| (0..=10_000_000).contains(f)).ok_or_else(|| bad(id, "durationFrames must be a whole number from 0 to 10000000"))?;
+            Some(rate.tick_of(frames))
+        }
+    };
     if ids.len() > 1 && (time.is_some() || duration.is_some()) {
         return Err(bad(id, "time edits require a single marker"));
     }
