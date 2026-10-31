@@ -11,16 +11,19 @@ use serde_json::{Value, json};
 struct Driver {
     harness: Harness<'static, FilmcraftApp>,
     tx: Sender<ControlRequest>,
+    _data: tempfile::TempDir,
 }
 
 impl Driver {
     fn demo() -> Self {
+        let data = tempfile::tempdir().expect("caption preset directory");
         let mut session = Session::default();
+        session.caption_style_presets.set_dir(data.path());
         session.execute("file.openDemoProject", json!({})).expect("demo project");
         let (tx, rx) = channel();
         let app = FilmcraftApp::new(session).with_control(rx);
         let harness = Harness::builder().with_size(egui::vec2(1600.0, 980.0)).with_max_steps(10_000).build_eframe(move |_cc| app);
-        let mut d = Driver { harness, tx };
+        let mut d = Driver { harness, tx, _data: data };
         d.frames(4);
         d
     }
@@ -90,6 +93,7 @@ fn caption_style_menu_copies_and_saves_reusable_styles() {
     d.frames(2);
     d.ok("ui.click", json!({"id": "text.captions.style.preset.save"}));
     d.frames(3);
+    assert!(d.harness.state().session.caption_style_presets.find("Broadcast Blue").is_some(), "the Save button persists the named style");
     d.ok("engine.execute", json!({"command": "captions.setStyle", "params": {"track": track, "size": 22.0}}));
     d.ok("ui.click", json!({"id": "text.captions.style.menu"}));
     d.frames(2);
