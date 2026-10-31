@@ -352,6 +352,9 @@ impl ConvolutionReverb {
         let [l, r] = &self.ir;
         let split = len.min(HEAD_LEN);
         self.head.set_impulse([&l[..split], &r[..split]]);
+        // the head's block in progress was computed with the old impulse: its unplayed samples
+        // are recomputed from the input spectra, as the queued tails are
+        self.head.convolve(0);
         for t in &mut self.tails {
             let (from, to) = (t.offset.min(len), (t.offset + t.capacity).min(len));
             t.stage.set_impulse([&l[from..to], &r[from..to]]);
@@ -712,6 +715,36 @@ mod tests {
             let rms = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
             let (a, b) = (rms(&got[change_at + 1_000..change_at + 9_000]), rms(&want[change_at + 1_000..change_at + 9_000]));
             assert!((a / b - 1.0).abs() < 0.01, "change at {change_at}: rms {a} vs {b}");
+        }
+    }
+
+    /// The same through the resampled and damped path (room size, low and high damping), on both
+    /// channels, from the very sample of the change: no sample of the old impulse is left in the
+    /// head's block in progress.
+    #[test]
+    fn changing_damping_and_size_takes_effect_on_the_next_sample_on_both_channels() {
+        let mut rng = Prng::new(11);
+        let noise: Vec<f32> = (0..40_000).map(|_| rng.uniform() * 0.5).collect();
+        let settings = [("room_size", 45.0), ("damping_lf", 300.0), ("damping_hf", 3_000.0)];
+        let mut fixed = reverb(3);
+        for (p, v) in settings {
+            assert!(fixed.set_param(p, v));
+        }
+        fixed.reset();
+        let want = process(&mut fixed, &noise);
+        // 256-sample blocks start at multiples of 256 of the effect's own clock: change mid-block
+        for change_at in [10_000usize, 10_100, 10_255] {
+            let mut e = reverb(3);
+            let mut got = process(&mut e, &noise[..change_at]);
+            for (p, v) in settings {
+                assert!(e.set_param(p, v));
+            }
+            let tail = process(&mut e, &noise[change_at..]);
+            for c in 0..2 {
+                got[c].extend(&tail[c]);
+                let worst = (change_at..noise.len()).map(|i| (got[c][i] - want[c][i]).abs()).fold(0.0f32, f32::max);
+                assert!(worst < 1e-4, "change at {change_at}, channel {c}: differs from the always-new run by {worst}");
+            }
         }
     }
 
