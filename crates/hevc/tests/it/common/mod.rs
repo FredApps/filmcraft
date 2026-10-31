@@ -209,10 +209,10 @@ pub fn ensure(f: &Fixture) -> Option<(PathBuf, PathBuf)> {
         // 10, and the reference decode scales that up to 10 bits, so no sample would match.
         let probe = filmcraft_testkit::ffprobe_or_skip(f.name)?;
         let got = stream_pix_fmt(&probe, &hevc);
-        if got.as_deref() != Some(pix_fmt(f.bit_depth)) {
+        if got.as_deref() != Some(pix_fmt(f.bit_depth, f.chroma)) {
             let _ = std::fs::remove_file(&hevc);
             let _ = std::fs::remove_file(&yuv);
-            let reason = format!("the encoder made {} instead of {}", got.as_deref().unwrap_or("no stream"), pix_fmt(f.bit_depth));
+            let reason = format!("the encoder made {} instead of {}", got.as_deref().unwrap_or("no stream"), pix_fmt(f.bit_depth, f.chroma));
             filmcraft_testkit::skip(f.name, &format!("{reason} (libx265 built for 8 bits only?)"));
             return None;
         }
