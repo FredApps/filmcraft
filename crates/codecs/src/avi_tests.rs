@@ -290,6 +290,25 @@ fn h264_copied_with_its_avcc_record() {
     check_h26x_frames("H.264 avcC", &path, &src);
 }
 
+/// An `avcC` record whose sets don't parse (here it lists no SPS) on a copied stream that carries
+/// good ones in band: the chunks keep the record's length prefixes, and play from the in-band sets.
+#[test]
+fn h264_with_a_damaged_avcc_record_uses_its_in_band_sets() {
+    let raw = ["-f", "lavfi", "-i", "testsrc2=s=160x120:r=25:d=2", "-c:v", "libx264", "-bf", "2", "-g", "12", "-pix_fmt", "yuv420p"];
+    let Some(annexb) = fixture_path("avi_in_band_source.h264", &raw) else { return };
+    let annexb = annexb.to_string_lossy().into_owned();
+    let Some(mp4) = fixture_path("avi_in_band_source.mp4", &["-r", "25", "-i", &annexb, "-c:v", "copy"]) else { return };
+    let mp4 = mp4.to_string_lossy().into_owned();
+    let Some(path) = fixture_path("avi_in_band_avcc_copy.avi", &["-i", &mp4, "-c:v", "copy", "-f", "avi"]) else { return };
+    let mut bytes = std::fs::read(&path).unwrap();
+    // the record follows the 40-byte bitmap header; byte 5 holds its SPS count
+    let avcc = bytes.windows(4).position(|w| w == b"strf").unwrap() + 8 + 40;
+    assert_eq!((bytes[avcc], bytes[avcc + 5]), (1, 0xe1));
+    bytes[avcc + 5] = 0xe0;
+    let src = crate::open_bytes("damaged_avcc.avi", bytes.into()).unwrap();
+    check_h26x_frames("H.264 damaged avcC", &path, &src);
+}
+
 /// HEVC with its parameter sets in the stream header. (ffmpeg has no AVI tag for HEVC and writes
 /// none: the copy is tagged `HEVC` as other writers do.)
 #[test]
