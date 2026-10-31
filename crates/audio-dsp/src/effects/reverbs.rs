@@ -16,6 +16,8 @@ const HEAD_LEN: usize = HEAD_PARTS * PART;
 /// (the last takes the rest). A stage's output for a block is ready one block after the block's
 /// input, which is in time because its stretch starts at least a partition in.
 const TAILS: [(usize, usize); 2] = [(2048, 3), (8192, usize::MAX)];
+/// Blocks of input spectra a stage keeps beyond its partitions (see [`Stage::convolve`]).
+const HISTORY: usize = 3;
 /// Ring of tail output waiting for its sample time (a power of two above the largest start offset
 /// plus latency plus partition: 8192 + 256 + 8192).
 const TAIL_RING: usize = 32768;
@@ -90,10 +92,12 @@ struct Stage {
     /// Partition spectra (`part + 1` bins, re/im interleaved per partition): `h[ch][p * 2(part+1) ..]`.
     h: [Vec<f32>; 2],
     parts: usize,
-    /// Frequency-domain delay line of input spectra (same layout), ring of `max_parts`.
+    /// Frequency-domain delay line of input spectra (same layout), ring of `cap`: `max_parts`
+    /// plus [`HISTORY`] blocks, so the output of the last few blocks can be recomputed.
     fdl: Vec<f32>,
     head: usize,
     max_parts: usize,
+    cap: usize,
     /// Time-domain input history (2 × part).
     hist: Vec<f32>,
     re: Vec<f32>,
@@ -113,9 +117,10 @@ impl Stage {
             fft: Fft::new(2 * part),
             h: [vec![0.0; max_parts * bins2], vec![0.0; max_parts * bins2]],
             parts: 0,
-            fdl: vec![0.0; max_parts * bins2],
+            fdl: vec![0.0; (max_parts + HISTORY) * bins2],
             head: 0,
             max_parts,
+            cap: max_parts + HISTORY,
             hist: vec![0.0; 2 * part],
             re: vec![0.0; 2 * part],
             im: vec![0.0; 2 * part],
@@ -164,7 +169,7 @@ impl Stage {
         self.re.copy_from_slice(&self.hist);
         self.im.iter_mut().for_each(|v| *v = 0.0);
         self.fft.forward(&mut self.re, &mut self.im);
-        self.head = (self.head + self.max_parts - 1) % self.max_parts;
+        self.head = (self.head + self.cap - 1) % self.cap;
         {
             let slot = &mut self.fdl[self.head * bins2..(self.head + 1) * bins2];
             for k in 0..=part {
@@ -172,6 +177,14 @@ impl Stage {
                 slot[2 * k + 1] = self.im[k];
             }
         }
+        self.convolve(0);
+    }
+
+    /// Fill `out` with the output of the block `back` blocks before the latest one, from the
+    /// input spectra kept in the delay line and the current impulse.
+    fn convolve(&mut self, back: usize) {
+        let part = self.part;
+        let bins2 = 2 * (part + 1);
         if self.parts == 0 {
             self.out.iter_mut().for_each(|o| o.iter_mut().for_each(|v| *v = 0.0));
             return;
@@ -180,7 +193,7 @@ impl Stage {
         self.yl.iter_mut().for_each(|v| *v = 0.0);
         self.yr.iter_mut().for_each(|v| *v = 0.0);
         for p in 0..self.parts {
-            let xi = ((self.head + p) % self.max_parts) * bins2;
+            let xi = ((self.head + back + p) % self.cap) * bins2;
             let x = &self.fdl[xi..xi + bins2];
             let hl = &self.h[0][p * bins2..(p + 1) * bins2];
             let hr = &self.h[1][p * bins2..(p + 1) * bins2];
@@ -339,12 +352,11 @@ impl ConvolutionReverb {
         let [l, r] = &self.ir;
         let split = len.min(HEAD_LEN);
         self.head.set_impulse([&l[..split], &r[..split]]);
-        // output the tails queued with the old impulse would play over the new one
-        self.tail_ring.iter_mut().for_each(|c| c.iter_mut().for_each(|v| *v = 0.0));
         for t in &mut self.tails {
             let (from, to) = (t.offset.min(len), (t.offset + t.capacity).min(len));
             t.stage.set_impulse([&l[from..to], &r[from..to]]);
         }
+        self.requeue_tails();
     }
 
     fn apply_params(&mut self, snap: bool) {
@@ -358,6 +370,32 @@ impl ConvolutionReverb {
             self.gain.snap();
             self.width.snap();
             self.predelay.snap();
+        }
+    }
+
+    /// Replace the tail output queued with the old impulse by the same blocks recomputed with the
+    /// new one, from the input spectra the stages kept: a change of size or damping while sound
+    /// plays leaves no hole and no old response in the tail.
+    fn requeue_tails(&mut self) {
+        self.tail_ring.iter_mut().for_each(|c| c.iter_mut().for_each(|v| *v = 0.0));
+        for t in &mut self.tails {
+            let part = t.stage.part as u64;
+            for back in 0..HISTORY {
+                let Some(block) = t.blocks.checked_sub(1 + back as u64) else { break };
+                let start = block * part + (t.offset + PART) as u64;
+                if start + part <= self.clock {
+                    break;
+                }
+                t.stage.convolve(back);
+                for c in 0..2 {
+                    for (k, v) in t.stage.out[c].iter().enumerate() {
+                        let at = start + k as u64;
+                        if at >= self.clock {
+                            self.tail_ring[c][(at % TAIL_RING as u64) as usize] += *v;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -649,13 +687,40 @@ mod tests {
         }
     }
 
-    /// A new impulse (or size, or damping) takes over completely: the tail output queued with the
-    /// old impulse must not be heard after the change.
+    /// A new impulse (or size, or damping) takes over completely and without a break: once the
+    /// head has flushed, the output equals that of the new settings from the start, tail included.
+    /// The tail output queued with the old impulse is replaced, not dropped (#3134).
     #[test]
-    fn changing_the_impulse_drops_the_queued_tail_of_the_old_one() {
-        let mut e = reverb(3);
+    fn changing_size_during_sound_continues_as_if_it_had_always_been_so() {
+        let mut rng = Prng::new(9);
+        let noise: Vec<f32> = (0..70_000).map(|_| rng.uniform() * 0.5).collect();
+        let mut fixed = reverb(3);
+        assert!(fixed.set_param("room_size", 60.0));
+        fixed.reset();
+        let [want, _] = process(&mut fixed, &noise);
+        for change_at in [20_000usize, 20_100, 33_333] {
+            let mut e = reverb(3);
+            process(&mut e, &noise[..0]);
+            let [mut got, _] = process(&mut e, &noise[..change_at]);
+            assert!(e.set_param("room_size", 60.0));
+            got.extend(&process(&mut e, &noise[change_at..])[0]);
+            // after the head's block and the old head's tail ring out, nothing of the old setting is left
+            let from = change_at + 2 * PART + 1;
+            let worst = (from..noise.len()).map(|i| (got[i] - want[i]).abs()).fold(0.0f32, f32::max);
+            assert!(worst < 1e-4, "change at {change_at}: output differs from the always-60% run by {worst}");
+            // and no dropout in the tail region
+            let rms = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
+            let (a, b) = (rms(&got[change_at + 1_000..change_at + 9_000]), rms(&want[change_at + 1_000..change_at + 9_000]));
+            assert!((a / b - 1.0).abs() < 0.01, "change at {change_at}: rms {a} vs {b}");
+        }
+    }
+
+    /// Changing the impulse itself drops nothing and keeps nothing of the old tail.
+    #[test]
+    fn changing_the_impulse_replaces_the_old_tail() {
         let mut rng = Prng::new(9);
         let noise: Vec<f32> = (0..30_000).map(|_| rng.uniform() * 0.5).collect();
+        let mut e = reverb(3);
         process(&mut e, &noise);
         // Vocal Booth at 10% room size: about 1000 samples long, all in the head stage
         assert!(e.set_param("impulse", 6.0) && e.set_param("room_size", 10.0));
