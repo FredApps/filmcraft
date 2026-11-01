@@ -48,14 +48,7 @@ pub struct Extras {
 
 impl Default for Extras {
     fn default() -> Self {
-        Extras {
-            dialog: None,
-            transcription_epoch: None,
-            transcription_sequence: None,
-            model_delete: None,
-            dynamic_waveforms: true,
-            opened: Vec::new(),
-        }
+        Extras { dialog: None, transcription_epoch: None, transcription_sequence: None, model_delete: None, dynamic_waveforms: true, opened: Vec::new() }
     }
 }
 
@@ -1231,10 +1224,8 @@ mod tests {
         for replace_project in [false, true] {
             let mut session = filmcraft_engine::Session::default();
             session.execute("file.openDemoProject", json!({})).unwrap();
-            session.transcriber = Some(std::sync::Arc::new(filmcraft_engine::speech::FixedTranscriber {
-                transcript: Default::default(),
-                id: "dialog-test".into(),
-            }));
+            session.transcriber =
+                Some(std::sync::Arc::new(filmcraft_engine::speech::FixedTranscriber { transcript: Default::default(), id: "dialog-test".into() }));
             let mut app = FilmcraftApp::new(session);
             let ctx = egui::Context::default();
             route(&mut app, &ctx, "sequence.transcribe", &json!({})).unwrap().unwrap();
