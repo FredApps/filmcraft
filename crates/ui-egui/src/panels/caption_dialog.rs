@@ -34,7 +34,11 @@ pub fn route(app: &mut FilmcraftApp, id: &str, params: &Value) -> Option<Result<
         app.ui.status = e.clone();
         return Some(Err(e));
     }
-    app.ui.caption_dialog = Some(CaptionDialogDraft { settings: app.session.prefs.captions.last.clone(), ..Default::default() });
+    app.ui.caption_dialog = Some(CaptionDialogDraft {
+        context: app.session.state.active_sequence.map(|sequence| (app.session.document_epoch, sequence)),
+        settings: app.session.prefs.captions.last.clone(),
+        ..Default::default()
+    });
     Some(Ok(json!({"dialog": "captions"})))
 }
 
@@ -134,6 +138,10 @@ fn save_prefs(app: &mut FilmcraftApp, f: impl FnOnce(&mut filmcraft_engine::tran
 /// Draw the open dialog, if any.
 pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let Some(mut d) = app.ui.caption_dialog.clone() else { return };
+    if d.context.is_none() || d.context != app.session.state.active_sequence.map(|sequence| (app.session.document_epoch, sequence)) {
+        app.ui.caption_dialog = None;
+        return;
+    }
     crate::widgets::revert_drag_on_escape(ctx, egui::Id::unique("caption-dialog-before-drag"), &mut d);
     let t = app.tokens;
     // Enter creates the captions, unless it is committing a number field or the preset name
@@ -399,6 +407,37 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn caption_dialog_closes_when_its_project_or_sequence_changes() {
+        for replace_project in [false, true] {
+            let mut session = filmcraft_engine::Session::default();
+            session.execute("file.openDemoProject", json!({})).unwrap();
+            let clip = session.active_sequence().unwrap().audio_tracks[0].items[0].clone();
+            session
+                .execute(
+                    "transcript.set",
+                    json!({"item":clip.item.0,"transcript":{"words":[{"text":"Hello","start":clip.source_in.0,"end":clip.source_in.0+100}]}}),
+                )
+                .unwrap();
+            let mut app = FilmcraftApp::new(session);
+            route(&mut app, COMMAND, &json!({})).unwrap().unwrap();
+            assert!(app.ui.caption_dialog.is_some());
+            if replace_project {
+                app.session.execute("file.openDemoProject", json!({})).unwrap();
+            } else {
+                app.session.state.active_sequence = None;
+            }
+            let before = app.session.project.clone();
+            let undo = app.session.history.undo.len();
+            let ctx = egui::Context::default();
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| show(&mut app, ui.ctx()));
+            output.textures_delta.clear();
+            assert!(app.ui.caption_dialog.is_none());
+            assert_eq!(app.session.project, before);
+            assert_eq!(app.session.history.undo.len(), undo);
+        }
+    }
 
     #[test]
     fn builtin_presets_match_whatever_the_style() {
