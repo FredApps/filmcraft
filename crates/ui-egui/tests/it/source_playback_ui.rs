@@ -184,6 +184,7 @@ fn source_range_playback_stops_at_out_and_loop_restarts_without_program_playback
 #[test]
 fn a_single_frame_source_range_starts_at_the_marked_last_frame() {
     let mut h = Harness::builder().with_step_dt(0.1).with_size(egui::vec2(1280.0, 800.0)).build_eframe(move |_cc| app(5));
+    // Keep the stepped clock ahead of slow first-frame host/font initialization.
     const START: f64 = 10_000.0;
     h.input_mut().time = Some(START);
     h.step();

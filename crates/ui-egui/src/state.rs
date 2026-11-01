@@ -454,6 +454,14 @@ pub struct TranscriptWordDraft {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UiState {
     #[serde(default)]
+    pub markers_panel: crate::panels::markers_panel::State,
+    #[serde(skip)]
+    pub palette_manager: Option<crate::panels::palette_manager::Draft>,
+    #[serde(skip)]
+    pub marker_properties: Option<crate::panels::marker_properties::Draft>,
+    #[serde(skip)]
+    pub custom_label_color: Option<crate::panels::custom_colors::Draft>,
+    #[serde(default)]
     pub language: crate::i18n::Language,
     pub tool: Tool,
     pub mode: Mode,
@@ -623,9 +631,6 @@ pub struct UiState {
     /// Open guide dialog (Add Guide / Save Guides as Template / Manage Guides).
     #[serde(default)]
     pub guide_dialog: Option<GuideDialog>,
-    /// Open Edit Marker dialog (double-click a marker, or Edit Marker… in its menu).
-    #[serde(default)]
-    pub marker_dialog: Option<MarkerDraft>,
     /// Open speech model download dialog (Transcribe without the model, G19).
     #[serde(default)]
     pub speech_download: Option<SpeechDownload>,
@@ -870,25 +875,6 @@ pub enum ColorDialog {
     Sequence { working_space: String, wide_gamut: bool, auto_tone_map: bool },
 }
 
-/// The Edit Marker dialog (#2416): the marker it edits and its fields as typed. `duration` is a
-/// timecode, `color` a label name, `kind` a `markers.edit` kind. `sequence` and `generation` (the
-/// session's `document_epoch`) tie it to where it was opened: in another project, or the same
-/// file opened again, the same marker id is another marker. `duration0` is the duration as the dialog opened, so OK leaves a duration it
-/// cannot show exactly (part of a frame) alone unless it was edited.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct MarkerDraft {
-    pub sequence: u64,
-    pub generation: u64,
-    pub duration0: String,
-    pub marker: u64,
-    pub name: String,
-    pub comment: String,
-    pub duration: String,
-    pub color: String,
-    pub kind: String,
-}
-
 /// The speech model download dialog (G19): the model, the running download job, and the
 /// transcription to run once it is there.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -1073,6 +1059,10 @@ fn yes() -> bool {
 impl Default for UiState {
     fn default() -> Self {
         Self {
+            marker_properties: None,
+            markers_panel: Default::default(),
+            palette_manager: None,
+            custom_label_color: None,
             language: crate::i18n::Language::default(),
             tool: Tool::Selection,
             mode: Mode::Edit,
@@ -1137,7 +1127,6 @@ impl Default for UiState {
             multicam_record: true,
             edit_cameras: None,
             guide_dialog: None,
-            marker_dialog: None,
             speech_download: None,
             text_props_dialog: None,
             workspace_dialog: None,

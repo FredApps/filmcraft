@@ -428,3 +428,9 @@ pub(crate) fn panel_items(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKin
 
 pub(crate) mod media_search;
 pub(crate) mod transcript_cache;
+
+pub mod custom_colors;
+pub mod marker_properties;
+
+pub mod markers_panel;
+pub mod palette_manager;
