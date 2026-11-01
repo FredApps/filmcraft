@@ -690,6 +690,9 @@ pub struct ClipDialogDraft {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CaptionDialogDraft {
+    /// Transient owner: restored or retargeted drafts must not edit another sequence.
+    #[serde(skip)]
+    pub context: Option<(u64, filmcraft_project::ItemId)>,
     pub settings: filmcraft_engine::transcript::CaptionSettings,
     /// The Captioning Preferences section is collapsed.
     pub collapsed: bool,
