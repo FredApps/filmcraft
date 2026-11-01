@@ -37,6 +37,8 @@ pub struct Extras {
     #[serde(skip)]
     transcription_epoch: Option<u64>,
     #[serde(skip)]
+    transcription_sequence: Option<filmcraft_project::ItemId>,
+    #[serde(skip)]
     model_delete: Option<ModelDeleteDraft>,
     /// View ▸ Dynamic Audio Waveforms: logarithmic (dB) waveform display; off = linear amplitude.
     pub dynamic_waveforms: bool,
@@ -46,7 +48,14 @@ pub struct Extras {
 
 impl Default for Extras {
     fn default() -> Self {
-        Extras { dialog: None, transcription_epoch: None, model_delete: None, dynamic_waveforms: true, opened: Vec::new() }
+        Extras {
+            dialog: None,
+            transcription_epoch: None,
+            transcription_sequence: None,
+            model_delete: None,
+            dynamic_waveforms: true,
+            opened: Vec::new(),
+        }
     }
 }
 
@@ -279,6 +288,10 @@ pub fn route(app: &mut FilmcraftApp, ctx: &egui::Context, id: &str, params: &Val
         Ok(x) => x,
         Err(e) => return Some(Err(e)),
     };
+    if cmd == "sequence.transcribe" {
+        app.ui.extras.transcription_epoch = Some(app.session.document_epoch);
+        app.ui.extras.transcription_sequence = app.session.state.active_sequence;
+    }
     app.ui.extras.dialog = Some(ClipDialogDraft { command: cmd.into(), params, info, error: String::new() });
     Some(Ok(json!({"dialog": meta(cmd).map(|m| m.1)})))
 }
@@ -537,7 +550,10 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if app.ui.speech_download.is_some() && matches!(d.command.as_str(), "transcript.generate" | "sequence.transcribe") {
         return;
     }
-    if d.command == "transcript.generate" && app.ui.extras.transcription_epoch != Some(app.session.document_epoch) {
+    if matches!(d.command.as_str(), "transcript.generate" | "sequence.transcribe")
+        && (app.ui.extras.transcription_epoch != Some(app.session.document_epoch)
+            || (d.command == "sequence.transcribe" && app.ui.extras.transcription_sequence != app.session.state.active_sequence))
+    {
         app.ui.extras.dialog = None;
         return;
     }
@@ -1209,6 +1225,35 @@ pub fn search_bin_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sequence_transcription_dialog_does_not_follow_project_or_sequence_changes() {
+        for replace_project in [false, true] {
+            let mut session = filmcraft_engine::Session::default();
+            session.execute("file.openDemoProject", json!({})).unwrap();
+            session.transcriber = Some(std::sync::Arc::new(filmcraft_engine::speech::FixedTranscriber {
+                transcript: Default::default(),
+                id: "dialog-test".into(),
+            }));
+            let mut app = FilmcraftApp::new(session);
+            let ctx = egui::Context::default();
+            route(&mut app, &ctx, "sequence.transcribe", &json!({})).unwrap().unwrap();
+            assert!(app.ui.extras.dialog.is_some());
+            if replace_project {
+                app.session.execute("file.openDemoProject", json!({})).unwrap();
+            } else {
+                app.session.state.active_sequence = None;
+            }
+            let before = app.session.project.clone();
+            let jobs = app.session.jobs.len();
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| show(&mut app, ui.ctx()));
+            output.textures_delta.clear();
+            assert!(app.ui.extras.dialog.is_none(), "stale sequence targets must close the dialog");
+            assert_eq!(app.session.project, before);
+            assert_eq!(app.session.jobs.len(), jobs);
+            assert!(app.ui.speech_download.is_none());
+        }
+    }
 
     #[test]
     fn every_command_with_a_menu_dialog_can_be_bound() {
