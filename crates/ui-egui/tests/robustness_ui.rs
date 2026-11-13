@@ -115,6 +115,9 @@ fn frame_worker_survives_a_panicking_job_and_keeps_rendering() {
     assert_eq!(st["failedJobs"].as_u64(), Some(faults), "{st}");
     let at_last_fault = at_last_fault.unwrap_or(u64::MAX);
     assert!(jobs(&st) > at_last_fault.saturating_add(workers), "workers still finish jobs after the panics (from {at_last_fault}): {st}");
+    // The final perf.stats request steps the UI and may enqueue fresh frame work.
+    // Drain it without issuing another stats request before checking the queue.
+    d.settle();
     assert_eq!(d.harness.state().frames.queue_len(), 0, "no job stuck in the queue");
 }
 
