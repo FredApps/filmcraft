@@ -14,7 +14,7 @@ pub(crate) fn project() -> (Arc<Project>, ItemId, SourceMap) {
         p.add_item(
             &info.name.clone(),
             Label::Iris,
-            ItemKind::Media(MediaClip {
+            ItemKind::Media(Box::new(MediaClip {
                 media: MediaRef::Generator(g.generator.clone()),
                 info,
                 interpret: Default::default(),
@@ -24,7 +24,7 @@ pub(crate) fn project() -> (Arc<Project>, ItemId, SourceMap) {
                 offline: false,
                 proxy: None,
                 identity: None,
-            }),
+            })),
             None,
         )
     };
@@ -230,7 +230,7 @@ fn caption_burn_in_h264_ffmpeg_oracle() {
     let matte = p.add_item(
         "matte",
         Label::Iris,
-        ItemKind::Media(MediaClip {
+        ItemKind::Media(Box::new(MediaClip {
             media: MediaRef::Generator(g.generator.clone()),
             info,
             interpret: Default::default(),
@@ -240,7 +240,7 @@ fn caption_burn_in_h264_ffmpeg_oracle() {
             offline: false,
             proxy: None,
             identity: None,
-        }),
+        })),
         None,
     );
     let r = FrameRate::FPS_24;
@@ -325,9 +325,25 @@ fn hdr_exports_signal_pq_and_hlg() {
         }
         // 709 red matte → BT.2020 HDR → decoded back into Rec. 709 (tone mapped) stays red
         let f = src.video_frame(FrameRequest::full(Tick::ZERO)).unwrap();
+        // The SDR policy can change while HDR export must retain the original working
+        // light. BT.2087 maps linear BT.709 red to this BT.2020 triple; allow the HDR
+        // transfer's 8-bit quantization for H.264 (ProRes is 10-bit).
+        let working = filmcraft_render::colorman::decode(&Project::new("x"), ItemId(0), &f, 1, &ColorPipeline { working: ws, ..ColorPipeline::REC709 });
+        let hdr_rgb = filmcraft_render::Image::unpremul(working.get(160, 90));
+        for (got, expected) in hdr_rgb[..3].iter().zip([0.6274, 0.0691, 0.0164]) {
+            assert!((got - expected).abs() < 0.04, "{path}: HDR working light changed: {hdr_rgb:?}");
+        }
         let back = filmcraft_render::colorman::decode(&Project::new("x"), ItemId(0), &f, 1, &ColorPipeline::REC709);
         let c = filmcraft_render::Image::unpremul(back.get(160, 90));
-        assert!(c[0] > 0.6 && c[1] < 0.05 && c[2] < 0.05, "{path}: {c:?}");
+        if transfer == Transfer::Hlg {
+            // HLG now uses the same pre-matrix Method A on input and output.
+            // PQ retains the legacy pre/post-matrix BT.2390 behaviour.
+            let preview = filmcraft_render::render_sequence(&p, seq, Tick::ZERO, Default::default(), &m);
+            let expected = filmcraft_render::Image::unpremul(preview.get(160, 90));
+            assert!(c[..3].iter().zip(&expected[..3]).all(|(a, b)| (a - b).abs() < 0.05), "{path}: SDR round trip {c:?}, monitor {expected:?}");
+        }
+        let minimum_red = if transfer == Transfer::Hlg { 0.3 } else { 0.6 };
+        assert!(c[0] > minimum_red && c[1] < 0.05 && c[2] < 0.05, "{path}: {c:?}");
         // ffprobe agrees
         let Some(ffprobe) = filmcraft_testkit::ffprobe_or_skip("hdr export signalling") else { continue };
         let out = std::process::Command::new(&ffprobe)
@@ -400,7 +416,7 @@ fn gpu_hook_scenarios() {
         let red = p.add_item(
             &info.name.clone(),
             Label::Iris,
-            ItemKind::Media(MediaClip {
+            ItemKind::Media(Box::new(MediaClip {
                 media: MediaRef::Generator(g.generator.clone()),
                 info,
                 interpret: Default::default(),
@@ -410,7 +426,7 @@ fn gpu_hook_scenarios() {
                 offline: false,
                 proxy: None,
                 identity: None,
-            }),
+            })),
             None,
         );
         let seq = p.new_sequence("s", SequenceSettings { width: w, height: h, frame_rate: FrameRate::FPS_24, ..Default::default() }, 1, 1, None);
@@ -516,4 +532,46 @@ impl FrameRenderer for FakeRenderer {
     ) -> Option<filmcraft_render::Image> {
         Some(filmcraft_render::Image::new(320, 180))
     }
+}
+
+/// The render threads may convert H.264 input ahead ([`VideoEncoder::prepare_ahead`]): the packets
+/// are the same whether a picture was converted ahead (in any order), converted by the encoder
+/// itself (none ahead, or one ahead for another picture size), or never asked for.
+#[test]
+fn h264_input_converted_ahead_encodes_to_the_same_packets() {
+    let (w, h) = (96u32, 64u32);
+    let frames: Vec<Vec<u8>> = (0..8u32)
+        .map(|t| {
+            (0..w * h)
+                .flat_map(|i| {
+                    let (x, y) = (i % w, i / w);
+                    [(x * 3 + t * 7) as u8, (y * 5 + t) as u8, ((x + y) * 2 + t * 3) as u8, 255]
+                })
+                .collect()
+        })
+        .collect();
+    let s = ExportSettings { format: Format::H264, ..Default::default() };
+    let frame = |i: usize| EncoderFrame { width: w, height: h, rgba: &frames[i], hdr: None, index: i as u64 };
+    let encode_all = |ahead: bool| -> Vec<Vec<u8>> {
+        let mut enc = h264_factory(Format::H264, w, h, FrameRate::FPS_24, &s).unwrap().unwrap();
+        if ahead {
+            let prepare = enc.prepare_ahead().expect("the H.264 encoder converts ahead");
+            for i in (0..frames.len()).rev().filter(|&i| i != 3) {
+                prepare(&frame(i));
+            }
+            // a picture of another size under index 5: the encoder converts that one itself
+            prepare(&EncoderFrame { width: w / 2, height: h / 2, rgba: &frames[5][..(w * h) as usize], hdr: None, index: 5 });
+            // and one it is never asked to encode
+            prepare(&EncoderFrame { index: 99, ..frame(0) });
+        }
+        let mut out = Vec::new();
+        for i in 0..frames.len() {
+            out.extend(enc.encode(&frame(i)).unwrap().into_iter().map(|p| p.data));
+        }
+        out.extend(enc.flush().unwrap().into_iter().map(|p| p.data));
+        out
+    };
+    let plain = encode_all(false);
+    assert!(!plain.is_empty());
+    assert!(plain == encode_all(true), "converting ahead changed the packets");
 }

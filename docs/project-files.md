@@ -125,9 +125,10 @@ like Premiere's:
 | Update it at least every N second(s) | `autoSave.recoveryIntervalSeconds` | 5 (1–600) |
 
 At each interval, if the project changed since the last auto-save, a copy is written to the
-`Auto-Save` folder next to the project as `<name>-YYYY-MM-DD_HH-MM-SS.fcproj` (local time). An
+`Auto-Save` folder next to the project as `<name>-YYYY-MM-DD_HH-MM-SS-<unix seconds>.fcproj` (local time, then the real time that orders
+the copies, so a clock change at the end of daylight saving time cannot reorder them). An
 unsaved project uses `<data dir>/Auto-Save/`. After each write the oldest copies beyond the limit are
-deleted. Only files named exactly `<name>-<timestamp>.fcproj` are ever deleted. An auto-save is an
+deleted. Only files named exactly `<name>-<timestamp>.fcproj` or `<name>-<timestamp>-<unix seconds>.fcproj` are ever deleted. An auto-save is an
 ordinary project file: open it with File ▸ Open Project. `file.listAutoSaves` lists them, newest
 first.
 
@@ -155,9 +156,21 @@ Premiere's auto-save can lose up to one interval of work. FilmCraft also keeps a
   Recover unsaved changes from 2026-10-01 00:02:09?"*, with the buttons **Recover**, **Not Now** and
   **Discard**. Stale directories without a snapshot are removed. Journals of running sessions are
   never touched.
+- If discarding a recovery session fails, FilmCraft reports the error and keeps that session and
+  the remaining candidates in the recovery list for retry. Sessions already deleted stay removed.
+- If the auto-save worker stops unexpectedly, FilmCraft reports the failure once in the Events
+  panel and an error notification; `file.autoSaveStatus` reports `running: false`. Edits remain in
+  the open project. Use **File ▸ Save** or **Save As** to save them; the worker is not restarted
+  automatically. Ordinary write errors are reported without treating a live worker as stopped.
 - Recovering loads the snapshot as an **unsaved** project with its original path, so Save writes
   over the original file. The recovered state goes into the new session's own journal before the old
-  journal is deleted.
+  journal is deleted. Both the replacement snapshot and its metadata must be successfully written
+  for that recovered revision. If journaling is disabled, writing fails, or the worker cannot
+  confirm the write, recovery reports an error and retains the original candidate. The recovered
+  project remains open and unsaved; use Save or Save As to keep it.
+- If removing the old recovery folder fails after the replacement is confirmed, the recovered project
+  stays open and the candidate stays listed. The old folder may have been partly removed. Save or use
+  Save As before retrying: if the old snapshot remains intact, another recovery can overwrite unsaved edits.
 - A normal quit with nothing unsaved removes the session directory. Quitting with unsaved changes
   (Quit, Cmd+Q or the window's close button) first asks *"Save changes to 'X' before closing?"*
   with **Cancel**, **Don't Save** and **Save** (Save on a never-saved project opens the Save dialog);
@@ -237,7 +250,7 @@ opens the dialog on a page.
 | Memory | frame cache budget of the monitors and thumbnails |
 | Playback | preroll / postroll (Play Around, trim loop), Step forward/back many |
 | Plugins | stub (no plugins) |
-| Timeline | video / audio transition and still image default durations (frames or seconds), playback auto-scrolling (none / page / smooth), snap playhead, return to beginning at playback end, play after rendering previews |
+| Timeline | video / audio transition and still image default durations (frames or seconds), playback auto-scrolling (none / page / smooth), snap playhead, return to beginning at playback end, play after rendering previews, Show Clip Mismatch Warning dialog (the first clip put into an empty sequence it doesn't match asks whether the sequence takes the clip's settings) |
 | Trim | Large Trim Offset, Selection tool picks roll (on the cut) / ripple (on the edge) without a modifier, playhead determines trim loop |
 
 The remaining fields are kept for parity and shown, but have no effect yet (`wired: false`).
